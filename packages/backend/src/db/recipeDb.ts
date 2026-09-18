@@ -5,17 +5,22 @@
  *
  * PK: moduleId  SK: version (number)
  * GSI: isActive-index for active recipe lookup
+ *
+ * When USE_LOCAL_DB=true, delegates to the JSON-file store in
+ * localStore.ts so local dev works without AWS.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
-  DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand,
+  DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { Recipe } from '@cap/shared';
+import { USE_LOCAL_DB }   from '../config/env';
+import { localRecipeDb }  from './localStore';
 
 const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
 const TABLE = process.env.DYNAMODB_TABLE_RECIPES!;
 
-export const recipeDb = {
+const ddbRecipeDb = {
   async getActiveRecipe(moduleId: string): Promise<Recipe | null> {
     const r = await ddb.send(new QueryCommand({
       TableName: TABLE,
@@ -28,13 +33,21 @@ export const recipeDb = {
   },
 
   async saveRecipe(recipe: Partial<Recipe>): Promise<Recipe> {
-    const versions = await recipeDb.listVersions(recipe.moduleId!);
-    const nextVer  = versions.length ? Math.max(...versions.map((v:any) => v.version)) + 1 : 1;
+    const versions = await ddbRecipeDb.listVersions(recipe.moduleId!);
+    const nextVer  = versions.length ? Math.max(...versions.map((v: any) => v.version)) + 1 : 1;
     const saved    = {
       ...recipe, version: nextVer, isActive: true,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     } as Recipe;
-    // TODO: deactivate previous active version
+    // Deactivate previous versions so only one active version exists per module
+    await Promise.all(versions.map(v =>
+      ddb.send(new UpdateCommand({
+        TableName: TABLE,
+        Key: { moduleId: recipe.moduleId, version: v.version },
+        UpdateExpression: 'SET isActive = :f',
+        ExpressionAttributeValues: { ':f': false },
+      }))
+    ));
     await ddb.send(new PutCommand({ TableName: TABLE, Item: saved }));
     return saved;
   },
@@ -48,3 +61,5 @@ export const recipeDb = {
     return r.Items ?? [];
   },
 };
+
+export const recipeDb = USE_LOCAL_DB ? localRecipeDb : ddbRecipeDb;

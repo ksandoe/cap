@@ -11,8 +11,14 @@
 import axios  from 'axios';
 import { logger } from '../eventLogger';
 import { EVENTS } from '@cap/shared';
+import { USE_LOCAL_DB } from '../../config/env';
 
 export async function issueBadge(session: any): Promise<void> {
+  // Local dev: no Credly instance — log the event and return
+  if (USE_LOCAL_DB) {
+    logger.info(EVENTS.BADGE_ISSUED, { sessionId: session.sessionId, assertionId: 'SIM-ASSERTION', simulated: true });
+    return;
+  }
   try {
     // TODO: load badge_template_id from module config
     const badgeTemplateId = 'TODO_from_module_config';

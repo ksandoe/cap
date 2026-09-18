@@ -17,6 +17,7 @@ export interface SessionTokenPayload {
   tempUserId:  string;
   moduleId:    string;
   currentPhase: number;
+  canvasUuid?: string;   // IIO PRD §3.4 — used for resume/retry lookups
 }
 
 export async function issueSessionToken(payload: SessionTokenPayload): Promise<string> {

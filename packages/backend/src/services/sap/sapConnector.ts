@@ -12,6 +12,7 @@
  * TODO: handle SAP connectivity errors and timeouts
  */
 import axios from 'axios';
+import { USE_LOCAL_DB } from '../../config/env';
 
 let _accessToken: string | null = null;
 let _tokenExpiry: number        = 0;
@@ -51,6 +52,16 @@ export async function verifySapDocuments(
   sapUsername: string,
   requiredDocTypes: string[],
 ): Promise<VerificationResult> {
+  // Local dev: no real SAP sandbox — report all documents present
+  if (USE_LOCAL_DB) {
+    console.log(`[SAP:local] Simulating verification for ${sapUsername}`);
+    return {
+      allPresent:   true,
+      foundDocs:    requiredDocTypes.map((t, i) => `SIM-${t}-0000${i + 1}`),
+      missingTypes: [],
+    };
+  }
+
   const token = await getAccessToken();
 
   // TODO: implement OData v4 query

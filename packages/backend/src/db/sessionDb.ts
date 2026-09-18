@@ -7,17 +7,22 @@
  *
  * NOTE: canvasUuid is used only server-side for resume lookups.
  * It is never returned to the browser.
+ *
+ * When USE_LOCAL_DB=true, delegates to the JSON-file store in
+ * localStore.ts so local dev works without AWS.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient, GetCommand, PutCommand,
   UpdateCommand, DeleteCommand, QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
+import { USE_LOCAL_DB }  from '../config/env';
+import { localSessionDb } from './localStore';
 
 const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
 const TABLE = process.env.DYNAMODB_TABLE_SESSIONS!;
 
-export const sessionDb = {
+const ddbSessionDb = {
   async getSession(sessionId: string) {
     const r = await ddb.send(new GetCommand({ TableName: TABLE, Key: { sessionId } }));
     return r.Item ?? null;
@@ -45,8 +50,6 @@ export const sessionDb = {
   },
 
   async findActiveSession(canvasUuid: string, moduleId: string) {
-    // TODO: requires GSI on canvasUuid + moduleId
-    // Placeholder: scan is acceptable for PoC scale
     const r = await ddb.send(new QueryCommand({
       TableName: TABLE,
       IndexName: 'canvasUuid-moduleId-index',
@@ -62,3 +65,5 @@ export const sessionDb = {
     return r.Items?.[0] ?? null;
   },
 };
+
+export const sessionDb = USE_LOCAL_DB ? localSessionDb : ddbSessionDb;

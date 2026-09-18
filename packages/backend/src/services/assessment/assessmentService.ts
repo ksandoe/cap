@@ -18,6 +18,8 @@ import { recipeDb }      from '../../db/recipeDb';
 import { compileContext } from './contextCompiler';
 import { logger }        from '../eventLogger';
 import { EVENTS }        from '@cap/shared';
+import { MOCK_AI }       from '../../config/env';
+import { mockCheckinQuestions, mockConversationTurn, mockEvaluation } from './mockAi';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const MODEL         = 'claude-sonnet-4-6';
@@ -42,9 +44,11 @@ export async function generateCheckinQuestions(req: Request, res: Response): Pro
   const recipe  = await recipeDb.getActiveRecipe(session!.moduleId);
   const { checkinSystemPrompt } = compileContext(recipe!, session!);
 
-  const raw = await callAnthropic(checkinSystemPrompt, [
-    { role: 'user', content: 'Generate the check-in questions now.' },
-  ]);
+  const raw = MOCK_AI
+    ? mockCheckinQuestions()
+    : await callAnthropic(checkinSystemPrompt, [
+        { role: 'user', content: 'Generate the check-in questions now.' },
+      ]);
 
   try {
     const questions = JSON.parse(raw);
@@ -62,7 +66,9 @@ export async function processConversationTurn(req: Request, res: Response): Prom
   const recipe  = await recipeDb.getActiveRecipe(session!.moduleId);
   const { checkoutSystemPrompt } = compileContext(recipe!, session!);
 
-  const raw = await callAnthropic(checkoutSystemPrompt, messages);
+  const raw = MOCK_AI
+    ? mockConversationTurn(messages.filter((m: any) => m.role === 'user').length)
+    : await callAnthropic(checkoutSystemPrompt, messages);
   logger.info(EVENTS.CHECKOUT_TURN, { sessionId, turn: messages.length });
 
   res.json({ response: raw });
@@ -76,9 +82,11 @@ export async function generateEvaluation(req: Request, res: Response): Promise<v
   const recipe  = await recipeDb.getActiveRecipe(session!.moduleId);
   const { evaluationSystemPrompt } = compileContext(recipe!, session!);
 
-  const raw = await callAnthropic(evaluationSystemPrompt, [
-    { role: 'user', content: `Here is the full conversation transcript:\n\n${JSON.stringify(transcript)}` },
-  ]);
+  const raw = MOCK_AI
+    ? mockEvaluation(recipe!)
+    : await callAnthropic(evaluationSystemPrompt, [
+        { role: 'user', content: `Here is the full conversation transcript:\n\n${JSON.stringify(transcript)}` },
+      ]);
 
   try {
     const evaluation = JSON.parse(raw.replace(/```json|```/g, '').trim());

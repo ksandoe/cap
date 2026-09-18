@@ -9,7 +9,10 @@
  * Phase 3 — CheckoutPhase
  * Phase 4 — SummaryPhase
  */
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSessionStore } from '../store/sessionStore';
+import { api } from '../services/api';
 import { CheckinPhase }   from '../components/wizard/CheckinPhase';
 import { ActivityPhase }  from '../components/wizard/ActivityPhase';
 import { CheckoutPhase }  from '../components/wizard/CheckoutPhase';
@@ -18,6 +21,43 @@ import { WizardShell }    from '../components/wizard/WizardShell';
 
 export function WizardPage() {
   const currentPhase = useSessionStore(s => s.currentPhase);
+  const token        = useSessionStore(s => s.token);
+  const sessionId    = useSessionStore(s => s.sessionId);
+  const moduleId     = useSessionStore(s => s.moduleId);
+  const setPhase     = useSessionStore(s => s.setPhase);
+  const setRecipe    = useSessionStore(s => s.setRecipe);
+  const setAttempt   = useSessionStore(s => s.setAttemptNumber);
+  const navigate     = useNavigate();
+
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token || !sessionId) { navigate('/error?code=NO_TOKEN'); return; }
+
+    // Refresh session state (resume may have happened server-side) and load the recipe
+    (async () => {
+      try {
+        const session = await api.session.get(sessionId);
+        if (session.phaseReached) setPhase(session.phaseReached);
+        if (session.attemptNumber) setAttempt(session.attemptNumber);
+        if (moduleId) {
+          const recipe = await api.recipe.get(moduleId);
+          setRecipe(recipe);
+        }
+      } catch (e: any) {
+        setError(`Could not load your session. ${e.message}`);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (error) {
+    return (
+      <WizardShell currentPhase={currentPhase}>
+        <div className="notice error" role="alert">{error}</div>
+      </WizardShell>
+    );
+  }
 
   return (
     <WizardShell currentPhase={currentPhase}>

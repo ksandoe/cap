@@ -19,14 +19,17 @@ export interface Session {
   phaseReached:       number;
   attemptNumber:      number;
   priorSessionId?:    string;
+  canvasUuid?:        string;       // server-side only — resume lookup, never sent to browser
   ltiContextId:       string;
   ltiResourceLinkId:  string;
-  agcEndpoint:        string;       // Canvas AGS endpoint for grade return
+  agsEndpoint:        string;       // Canvas AGS endpoint for grade return
   lisResultSourcedId: string;
   sapUsername?:       string;       // assigned from pool; server-side only
   sapVerifiedAt?:     string;
   sapDocRefs?:        string[];
+  sapVerificationError?: { missingTypes?: string[]; error?: string };
   checkinResponses?:  CheckinResponse[];
+  transcript?:        { role: string; content: string }[];
   gradePostedAt?:     string;
   gradePostedScore?:  number;
   credlyAssertionId?: string;

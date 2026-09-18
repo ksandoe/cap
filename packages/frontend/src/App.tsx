@@ -6,13 +6,15 @@
  * /        — fallback / error state
  */
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { LaunchPage }  from './pages/LaunchPage';
-import { WizardPage }  from './pages/WizardPage';
-import { ErrorPage }   from './pages/ErrorPage';
+import { LaunchPage }    from './pages/LaunchPage';
+import { WizardPage }    from './pages/WizardPage';
+import { ErrorPage }     from './pages/ErrorPage';
+import { DevLaunchPage } from './pages/DevLaunchPage';
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/"       element={<DevLaunchPage />} />
       <Route path="/launch" element={<LaunchPage />} />
       <Route path="/wizard" element={<WizardPage />} />
       <Route path="/error"  element={<ErrorPage />} />

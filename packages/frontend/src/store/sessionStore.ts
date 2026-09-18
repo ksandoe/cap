@@ -9,35 +9,54 @@
  * they must relaunch from Canvas. (Future: encode resume token in URL hash.)
  */
 import { create } from 'zustand';
-import { Evaluation, CheckinResponse } from '@cap/shared';
+import { Evaluation, CheckinResponse, Recipe } from '@cap/shared';
+
+export interface ChatTurn { role: string; content: string; hidden?: boolean }
 
 interface SessionState {
   token:           string | null;
   sessionId:       string | null;
+  moduleId:        string | null;
   currentPhase:    number;
+  attemptNumber:   number;
+  recipe:          Recipe | null;
   checkinResponses: CheckinResponse[];
-  transcript:      { role: string; content: string }[];
+  transcript:      ChatTurn[];
   evaluation:      Evaluation | null;
 
-  setSession:      (data: { token: string; currentPhase: number }) => void;
+  setSession:      (data: { token: string; sessionId: string; moduleId: string; currentPhase: number }) => void;
   setPhase:        (phase: number) => void;
+  setRecipe:       (recipe: Recipe) => void;
+  setAttemptNumber:(n: number) => void;
   setCheckinResponses: (responses: CheckinResponse[]) => void;
-  appendTurn:      (role: string, content: string) => void;
+  appendTurn:      (role: string, content: string, hidden?: boolean) => void;
   setEvaluation:   (evaluation: Evaluation) => void;
+  reset:           () => void;
 }
 
-export const useSessionStore = create<SessionState>((set) => ({
+const initial = {
   token:            null,
   sessionId:        null,
+  moduleId:         null,
   currentPhase:     1,
-  checkinResponses: [],
-  transcript:       [],
+  attemptNumber:    1,
+  recipe:           null,
+  checkinResponses: [] as CheckinResponse[],
+  transcript:       [] as ChatTurn[],
   evaluation:       null,
+};
 
-  setSession:      ({ token, currentPhase }) => set({ token, currentPhase }),
-  setPhase:        (phase) => set({ currentPhase: phase }),
+export const useSessionStore = create<SessionState>((set) => ({
+  ...initial,
+
+  setSession:      ({ token, sessionId, moduleId, currentPhase }) =>
+                     set({ token, sessionId, moduleId, currentPhase }),
+  setPhase:        (currentPhase) => set({ currentPhase }),
+  setRecipe:       (recipe) => set({ recipe }),
+  setAttemptNumber:(attemptNumber) => set({ attemptNumber }),
   setCheckinResponses: (checkinResponses) => set({ checkinResponses }),
-  appendTurn:      (role, content) =>
-    set(s => ({ transcript: [...s.transcript, { role, content }] })),
+  appendTurn:      (role, content, hidden) =>
+    set(s => ({ transcript: [...s.transcript, { role, content, hidden }] })),
   setEvaluation:   (evaluation) => set({ evaluation }),
+  reset:           () => set(initial),
 }));

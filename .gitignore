@@ -8,3 +8,4 @@ dist/
 .amplify/
 cdk.out/
 .serverless/
+.dev-data/

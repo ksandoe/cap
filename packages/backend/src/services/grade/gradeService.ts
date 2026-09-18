@@ -18,8 +18,14 @@
 import axios  from 'axios';
 import { logger } from '../eventLogger';
 import { EVENTS } from '@cap/shared';
+import { USE_LOCAL_DB } from '../../config/env';
 
 export async function postGradeToCanvas(session: any, score: number): Promise<void> {
+  // Local dev: no Canvas instance — log the event and return
+  if (USE_LOCAL_DB) {
+    logger.info(EVENTS.GRADE_POSTED, { sessionId: session.sessionId, score, simulated: true });
+    return;
+  }
   try {
     // TODO: fetch Canvas access token via client_credentials
     const accessToken = 'TODO_fetch_canvas_token';

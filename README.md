@@ -8,10 +8,25 @@ Monorepo for the Conversational Assessment Platform (CAP). Two workspaces:
 ## Quick start (local dev)
 
 ```bash
-cp .env.example .env        # fill in local values
+cp .env.example .env        # local defaults already work out of the box
 npm install
 npm run dev
 ```
+
+Then open http://localhost:3000 and click **Launch demo** — the dev
+landing page simulates the Canvas LTI launch.
+
+Local dev runs against a JSON-file store (`USE_LOCAL_DB=true`, data in
+`packages/backend/.dev-data/`) seeded with a demo recipe and SAP account
+pool — no AWS required. SAP verification, Canvas grade return, and Credly
+badge issuance are simulated. With no `ANTHROPIC_API_KEY` set, the AI calls
+return canned mock responses (`MOCK_AI=true`); add a key to `.env` for the
+real Anthropic API.
+
+| URL | What |
+|---|---|
+| http://localhost:3000 | Vite dev server (React SPA) |
+| http://localhost:3001 | Express API (`/health`, `/dev/launch`) |
 
 ## Architecture overview
 

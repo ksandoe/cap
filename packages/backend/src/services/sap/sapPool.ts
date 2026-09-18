@@ -12,16 +12,21 @@
  * On activity exit (completion, expiry, or error), the account
  * is reset via the SAP reset endpoint and returned to 'available'.
  *
+ * When USE_LOCAL_DB=true, delegates to the JSON-file store in
+ * db/localStore.ts so local dev works without AWS.
+ *
  * TODO: implement stale-lock reclamation (account locked > N hours → force release)
  * TODO: implement SAP account reset call
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { USE_LOCAL_DB }  from '../../config/env';
+import { localSapPool }  from '../../db/localStore';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
 const TABLE = process.env.DYNAMODB_TABLE_SAP_POOL!;
 
-export async function acquireSapAccount(sessionId: string): Promise<string> {
+async function ddbAcquire(sessionId: string): Promise<string> {
   // Scan for an available account
   // TODO: replace Scan with a GSI query on status for efficiency at scale
   const result = await ddb.send(new ScanCommand({
@@ -56,7 +61,7 @@ export async function acquireSapAccount(sessionId: string): Promise<string> {
   return account.sapUsername as string;
 }
 
-export async function releaseSapAccount(sapUsername: string): Promise<void> {
+async function ddbRelease(sapUsername: string): Promise<void> {
   // TODO: call SAP reset endpoint before releasing
   await ddb.send(new UpdateCommand({
     TableName:        TABLE,
@@ -66,3 +71,8 @@ export async function releaseSapAccount(sapUsername: string): Promise<void> {
     ExpressionAttributeValues: { ':available': 'available' },
   }));
 }
+
+export const acquireSapAccount = USE_LOCAL_DB
+  ? localSapPool.acquireSapAccount : ddbAcquire;
+export const releaseSapAccount = USE_LOCAL_DB
+  ? localSapPool.releaseSapAccount : ddbRelease;

@@ -11,6 +11,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 import { EventType }    from '@cap/shared';
+import { USE_LOCAL_DB } from '../config/env';
 
 const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
 const TABLE = process.env.DYNAMODB_TABLE_SESSIONS!;
@@ -25,6 +26,7 @@ async function log(severity: Severity, eventType: EventType, payload: Record<str
     ttl: Math.floor(Date.now() / 1000) + 90 * 24 * 3600, // 90-day retention
   };
   console.log(`[${severity}] ${eventType}`, payload);
+  if (USE_LOCAL_DB) return; // local dev: console-only audit log
   try {
     await ddb.send(new PutCommand({ TableName: TABLE, Item: entry }));
   } catch (err) {

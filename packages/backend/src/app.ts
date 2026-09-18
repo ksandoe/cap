@@ -4,6 +4,8 @@
  * In local dev: started directly by nodemon, listens on PORT.
  * In Lambda:    wrapped by serverless-http in lambda/handler.ts.
  */
+// config/env must be imported first — it loads .env before other modules read it
+import { USE_LOCAL_DB } from './config/env';
 import express from 'express';
 import { ltiRouter }         from './routes/lti';
 import { sessionRouter }     from './routes/session';
@@ -26,6 +28,15 @@ app.get('/.well-known/jwks.json', (_req, res) => {
   res.json({ keys: [] });
 });
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// ── Dev-only routes (simulated LTI launch for local development) ─────────────
+if (process.env.NODE_ENV !== 'production') {
+  if (USE_LOCAL_DB) {
+    require('./db/localStore').seedLocalStore();
+    console.log('[dev] USE_LOCAL_DB — JSON-file store active, external calls simulated');
+  }
+  app.use('/dev', require('./routes/dev').devRouter);
+}
 
 // ── Protected (session token required) ───────────────────────────────────────
 app.use('/session',     authMiddleware, sessionRouter);

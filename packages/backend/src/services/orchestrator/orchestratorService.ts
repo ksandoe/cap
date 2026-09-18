@@ -21,6 +21,7 @@ import { verifySapDocuments } from '../sap/sapConnector';
 import { postGradeToCanvas }  from '../grade/gradeService';
 import { issueBadge }         from '../badge/badgeService';
 import { sessionDb }          from '../../db/sessionDb';
+import { recipeDb }           from '../../db/recipeDb';
 import { logger }             from '../eventLogger';
 import { EVENTS, PHASES }     from '@cap/shared';
 
@@ -38,6 +39,7 @@ export async function createSession(ltiContext: {
     const token = await issueSessionToken({
       sessionId: existing.sessionId, tempUserId: existing.tempUserId,
       moduleId: existing.moduleId,   currentPhase: existing.phaseReached,
+      canvasUuid: existing.canvasUuid,
     });
     return { sessionToken: token, redirectPhase: existing.phaseReached };
   }
@@ -49,12 +51,16 @@ export async function createSession(ltiContext: {
   const now         = new Date().toISOString();
   const ttlSeconds  = parseInt(process.env.SESSION_TTL_HOURS ?? '8', 10) * 3600;
 
+  // Resolve the active recipe for this module (module config lookup TODO: cap-modules table)
+  const recipe = await recipeDb.getActiveRecipe(ltiContext.moduleId);
+
   const session = {
     sessionId, tempUserId, moduleId: ltiContext.moduleId,
-    recipeId:  'TODO_lookup_from_module_config',
+    recipeId:   recipe?.recipeId ?? null,
     state:      'LAUNCHED' as const,
     phaseReached: PHASES.CHECKIN,
     attemptNumber: 1,
+    canvasUuid:         ltiContext.canvasUuid,   // server-side only — resume lookup
     ltiContextId:       ltiContext.ltiContextId,
     ltiResourceLinkId:  ltiContext.ltiResourceLinkId,
     agsEndpoint:        ltiContext.agsEndpoint,
@@ -69,7 +75,8 @@ export async function createSession(ltiContext: {
   logger.info(EVENTS.SAP_USER_ASSIGNED, { sessionId, sapUsername });
 
   const token = await issueSessionToken({
-    sessionId, tempUserId, moduleId: ltiContext.moduleId, currentPhase: PHASES.CHECKIN,
+    sessionId, tempUserId, moduleId: ltiContext.moduleId,
+    currentPhase: PHASES.CHECKIN, canvasUuid: ltiContext.canvasUuid,
   });
 
   return { sessionToken: token, redirectPhase: PHASES.CHECKIN };
@@ -81,7 +88,7 @@ export async function getSession(req: Request, res: Response): Promise<void> {
   const session = await sessionDb.getSession(req.params.id);
   if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
   // Strip server-side-only fields before returning to browser
-  const { sapUsername: _sap, ...safeSession } = session as any;
+  const { sapUsername: _sap, canvasUuid: _cu, ...safeSession } = session as any;
   res.json(safeSession);
 }
 
@@ -172,8 +179,15 @@ export async function completeSession(req: Request, res: Response): Promise<void
 }
 
 export async function createRetry(req: Request, res: Response): Promise<void> {
+  // The parent session may already be deleted (sessions are destroyed on
+  // completion). Fall back to the session-token claims + request body.
   const parent = await sessionDb.getSession(req.params.id);
-  if (!parent) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
+  const claims = req.session!;
+
+  if (!parent && claims.sessionId !== req.params.id) {
+    res.status(404).json({ error: 'SESSION_NOT_FOUND' });
+    return;
+  }
 
   // TODO: enforce retry limit from module config
   const newSessionId = uuidv4();
@@ -181,24 +195,31 @@ export async function createRetry(req: Request, res: Response): Promise<void> {
   const sapUsername  = await acquireSapAccount(newSessionId);
 
   const retrySession = {
-    ...parent,
-    sessionId:       newSessionId,
-    state:           'SAP_VERIFIED' as const, // skip SAP gate on retry
-    phaseReached:    PHASES.CHECKOUT,
-    attemptNumber:   parent.attemptNumber + 1,
-    priorSessionId:  parent.sessionId,
+    ...(parent ?? {}),
+    sessionId:         newSessionId,
+    tempUserId:        parent?.tempUserId ?? claims.tempUserId,
+    moduleId:          parent?.moduleId   ?? claims.moduleId,
+    canvasUuid:        parent?.canvasUuid ?? claims.canvasUuid,
+    state:             'SAP_VERIFIED' as const, // skip SAP gate on retry
+    phaseReached:      PHASES.CHECKOUT,
+    attemptNumber:     (parent?.attemptNumber ?? req.body.attemptNumber ?? 1) + 1,
+    priorSessionId:    req.params.id,
     sapUsername,
-    startedAt:       new Date().toISOString(),
-    completedAt:     undefined,
-    ttl:             Math.floor(Date.now() / 1000) + ttlSeconds,
+    startedAt:         new Date().toISOString(),
+    completedAt:       undefined,
+    transcript:        undefined,
+    evaluation:        undefined,
+    sapVerificationError: undefined,
+    ttl:               Math.floor(Date.now() / 1000) + ttlSeconds,
   };
 
   await sessionDb.putSession(retrySession);
-  logger.info(EVENTS.RETRY_CREATED, { sessionId: newSessionId, priorSessionId: parent.sessionId });
+  logger.info(EVENTS.RETRY_CREATED, { sessionId: newSessionId, priorSessionId: req.params.id });
 
   const token = await issueSessionToken({
-    sessionId: newSessionId, tempUserId: parent.tempUserId,
-    moduleId: parent.moduleId, currentPhase: PHASES.CHECKOUT,
+    sessionId: newSessionId, tempUserId: retrySession.tempUserId,
+    moduleId: retrySession.moduleId, currentPhase: PHASES.CHECKOUT,
+    canvasUuid: retrySession.canvasUuid,
   });
 
   res.json({ sessionToken: token, redirectPhase: PHASES.CHECKOUT });
