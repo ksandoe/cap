@@ -18,11 +18,11 @@
 import axios  from 'axios';
 import { logger } from '../eventLogger';
 import { EVENTS } from '@cap/shared';
-import { USE_LOCAL_DB } from '../../config/env';
+import { CANVAS_MODE } from '../../config/env';
 
 export async function postGradeToCanvas(session: any, score: number): Promise<void> {
-  // Local dev: no Canvas instance — log the event and return
-  if (USE_LOCAL_DB) {
+  // Stub mode: no Canvas instance — log the event and return
+  if (CANVAS_MODE === 'stub') {
     logger.info(EVENTS.GRADE_POSTED, { sessionId: session.sessionId, score, simulated: true });
     return;
   }

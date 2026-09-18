@@ -19,9 +19,13 @@ landing page simulates the Canvas LTI launch.
 Local dev runs against a JSON-file store (`USE_LOCAL_DB=true`, data in
 `packages/backend/.dev-data/`) seeded with a demo recipe and SAP account
 pool — no AWS required. SAP verification, Canvas grade return, and Credly
-badge issuance are simulated. With no `ANTHROPIC_API_KEY` set, the AI calls
-return canned mock responses (`MOCK_AI=true`); add a key to `.env` for the
-real Anthropic API.
+badge issuance are simulated. With no `OPENAI_API_KEY` set, the AI calls
+return canned mock responses (`LLM_MODE=mock`); add a key to `.env` for the
+real OpenAI-compatible API (Azure OpenAI supported — see `.env.example`).
+
+Each external integration has an independent `stub|live` switch in `.env`
+(`SAP_MODE`, `CANVAS_MODE`, `CREDLY_MODE`, `LLM_MODE`) so they can be
+enabled one at a time as campus credentials arrive.
 
 | URL | What |
 |---|---|

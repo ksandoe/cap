@@ -11,11 +11,11 @@
 import axios  from 'axios';
 import { logger } from '../eventLogger';
 import { EVENTS } from '@cap/shared';
-import { USE_LOCAL_DB } from '../../config/env';
+import { CREDLY_MODE } from '../../config/env';
 
 export async function issueBadge(session: any): Promise<void> {
-  // Local dev: no Credly instance — log the event and return
-  if (USE_LOCAL_DB) {
+  // Stub mode: no Credly instance — log the event and return
+  if (CREDLY_MODE === 'stub') {
     logger.info(EVENTS.BADGE_ISSUED, { sessionId: session.sessionId, assertionId: 'SIM-ASSERTION', simulated: true });
     return;
   }
