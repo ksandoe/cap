@@ -1,0 +1,577 @@
+
+USER STORIES
+Conversational Assessment Platform
+30 stories across 4 roles
+
+Version 1.0  ·  Draft  ·  September 2026
+
+Story index
+This document contains 30 user stories covering the four roles of the Conversational Assessment Platform: students completing learning modules, domain experts authoring instructional recipes, instructors monitoring and reviewing outcomes, and platform administrators managing infrastructure and integrations.
+
+ID
+Title
+Role
+STU-01
+Launch activity from Canvas
+Student
+STU-02
+Complete check-in survey
+Student
+STU-03
+View activity instructions
+Student
+STU-04
+Proceed to assessment after SAP completion
+Student
+STU-05
+Engage in checkout conversation
+Student
+STU-06
+Receive summary evaluation
+Student
+STU-07
+Retry the checkout conversation
+Student
+STU-08
+Resume an interrupted session
+Student
+AUT-01
+Create a new instructional recipe
+Domain Expert
+AUT-02
+Define numbered activity steps
+Domain Expert
+AUT-03
+Map activity steps to learning outcomes
+Domain Expert
+AUT-04
+Upload background documentation
+Domain Expert
+AUT-05
+Define probing rules and vague answer triggers
+Domain Expert
+AUT-06
+Preview generated check-in questions
+Domain Expert
+AUT-07
+Revise and version a recipe
+Domain Expert
+AUT-08
+Add validation notes to a recipe
+Domain Expert
+INS-01
+View module completion status
+Instructor
+INS-02
+Review a student's conversation transcript
+Instructor
+INS-03
+Export session results to CSV
+Instructor
+INS-04
+Grant a retry attempt
+Instructor
+INS-05
+View and annotate the recipe validation log
+Instructor
+INS-06
+Review AI assessment accuracy
+Instructor
+ADM-01
+Register the platform as a Canvas external tool
+Administrator
+ADM-02
+Provision the SAP account pool
+Administrator
+ADM-03
+Monitor SAP pool utilization
+Administrator
+ADM-04
+Manage application secrets
+Administrator
+ADM-05
+Configure a module
+Administrator
+ADM-06
+View the audit event log
+Administrator
+ADM-07
+Monitor external integration health
+Administrator
+ADM-08
+Handle a FERPA data request
+Administrator
+
+Student stories
+STU-01
+Launch activity from Canvas
+STUDENT
+Story
+As a student, I want to launch my learning activity directly from a Canvas assignment so that I do not need a separate login or URL.
+Acceptance
+✓  Clicking the assignment link in Canvas initiates the LTI 1.3 launch without prompting for credentials.
+
+✓  The student is directed to the correct wizard phase (check-in if new, or the last reached phase if resuming).
+
+✓  A temporary session identity is created invisibly — the student never sees or interacts with it.
+
+✓  If the SAP account pool is exhausted, a clear, non-technical error message is displayed with an instruction to try again shortly.
+
+STU-02
+Complete check-in survey
+STUDENT
+Story
+As a student, I want to answer a short set of questions about my background so that the subsequent conversation is relevant to my level of experience.
+Acceptance
+✓  The check-in presents 3–4 questions generated from the module's domain context.
+
+✓  Questions use appropriate response formats: Likert scale, multiple choice, or short text (max 150 chars).
+
+✓  All questions must be answered before the student can advance to the activity phase.
+
+✓  Check-in responses are not graded or scored — no feedback is shown to the student at this stage.
+
+✓  Progress is not lost if the student pauses mid-survey within the same browser session.
+
+STU-03
+View activity instructions
+STUDENT
+Story
+As a student, I want to see clear, numbered instructions for the activity so that I know exactly what I need to do before my understanding is assessed.
+Acceptance
+✓  The activity phase displays the module summary text and all numbered steps in sequence.
+
+✓  Resource links (readings, videos, tools) are displayed below the summary with their type labeled.
+
+✓  Understanding notes authored per step are not visible to the student.
+
+✓  Steps are displayed in a fixed, non-reorderable sequence.
+
+✓  A prominent "I have completed the activity" button is visible but requires confirmation before submission.
+
+STU-04
+Proceed to assessment after SAP completion
+STUDENT
+Story
+As a student, I want the system to confirm my SAP work before the conversation begins so that I know my task completion has been recognized.
+Acceptance
+✓  After submitting activity completion, a visual indicator shows that verification is in progress.
+
+✓  If all required SAP documents are found, the student is automatically advanced to the checkout conversation.
+
+✓  If documents are missing, a message lists which document types were not found and invites the student to complete them before trying again.
+
+✓  If SAP is temporarily unavailable, a user-facing message explains the issue without technical detail and invites a retry.
+
+✓  Verification polling occurs at 3-second intervals and times out after 15 seconds with an appropriate message.
+
+STU-05
+Engage in checkout conversation
+STUDENT
+Story
+As a student, I want to have a supportive conversation about what I did and learned so that I can demonstrate my understanding in my own words rather than through a quiz.
+Acceptance
+✓  The conversation opens with an acknowledgment of the completed activity and a reference to the student's check-in answers.
+
+✓  The agent asks one question at a time and waits for a response before continuing.
+
+✓  The agent probes vague or incomplete answers with a follow-up rather than accepting them without engagement.
+
+✓  The agent never uses the words "correct" or "incorrect."
+
+✓  The agent validates effort before redirecting: e.g. "That's a good start — let's go a bit deeper."
+
+✓  The conversation includes at least one question about how the skills connect to the student's future career.
+
+✓  A typing indicator is shown while the AI response is loading.
+
+✓  The conversation concludes with the agent providing one observation of strength and one area for development.
+
+STU-06
+Receive summary evaluation
+STUDENT
+Story
+As a student, I want to see a clear, honest evaluation of my conversation so that I understand what I demonstrated well and what I should continue to develop.
+Acceptance
+✓  The summary displays a rating for each rubric dimension: Strong, Developing, or Needs further work.
+
+✓  Each dimension rating is accompanied by a 2–3 sentence narrative that references specific things the student said.
+
+✓  An overall summary of 3–5 sentences is displayed, including one strength and one development area.
+
+✓  If a badge was awarded, it is displayed prominently with a link to the student's Credly profile.
+
+✓  If the assessment threshold was not met, a clear but encouraging message explains this and offers the retry option.
+
+✓  The evaluation is displayed in the browser and can be printed by the student.
+
+STU-07
+Retry the checkout conversation
+STUDENT
+Story
+As a student, I want the option to retry the assessment conversation if I did not meet the threshold so that I have a fair opportunity to demonstrate my understanding.
+Acceptance
+✓  The retry option is clearly offered on the summary screen when one or more dimensions are rated "Needs further work."
+
+✓  A retry does not require the student to repeat the check-in or SAP activity.
+
+✓  The retry conversation is focused on the dimensions that were rated as needing further work.
+
+✓  The student is informed of the maximum number of attempts remaining before beginning a retry.
+
+✓  If the retry limit has been reached, a message advises the student to contact their instructor rather than offering another retry.
+
+STU-08
+Resume an interrupted session
+STUDENT
+Story
+As a student, I want to be able to resume my activity if I am interrupted so that I do not lose my progress.
+Acceptance
+✓  Relaunching the Canvas assignment within the session window (8 hours) resumes the student at their last completed phase.
+
+✓  Check-in responses and conversation history are restored on resume.
+
+✓  A brief message informs the student that their session has been resumed.
+
+✓  If the session has expired (> 8 hours), the student is informed and a new session begins from Phase 1.
+
+✓  Session state is never stored in the student's browser (no localStorage). Resume works across devices.
+
+
+Domain expert stories
+AUT-01
+Create a new instructional recipe
+DOMAIN EXPERT
+Story
+As a domain expert, I want to create a structured recipe for my learning module so that the AI agent can conduct a meaningful, domain-specific assessment conversation without any code changes.
+Acceptance
+✓  The authoring form presents all required and optional fields in clearly labeled sections.
+
+✓  Required fields (module title, description, learning outcomes, key concepts, rubric dimensions) are marked and validated before saving.
+
+✓  Saving the recipe creates a new versioned record and sets it as the active version.
+
+✓  A confirmation is shown on save with the version number and timestamp.
+
+✓  The saved recipe is immediately active for new student sessions launched against that module.
+
+AUT-02
+Define numbered activity steps
+DOMAIN EXPERT
+Story
+As a domain expert, I want to describe the activity as a numbered sequence of steps so that students have clear instructions and the agent has specific context for probing.
+Acceptance
+✓  Steps are entered in sequence and auto-numbered.
+
+✓  Each step has a required description field and two optional fields: outcome tag(s) and understanding note.
+
+✓  Steps can be added, reordered, and deleted before saving.
+
+✓  A tooltip or inline guidance explains the purpose of the outcome tag and understanding note fields.
+
+✓  A step with all three fields populated is visually distinguished from a sparse step (description only) so the author can see at a glance which steps will be probe-eligible.
+
+AUT-03
+Map activity steps to learning outcomes
+DOMAIN EXPERT
+Story
+As a domain expert, I want to tag each step with one or more learning outcomes so that the agent knows which outcomes each step is intended to develop.
+Acceptance
+✓  Outcome tags are selected from the numbered list of learning outcomes defined earlier in the form.
+
+✓  Multiple outcomes can be tagged per step.
+
+✓  Untagged steps are labeled "context-only" in the step list.
+
+✓  A summary at the bottom of the steps section shows which outcomes have at least one tagged step and which are untagged — prompting the author to consider whether any outcomes are underserved.
+
+✓  The author can save a recipe with untagged steps; a warning is shown but it is not blocking.
+
+AUT-04
+Upload background documentation
+DOMAIN EXPERT
+Story
+As a domain expert, I want to provide reference material so that the AI agent's probing questions and rubric scoring are grounded in the actual content of the module.
+Acceptance
+✓  The form accepts PDF and DOCX file uploads (max 10 MB per file, max 5 files).
+
+✓  Pasted text is accepted in a dedicated text area (max 10,000 characters).
+
+✓  External URLs can be added with a display label; the system fetches and indexes the content on save.
+
+✓  Uploaded files are confirmed with filename and size displayed.
+
+✓  A warning is shown if total documentation volume approaches the AI context limit.
+
+AUT-05
+Define probing rules and vague answer triggers
+DOMAIN EXPERT
+Story
+As a domain expert, I want to specify if/then probing rules so that the agent handles predictable student response patterns in the way I would as an instructor.
+Acceptance
+✓  Probing rules are entered as trigger / follow-up pairs.
+
+✓  Up to 10 rules can be added per recipe.
+
+✓  Vague answer triggers are entered as a list of response pattern descriptions.
+
+✓  The form provides example rules drawn from the SAP Sales Process module as inline guidance.
+
+✓  Rules can be deleted and reordered before saving.
+
+AUT-06
+Preview generated check-in questions
+DOMAIN EXPERT
+Story
+As a domain expert, I want to preview the check-in questions that the AI would generate from my recipe so that I can verify they are appropriate before students see them.
+Acceptance
+✓  A "Preview check-in questions" button sends the current (unsaved) recipe to the AI and displays the generated questions.
+
+✓  The preview shows the question text and response format for each question.
+
+✓  The preview is clearly labeled as a sample and notes that questions may vary between sessions.
+
+✓  The preview does not require saving the recipe first.
+
+AUT-07
+Revise and version a recipe
+DOMAIN EXPERT
+Story
+As a domain expert, I want to update an existing recipe and have the previous version preserved so that I can track how the recipe has evolved and roll back if needed.
+Acceptance
+✓  Editing and saving an existing recipe creates a new version and activates it.
+
+✓  The previous version is retained and marked inactive.
+
+✓  A version history list shows all versions with their saved timestamp.
+
+✓  An author can view (but not edit) a previous version.
+
+✓  Rolling back to a previous version creates a new version (copy of the old one) rather than overwriting current.
+
+AUT-08
+Add validation notes to a recipe
+DOMAIN EXPERT
+Story
+As a domain expert, I want to record observations from real student sessions against a recipe so that the validation log informs future revisions.
+Acceptance
+✓  A validation log section is available on the recipe detail view after the recipe has been used in at least one session.
+
+✓  Notes can be appended with a timestamp; existing notes cannot be edited or deleted.
+
+✓  Notes are free text with a 1,000 character limit per entry.
+
+✓  The log is visible to the author and instructor roles but not to students.
+
+
+Instructor stories
+INS-01
+View module completion status
+INSTRUCTOR
+Story
+As an instructor, I want to see which students have completed the module and what outcome they received so that I can monitor cohort progress without logging into SAP or Canvas separately.
+Acceptance
+✓  A module view lists all sessions for a given module with: tempUser identifier, completion status, badge awarded (yes/no), attempt number, and completion timestamp.
+
+✓  No student PII (name, email, Canvas ID) is displayed in the platform — the instructor uses the Canvas gradebook for identity.
+
+✓  The list can be filtered by completion status and sorted by timestamp.
+
+✓  The view is read-only; no session data can be modified from this view.
+
+INS-02
+Review a student's conversation transcript
+INSTRUCTOR
+Story
+As an instructor, I want to read the transcript of a student's checkout conversation so that I can understand the quality of their responses and validate the agent's evaluation.
+Acceptance
+✓  Selecting a completed session displays the full conversation transcript in a readable format.
+
+✓  The transcript displays agent and student turns in alternating visual styles.
+
+✓  The rubric evaluation is shown alongside the transcript for reference.
+
+✓  Transcripts are available only for sessions that reached Phase 4.
+
+✓  Transcripts are not available after the session record has been destroyed (post-completion cleanup).
+
+INS-03
+Export session results to CSV
+INSTRUCTOR
+Story
+As an instructor, I want to export a CSV of all session results for a module so that I can analyze outcomes in a spreadsheet or submit them to a reporting system.
+Acceptance
+✓  An "Export CSV" button on the module view downloads a file with one row per session.
+
+✓  Columns include: session ID, module ID, phase reached, attempt number, rubric dimension ratings, badge awarded, completion timestamp, and grade posted score.
+
+✓  No student PII is included in the export.
+
+✓  The export reflects only sessions active in DynamoDB — completed and deleted sessions are not included unless a separate archive is configured.
+
+✓  The export is available only to users with the instructor role.
+
+INS-04
+Grant a retry attempt
+INSTRUCTOR
+Story
+As an instructor, I want to grant an additional retry attempt to a specific student who has reached the retry limit so that exceptional circumstances can be accommodated.
+Acceptance
+✓  An instructor can locate a session by session ID and increment the retry allowance by 1.
+
+✓  The action is logged with the instructor's identity and a required reason field.
+
+✓  The student can then relaunch the tool from Canvas and proceed with the additional attempt.
+
+✓  The retry allowance override does not change the module-level default retry limit for other students.
+
+INS-05
+View and annotate the recipe validation log
+INSTRUCTOR
+Story
+As an instructor, I want to add observations about student performance to the recipe's validation log so that the domain expert can use them to improve the recipe.
+Acceptance
+✓  Instructors can append notes to the validation log of any recipe associated with their modules.
+
+✓  Notes are attributed to the instructor role (not a personal identity) and timestamped.
+
+✓  The log is visible to both the instructor and the domain expert.
+
+✓  A note submitted by an instructor triggers a notification flag for the domain expert (in-app indicator; no email required).
+
+INS-06
+Review AI assessment accuracy
+INSTRUCTOR
+Story
+As an instructor, I want to compare the AI's evaluation ratings against my own reading of a transcript so that I can assess whether the rubric and agent behavior are well-calibrated.
+Acceptance
+✓  The transcript view shows the AI-generated rating for each rubric dimension alongside the narrative justification.
+
+✓  An instructor can record a manual rating for each dimension (agree / partially agree / disagree) as a review annotation.
+
+✓  Review annotations are saved to the session record and surfaced in the recipe validation log.
+
+✓  Disagreement annotations trigger a flag visible to the domain expert when reviewing the recipe.
+
+
+Administrator stories
+ADM-01
+Register the platform as a Canvas external tool
+ADMINISTRATOR
+Story
+As a platform administrator, I want to register the application as an LTI 1.3 external tool in Canvas so that students can launch activities from their assignments.
+Acceptance
+✓  Documentation specifies the four required registration values: OIDC login URL, redirect URI, JWKS URL, and target link URI.
+
+✓  A health-check endpoint confirms that the LTI service is reachable before registration is attempted.
+
+✓  Registration instructions are environment-specific (dev / staging / prod URLs are clearly distinguished).
+
+✓  After registration, a test launch from a Canvas sandbox course confirms the full LTI flow end-to-end.
+
+ADM-02
+Provision the SAP account pool
+ADMINISTRATOR
+Story
+As a platform administrator, I want to populate the SAP account pool with pre-provisioned sandbox accounts so that students can be assigned a working SAP environment on launch.
+Acceptance
+✓  A bulk import tool (CSV upload or CLI script) populates the cap-sap-pool DynamoDB table with SAP usernames.
+
+✓  Imported accounts are set to "available" status by default.
+
+✓  A pool status view shows the total count, available count, and in-use count of accounts.
+
+✓  A minimum pool size warning threshold is configurable; an alert is shown in the admin view when available accounts fall below it.
+
+✓  Accounts can be individually removed from the pool (e.g. for maintenance) without affecting in-use accounts.
+
+ADM-03
+Monitor SAP pool utilization
+ADMINISTRATOR
+Story
+As a platform administrator, I want to see the current state of the SAP account pool so that I can detect exhaustion or stale locks before they affect students.
+Acceptance
+✓  The pool status view refreshes automatically or on demand.
+
+✓  Accounts that have been in_use for longer than the session TTL are flagged as potentially stale.
+
+✓  An administrator can manually release a stale account after confirming it is safe to do so.
+
+✓  A force-release triggers the SAP account reset before returning the account to available.
+
+ADM-04
+Manage application secrets
+ADMINISTRATOR
+Story
+As a platform administrator, I want to store and rotate API keys and credentials in AWS Secrets Manager so that no sensitive values appear in code or configuration files.
+Acceptance
+✓  All required secrets are documented with their Secrets Manager key names, expected format, and rotation guidance.
+
+✓  The backend retrieves secrets from Secrets Manager at startup; no secrets are read from environment variables in production.
+
+✓  Rotating a secret (e.g. Anthropic API key) does not require a redeployment — the backend picks up the new value within one Lambda cold start.
+
+✓  A missing or malformed secret causes a clear startup error with the name of the missing key, not a generic crash.
+
+ADM-05
+Configure a module
+ADMINISTRATOR
+Story
+As a platform administrator, I want to configure the module-level settings for a learning module so that SAP verification, badge issuance, retry limits, and grade mapping are correctly set before students launch.
+Acceptance
+✓  A module configuration record can be created or updated via an admin interface or CLI.
+
+✓  Required fields: module ID, recipe ID, required SAP document types.
+
+✓  Optional fields: badge template ID, score mapping, retry limit (default 2), SAP verification timeout (default 15s), max session age (default 72h).
+
+✓  Saving a module configuration takes effect for all new sessions launched after the save.
+
+✓  In-progress sessions are not affected by a configuration change.
+
+ADM-06
+View the audit event log
+ADMINISTRATOR
+Story
+As a platform administrator, I want to query the audit event log so that I can diagnose integration failures, track session lifecycle issues, and respond to support requests.
+Acceptance
+✓  The audit log can be queried by session ID, event type, severity (INFO / WARN / ERROR), and date range.
+
+✓  ERROR-severity events are surfaced in an admin dashboard without requiring a manual query.
+
+✓  Log entries do not contain student PII — only session ID, temp user ID, and module ID.
+
+✓  Logs are retained for 90 days; a warning is shown as entries approach the retention boundary.
+
+✓  Log entries cannot be edited or deleted by any user role.
+
+ADM-07
+Monitor external integration health
+ADMINISTRATOR
+Story
+As a platform administrator, I want to see the health status of each external integration (Canvas, SAP, Credly, Anthropic) so that I can quickly identify which system is causing failures.
+Acceptance
+✓  A health dashboard shows the last-known status of each integration: OK, DEGRADED, or UNREACHABLE.
+
+✓  Status is derived from the most recent event log entries for each integration.
+
+✓  The dashboard shows the timestamp of the last successful call and the last error for each system.
+
+✓  No active health-check polling is performed — status is inferred from operational traffic to reduce cost.
+
+ADM-08
+Handle a FERPA data request
+ADMINISTRATOR
+Story
+As a platform administrator, I want to be able to confirm what student data the platform holds so that I can respond accurately to a FERPA data request or audit.
+Acceptance
+✓  Documentation clearly states: the platform holds no student PII in persistent storage.
+
+✓  Ephemeral session records (DynamoDB, TTL-governed) contain only: session ID, temp user ID, module ID, phase, and transcript. No name, email, or Canvas ID is stored.
+
+✓  The identity map (Canvas UUID → SAP username) is the only record linking a student to a session, and it is held server-side only.
+
+✓  A data inventory document is maintained alongside the codebase and updated when the data model changes.
+
+✓  Session records are confirmed deleted on completion; the deletion is logged in the audit log.
+

@@ -1,0 +1,431 @@
+
+PRODUCT REQUIREMENTS DOCUMENT
+Conversational Assessment Platform
+Proof of Concept
+
+Version 1.0  ·  Draft
+August 2026
+
+1. Product overview
+1.1 Purpose
+This document specifies the requirements for a proof-of-concept (PoC) conversational assessment platform. The platform replaces traditional summative quizzes at the end of learning modules with adaptive AI-driven conversations that evaluate whether students have genuinely understood what they did — not merely whether they completed assigned tasks.
+The PoC is deliberately scoped to validate the core interaction model before any orchestration layer (LMS integration, SAP, badge issuance) is added. It must demonstrate that the authoring workflow, the conversational assessment, and the rubric-based evaluation are sound independently of the surrounding infrastructure.
+1.2 Problem statement
+Existing approaches to summative assessment in technology-enabled learning modules have two failure modes. First, task-completion checks (querying whether a student created the required records in a system) confirm that steps were followed but cannot determine whether the student understood why each step matters. Second, traditional quizzes test recall of isolated facts but cannot assess the student's ability to articulate process understanding, apply concepts to novel situations, or connect the activity to transferable career skills.
+The gap is meaningful: a student who can click through a sales order workflow in SAP without understanding the business logic of an inquiry-quotation-order sequence has completed the activity but not learned from it. The platform addresses this gap.
+1.3 Proposed solution
+The platform consists of two modes: an authoring mode in which a domain expert creates a structured instructional recipe for a learning module, and a student mode in which learners move through a four-phase wizard:
+Phase 1 — Check-in: a short adaptive survey (3–4 questions) that establishes the student's prior knowledge and experience with the domain.
+Phase 2 — Activity: display of the content stub and numbered activity steps that the student completes (reading, watching, using software, or other tasks).
+Phase 3 — Checkout conversation: an AI-driven adaptive conversation that probes the student's understanding of what they did, why it matters, and how it connects to transferable skills.
+Phase 4 — Summary evaluation: a rubric-based assessment of the conversation, surfaced to the student as a structured evaluation with per-outcome and per-step detail.
+The AI agent is informed by the domain expert's instructional recipe, the student's check-in answers, and any background documentation provided by the author. This makes the conversation grounded, personalized, and domain-specific — without requiring code changes between modules.
+1.4 Design principles
+Domain-independent: the system operates off a context object that any non-technical domain expert can author, with no code changes required to deploy a new module.
+Adaptive but not threatening: the conversation should feel like a supportive mentoring session or job interview, not an interrogation. Tone, scaffolding, and pacing are governed by the instructional recipe.
+Grounded in the activity: the agent always knows what the student did. It probes on specific steps or uses them as background context depending on how richly each step was authored.
+Rubric as the contract: the evaluation dimensions are specified by the author, not improvised by the AI. This makes the assessment auditable and improvable over time.
+Recipes improve with use: instructional recipes are persisted and versioned so that observations from real sessions can be incorporated into future revisions.
+
+2. Users and roles
+2.1 Domain expert (author)
+A domain expert is a subject-matter expert or instructional designer who creates and maintains the instructional recipe for a learning module. They are not expected to write code. They interact with the platform through a structured authoring form.
+Key characteristics:
+Deep knowledge of the subject domain.
+Familiarity with the learning outcomes the module is designed to achieve.
+Ability to articulate what "good understanding" looks like for each activity step.
+No technical background required beyond comfort with web forms.
+2.2 Student (learner)
+A student is an individual completing the learning module. In the PoC, no authentication is required — the student simply arrives at the application and begins. In production, identity would be passed via LTI or another SSO mechanism.
+Key characteristics:
+May have little to no prior experience with the domain.
+Has completed (or is about to complete) the activity described in the module.
+Should feel supported, not evaluated, during the checkout conversation.
+2.3 Instructor (future role)
+An instructor reviews evaluation results across a cohort and uses them to identify learning gaps, refine the recipe, or award recognition (e.g. badges). This role is out of scope for the PoC but the data model is designed to support it.
+
+3. Authoring mode
+The authoring mode is a multi-section web form that a domain expert completes to define a learning module. The completed form is serialized into a domain context object and persisted to the recipe store. All fields drive the behavior of the AI agent during the student experience — nothing is decorative.
+3.1 Domain context form
+This section captures the foundational framing of the module.
+
+Field
+Type
+Required
+Description
+module_title
+string
+Yes
+Short display name for the module, e.g. "The Sales Process".
+module_description
+text
+Yes
+One to three sentences describing what the module covers and its purpose in the curriculum.
+learning_outcomes
+string[]
+Yes
+Numbered list of outcomes. Each is a one-sentence statement of what the student should be able to do or explain after completing the module. Minimum 2, maximum 8.
+key_concepts
+object[]
+Yes
+List of terms or concepts central to the domain. Each entry has a term and a brief definition (1–2 sentences). Used to ground AI probing and detect vocabulary gaps.
+probing_rules
+object[]
+No
+Conditional if/then rules for the agent. Each rule has a trigger (e.g. "student mentions X without explaining Y") and a follow-up instruction (e.g. "ask them to clarify the difference"). Up to 10 rules.
+
+3.2 Instructional recipe
+This section defines how the checkout conversation should behave and how the final evaluation should be structured.
+
+Field
+Type
+Required
+Description
+rubric_dimensions
+object[]
+Yes
+The dimensions on which the student is evaluated. Each has a name (e.g. "Process understanding"), a description, and an optional weight. Minimum 2, maximum 6.
+vague_answer_triggers
+string[]
+No
+Descriptions of response patterns that should prompt the agent to probe deeper. E.g. "Student describes a step without explaining its purpose."
+career_transfer_prompts
+string[]
+No
+One to three questions the agent should ask toward the end of the checkout conversation connecting the module to the student's future career. E.g. "How might understanding this process help you in a role in procurement or operations?"
+tone_guidance
+string
+No
+Free-text note to the agent about the appropriate conversational register. E.g. "This module is typically completed by students with no prior business experience — be especially patient and scaffolding in the early phases of the conversation."
+max_turns
+integer
+No
+Soft ceiling on conversation turns before the agent moves to wrap-up. Default: 20. Range: 10–40.
+
+3.3 Activity steps
+The activity section describes what the student does during Phase 2. Steps are numbered to preserve sequence. They are displayed to the student as instructions and fed to the AI agent as context for the checkout conversation.
+Each step has the following structure:
+
+Field
+Type
+Required
+Description
+step_number
+integer
+Yes
+Auto-assigned sequential integer. Determines display and reference order.
+description
+text
+Yes
+What the student does in this step. Should be written in imperative voice and be specific enough to action. E.g. "Create an Inquiry in SAP for customer 1001 using material number M-001."
+outcome_tags
+integer[]
+No
+One or more indices referencing learning_outcomes. Indicates which outcomes this step is intended to develop. If omitted, the context compiler asks the AI to infer the mapping at runtime.
+understanding_note
+text
+No
+What good understanding of this step looks like. Written from the instructor's perspective. E.g. "Student should be able to explain that an Inquiry is a non-binding request from a customer, not a commitment to purchase." Used by the agent as a probing target.
+
+Authoring guidance  A step with only a description will be used as background context by the agent. A step with a description, at least one outcome tag, and an understanding note will be probed directly during the checkout conversation. Authors are encouraged to provide understanding notes for the steps they consider most critical to the learning outcomes.
+AI inference  When outcome_tags are omitted, the context compiler passes the step description alongside the full list of learning_outcomes to the AI and asks it to infer the most likely mapping. The inferred mapping is stored alongside the session transcript so authors can review and correct it when revising the recipe.
+
+3.4 Background documentation
+Authors may provide reference material that the AI agent uses to ground its probing questions and rubric scoring. This material is not displayed to the student directly — it informs the agent's knowledge of the domain.
+
+Field
+Type
+Required
+Description
+documents
+file[]
+No
+Uploaded files. Accepted formats: PDF, DOCX, TXT. Maximum file size: 10 MB per file. Maximum 5 files per module.
+pasted_text
+text
+No
+Free-form text pasted directly into the form. Useful for excerpts, definitions, or process descriptions. Maximum 10,000 characters.
+external_links
+object[]
+No
+URLs to external resources. Each entry has a URL and an optional description. The context compiler fetches and indexes the content at the time the recipe is saved. Maximum 5 links.
+
+PoC scope note  In the PoC, uploaded documents are extracted to plain text and included in the AI system prompt up to the token limit. In production, a vector retrieval layer would allow larger document sets without hitting context limits.
+
+3.5 Content stub
+The content stub is the student-facing introductory material displayed at the start of Phase 2. It is intentionally minimal in the PoC and will be expanded in a later development phase.
+
+Field
+Type
+Required
+Description
+summary_text
+text
+No
+A brief overview of the module topic, written for the student. Displayed at the top of the Phase 2 screen. Recommended length: 100–300 words.
+resource_links
+object[]
+No
+Optional links to supplementary reading or video. Each entry has a URL, a display label, and an optional type tag (reading, video, tool). Displayed as a list below the summary text.
+
+4. Student mode
+The student experience is a four-phase wizard. Each phase occupies its own screen with a clear visual transition. The student cannot skip phases or navigate backward. Progress is preserved in the session store so that a student who closes the browser mid-activity can resume from where they left off.
+4.1 Phase 1 — Check-in
+The check-in is a short, ungraded survey designed to establish a baseline of the student's prior knowledge and experience with the domain. Its results are not shown to the student as a score — they are used internally to personalize the checkout conversation.
+4.1.1 Question generation
+Check-in questions are generated by the AI at session start, using the module_title, module_description, learning_outcomes, and key_concepts from the domain context form. The AI generates 3–4 questions targeting:
+Prior professional or academic experience with the domain.
+Self-assessed comfort level with the key concepts.
+Any relevant prior exposure to the tools or systems used in the activity.
+Questions are regenerated each time a new session starts for a given module version. They are not stored as static content — this ensures they remain well-calibrated to the recipe as it evolves.
+4.1.2 Response format
+Each question uses one of three response formats: a 5-point Likert scale (for comfort/confidence questions), a multiple-choice selector (for experience-level questions), or a short free-text field (maximum 150 characters, for open-ended questions). The authoring form does not specify question format — the AI selects the most appropriate format for each generated question.
+4.1.3 Data use
+Check-in responses are stored in the session store and injected into the context compiler before the checkout conversation begins. The agent receives a summary such as: "This student reported no prior experience with sales processes and low confidence with ERP systems. Adjust baseline expectations and provide more scaffolding in the early phases of the conversation."
+4.2 Phase 2 — Activity
+Phase 2 presents the content stub and the numbered activity steps. The student reads the summary text, consults any resource links, and completes the activity steps — which may involve interacting with external software, reading additional material, or watching video content.
+4.2.1 Display
+The phase 2 screen displays:
+The module title and summary text from the content stub.
+Any resource links from the content stub, labeled by type (reading, video, tool).
+The numbered activity steps, displayed in sequence. Step descriptions are shown as-is from the authoring form. Understanding notes are not shown to the student.
+A prominent "I have completed the activity" button that advances to Phase 3. In the PoC this button is always enabled — no automated task verification is performed.
+4.2.2 Activity scope
+The PoC does not embed or sandbox the activity itself. Students complete tasks in whatever environment the step descriptions point them to (external software, a browser tab, a physical worksheet). The platform's role in Phase 2 is to display instructions and confirm completion.
+Future capability  In production, the activity completion gate can be connected to an external verification API (e.g. querying an SAP instance for the existence of required documents) before Phase 3 is unlocked.
+4.3 Phase 3 — Checkout conversation
+The checkout conversation is the core of the platform. It is an adaptive, text-based dialogue between the student and an AI agent that probes understanding of the activity, the underlying concepts, and the transferable skills demonstrated.
+4.3.1 Conversation structure
+The agent conducts the conversation in four internal phases, signaled by hidden markers in the AI output rather than visible UI changes:
+Opening (2–3 turns): The agent acknowledges the completed activity, references the student's check-in responses to establish rapport, and asks an open opening question. E.g. "You mentioned you haven't worked with sales systems before — now that you've been through the process, what stood out to you?"
+Process understanding (4–6 turns): The agent asks the student to walk through what they did and probes the reasoning behind key steps. The agent uses the activity steps and outcome tags to select which steps to probe directly and which to use as background context.
+Durable skills and career transfer (3–4 turns): The agent shifts to reflective questions drawn from the career_transfer_prompts field. E.g. "What transferable skills do you feel you practiced during this activity?" If the student's answer only names technical skills, the agent prompts for interpersonal or cognitive skills.
+Wrap-up (1–2 turns): The agent thanks the student, offers one observation of strength and one of development, and signals the end of the conversation.
+4.3.2 Adaptive probing
+The agent applies probing rules from the instructional recipe and vague_answer_triggers to decide when and how to probe. The following behaviors are always active regardless of recipe content:
+If a student describes a step without explaining its purpose, the agent asks why the step exists.
+If a student uses correct vocabulary without demonstrating understanding of the concept, the agent asks for an example or analogy.
+If a student says "I don't know" or equivalent, the agent offers one gentle scaffold before accepting the non-answer and moving on.
+If a student's answer is rich and complete, the agent affirms it briefly and advances — it does not ask redundant follow-up questions.
+The agent never asks more than one question per turn. It never lectures or corrects — it redirects with curiosity.
+4.3.3 Step routing
+At the start of the checkout conversation, the context compiler classifies each activity step as either probe-eligible or context-only:
+Probe-eligible: steps with a description, at least one outcome tag (authored or AI-inferred), and an understanding note. The agent may address these directly by number or substance.
+Context-only: steps with only a description (no tag, no understanding note). These inform the agent's awareness of what the student did but are not directly probed.
+The agent is not required to probe every probe-eligible step. It selects based on the flow of the conversation and the student's responses.
+4.3.4 Tone and constraints
+The agent always:
+Validates effort before redirecting. E.g. "That's a good start — let's go a bit deeper."
+Uses the student's own language where possible.
+Maintains a warm, professional register — mentor or interviewer, not examiner.
+The agent never:
+Uses the words "correct" or "incorrect."
+Asks more than one question in a single turn.
+Lectures about the domain or explains content the student should have learned in Phase 2.
+Refers to the rubric dimensions by name during the conversation.
+4.4 Phase 4 — Summary evaluation
+At the conclusion of the checkout conversation the AI generates a structured evaluation based on the rubric dimensions defined in the instructional recipe. The evaluation is displayed to the student and stored in the session store.
+4.4.1 Evaluation structure
+The evaluation consists of:
+A rating for each rubric dimension: Strong, Developing, or Needs further work.
+A two to three sentence narrative per dimension explaining the rating with reference to specific things the student said.
+An overall summary (3–5 sentences) that synthesizes the student's performance, names one clear strength, and identifies one area for continued development.
+A per-outcome view (where data permits): a brief note on whether each learning outcome appears to have been achieved, not achieved, or only partially addressed in the conversation.
+4.4.2 Tone of the evaluation
+The evaluation is written for the student to read. It is honest but constructive — it does not use deficit language and always ends with a forward-looking observation. The AI is instructed to write as a mentor would after a job interview debrief.
+4.4.3 Retry
+If one or more rubric dimensions are rated "Needs further work," the student is offered the option to retry the checkout conversation. A retry creates a new session record linked to the original. The agent receives the previous session's evaluation as context and focuses the follow-up conversation on the identified gaps rather than repeating the full interview.
+
+5. Context compiler
+The context compiler is the central processing component of the platform. It takes the domain context object produced by the authoring form and assembles it into the system prompts and runtime inputs used by the AI engine at each phase. It is not user-facing — it runs server-side at session creation and at the start of each phase.
+5.1 Responsibilities
+Assemble the check-in question generation prompt from the domain context form fields.
+Classify activity steps as probe-eligible or context-only based on the presence of outcome tags and understanding notes.
+Request AI inference of outcome tags for any steps where outcome_tags is empty.
+Inject check-in responses into the checkout conversation system prompt as a student profile summary.
+Include indexed background documentation in the checkout conversation system prompt up to the available token budget.
+Select and format the rubric dimensions for the evaluation prompt.
+Apply tone_guidance and probing_rules to the checkout conversation system prompt.
+5.2 Step classification logic
+A step is classified as probe-eligible if and only if all of the following are true after compilation:
+It has a non-empty description.
+It has at least one outcome tag (authored or AI-inferred with confidence ≥ 0.7).
+It has a non-empty understanding_note.
+Steps that fail any of these conditions are classified as context-only. The classification is stored in the session record so it can be reviewed when the recipe is revised.
+5.3 Token budget management
+The context compiler manages token usage across the system prompt to stay within the AI engine's context window. Priority order for inclusion:
+Core recipe fields (domain context form + instructional recipe). Always included.
+Activity steps (all, with classifications). Always included.
+Check-in response summary. Always included.
+Background documentation. Included in order of relevance score up to remaining token budget. Truncated at the document level (whole documents are included or excluded — no mid-document truncation in the PoC).
+PoC limitation  The PoC uses a simple character-count proxy for token estimation. A production implementation would use the API tokenizer for precise budget management and implement vector retrieval for large documentation sets.
+
+6. Data model
+6.1 Recipe store (backend, persisted)
+The recipe store is a server-side database that persists instructional recipes across sessions. It is the primary artifact of the authoring workflow.
+
+Field
+Type
+Required
+Description
+recipe_id
+uuid
+Yes
+Primary key. Auto-generated on first save.
+version
+integer
+Yes
+Auto-incremented on each save. Starts at 1.
+module_title
+string
+Yes
+From domain context form.
+created_at
+timestamp
+Yes
+Timestamp of initial creation.
+updated_at
+timestamp
+Yes
+Timestamp of most recent save.
+context_object
+json
+Yes
+Full serialized domain context object including all form fields.
+documents
+file_refs
+No
+References to uploaded background documentation files.
+validation_log
+text[]
+No
+Append-only list of notes from recipe review sessions. Each entry has a timestamp, author, and note text.
+is_active
+boolean
+Yes
+Only one version per recipe_id can be active at a time. New sessions always load the active version.
+6.2 Session store
+The session store holds all data produced during a student's interaction with a module.
+
+Field
+Type
+Required
+Description
+session_id
+uuid
+Yes
+Primary key. Auto-generated at session start.
+recipe_id
+uuid
+Yes
+Foreign key to recipe store.
+recipe_version
+integer
+Yes
+The version of the recipe active at session start.
+started_at
+timestamp
+Yes
+Session start time.
+completed_at
+timestamp
+No
+Null until Phase 4 is reached.
+phase_reached
+integer
+Yes
+Highest phase number reached (1–4). Used for resume logic.
+checkin_responses
+json
+No
+Array of question/response pairs from Phase 1.
+step_classifications
+json
+No
+Compiler output: array of steps with probe_eligible boolean and inferred_tags where applicable.
+transcript
+json
+No
+Full checkout conversation as an array of turn objects (role, content, timestamp).
+evaluation
+json
+No
+Structured evaluation output from Phase 4.
+attempt_number
+integer
+Yes
+Starts at 1. Incremented on retry.
+prior_session_id
+uuid
+No
+For retry sessions: references the session_id of the previous attempt.
+
+7. AI engine
+7.1 Model
+The PoC uses Claude claude-sonnet-4 (claude-sonnet-4-6) via the Anthropic API. All API calls are made server-side through an Anthropic proxy that holds the API key — the key is never exposed to the client.
+7.2 API calls
+The AI engine makes four distinct types of API call, each with its own system prompt assembled by the context compiler:
+Check-in question generation: called once at session start. Returns 3–4 questions with format specifications (Likert, multiple-choice, or short text).
+Outcome tag inference: called once per step with an empty outcome_tags field, at session start. Returns a ranked list of outcome indices with confidence scores.
+Checkout conversation turn: called once per student turn during Phase 3. The full conversation history is included in each call (stateless API, stateful client).
+Evaluation generation: called once at the conclusion of Phase 3. Returns the structured evaluation object.
+7.3 System prompt structure
+The checkout conversation system prompt is assembled in the following order:
+Role and persona: the agent's identity, tone, and constraints.
+Module context: title, description, learning outcomes, key concepts.
+Activity context: numbered steps with probe-eligible/context-only classifications and understanding notes for probe-eligible steps.
+Student profile: summarized check-in responses.
+Instructional recipe: probing rules, vague answer triggers, career transfer prompts, tone guidance.
+Rubric dimensions: names and descriptions only (not shown to student during conversation).
+Background documentation: indexed content up to token budget.
+Conversation phase instructions: the four internal phases with turn counts and transition signals.
+7.4 Output formatting
+The AI uses hidden markers in its output to signal phase transitions and the evaluation object. These markers are stripped by the client before display. The evaluation object is returned as a JSON block within the final assistant turn, parsed by the client and rendered as the Phase 4 summary card.
+
+8. Non-functional requirements
+8.1 PoC scope
+The following constraints apply specifically to the proof-of-concept implementation and are expected to be revisited before production deployment.
+8.1.1 Authentication
+No authentication is required in the PoC. The authoring form and student wizard are accessible without login. In production, the authoring form would be protected by role-based access and the student wizard would receive identity via LTI or SSO.
+8.1.2 Persistence
+The recipe store must persist data durably across application restarts. A lightweight server-side database (SQLite or equivalent) is acceptable for the PoC. Session data may use the same database. No data migration tooling is required for the PoC.
+8.1.3 Performance
+AI response latency is expected to be 2–8 seconds per checkout conversation turn. A typing indicator must be displayed during this period. No caching of AI responses is required.
+8.1.4 Concurrency
+The PoC is designed for single-user or small-group use (fewer than 10 concurrent sessions). No horizontal scaling is required.
+8.1.5 Export
+Session data must be exportable as a JSON file from the session store. A human-readable printable summary of the Phase 4 evaluation must be available from the student's browser at the end of Phase 4. CSV export across sessions is a post-PoC requirement.
+8.2 Accessibility
+The student wizard must be usable with a keyboard alone. All form inputs must have visible labels. Color must not be the sole indicator of status or meaning. Minimum contrast ratio of 4.5:1 for body text.
+8.3 Browser support
+The PoC must function in current versions of Chrome, Firefox, and Safari on desktop. Mobile support is not required for the PoC.
+
+9. Out of scope for PoC
+The following capabilities are explicitly excluded from the PoC. They are documented here to prevent scope creep and to inform the production roadmap.
+LMS integration (Canvas LTI launch, grade passback).
+SAP or other external system task verification.
+Badge issuance (Credly or equivalent).
+Student authentication and identity management.
+Multi-tenant support (multiple institutions or organizations).
+Voice-based conversation interface.
+Instructor dashboard and cohort-level analytics.
+Vector retrieval for large documentation sets.
+CSV export across multiple sessions.
+Automated recipe validation or A/B testing infrastructure.
+Mobile-optimized UI.
+
+10. PoC success criteria
+The PoC is considered successful if it demonstrates the following:
+A non-technical domain expert can complete the authoring form for a real module in under 60 minutes without assistance, producing a recipe that meaningfully constrains agent behavior.
+The checkout conversation feels qualitatively different from a quiz — at least three independent reviewers describe it as "like a conversation" rather than "like a test."
+The agent probes at least one step directly (by substance) during a checkout conversation with a student who provides a vague initial answer.
+The Phase 4 evaluation is judged as fair and specific by the student — not generic — when evaluated against the conversation transcript.
+A recipe authored for one domain (e.g. SAP Sales Process) can be replaced by a recipe for a different domain (e.g. a biology lab activity) with zero code changes.
+11. Open questions
+The following questions are unresolved and should be addressed before or during the PoC build:
+Should the authoring form be a standalone screen in the same application as the student wizard, or a separate tool? A separate tool reduces complexity but makes testing the full loop slower.
+How should the agent handle a student who attempts to game the conversation by giving answers that sound correct without genuine understanding? Is this a PoC concern or a production concern?
+What is the right default value for max_turns? 20 is a reasonable starting point but should be validated with real students.
+Should the Phase 4 evaluation be visible only to the student, or also logged in a format reviewable by the author or instructor? For the PoC, student-only is simpler, but the validation loop requires instructor access.
+How should the retry conversation differ in tone from the first attempt? The agent receives the prior evaluation, but should it explicitly reference it ("Last time we talked, you found it difficult to explain X...") or use it silently?
+

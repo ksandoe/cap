@@ -1,0 +1,545 @@
+
+PRODUCT REQUIREMENTS DOCUMENT
+Identity, Integration & Orchestration
+Subsystem PRD
+
+Version 1.0  ·  Draft
+August 2026
+Companion document to: Conversational Assessment Platform PRD v1.0
+
+1. Purpose and scope
+1.1 Purpose
+This document specifies the requirements for the Identity, Integration, and Orchestration (IIO) subsystem of the Conversational Assessment Platform. The IIO subsystem is the infrastructure layer that connects the platform to its external partners — Canvas LMS, the institution's SAP sandbox, and the Credly badge service — and manages the full lifecycle of a student session from LTI launch through completion.
+The IIO subsystem is intentionally designed to be decoupled from the Conversational Assessment subsystem. The two subsystems communicate through a defined internal API and event bus. This separation means that either subsystem can be developed, tested, or replaced independently without affecting the other.
+1.2 Relationship to the Conversational Assessment PRD
+The Conversational Assessment Platform PRD (v1.0) defines the authoring mode, the four-phase student wizard, the context compiler, and the AI engine. That document deliberately defers all orchestration, identity, and integration concerns to this subsystem. The IIO subsystem PRD should be read as a companion document, not a standalone specification.
+The primary interface between the two subsystems is the Session API: the IIO subsystem creates and owns session records; the Conversational Assessment subsystem reads and writes to them via the Session API. Neither subsystem accesses the other's internal database directly.
+1.3 Scope
+The IIO subsystem is responsible for:
+LTI 1.3 launch receipt, validation, and handoff to the student wizard.
+Identity mapping between Canvas user identifiers and SAP user identifiers.
+Session lifecycle management: creation, phase progression, resume, and termination.
+Workflow orchestration: routing the student through the correct sequence of phases and enforcing gates between them.
+SAP task verification: querying the SAP sandbox to confirm that required documents exist before the checkout conversation is unlocked.
+Grade return to Canvas via the LTI Advantage Assignment and Grade Services (AGS) API.
+Badge issuance to Credly Acclaim upon successful assessment completion.
+Audit logging and event bus: recording all significant platform events for internal diagnostics and operational monitoring.
+1.4 Out of scope
+The following are explicitly excluded from this subsystem:
+The conversational AI agent and its prompting logic (Conversational Assessment PRD).
+The authoring form and instructional recipe management (Conversational Assessment PRD).
+xAPI / Tin Can LRS integration (post-PoC).
+External SIEM or data warehouse integration (post-PoC).
+Provisioning or writing to SAP (read-only in this version).
+Multi-tenant or multi-institution support (post-PoC).
+
+2. External systems and protocols
+The IIO subsystem communicates with three external systems. Each uses a distinct authentication and integration protocol. This section defines the protocol choices and the rationale for each.
+2.1 Canvas LMS — LTI 1.3 + REST API
+Canvas is the system of record for student enrollment, course structure, and grades. The platform integrates with Canvas in two directions: inbound (LTI 1.3 launch, carrying student identity and context) and outbound (grade return via LTI Advantage AGS).
+2.1.1 LTI 1.3 launch (inbound)
+LTI 1.3 uses OpenID Connect (OIDC) for identity and OAuth 2.0 for authorization. The launch flow is a two-step redirect: Canvas sends a login initiation request to the platform's OIDC endpoint, the platform redirects back to Canvas for authentication, and Canvas returns a signed JWT containing the student's identity and the assignment context. The platform validates the JWT using Canvas's public key set (JWKS).
+The JWT carries the following claims used by the IIO subsystem:
+sub: the Canvas user UUID (platform-scoped, stable across sessions).
+https://purl.imsglobal.org/spec/lti/claim/context: the course and section context.
+https://purl.imsglobal.org/spec/lti/claim/resource_link: the specific assignment link.
+https://purl.imsglobal.org/spec/lti/claim/lis: the LIS result sourcedId used for grade return.
+https://purl.imsglobal.org/spec/lti-ags/claim/endpoint: the AGS endpoint URL for this assignment.
+2.1.2 Grade return (outbound)
+Grade return uses the LTI Advantage Assignment and Grade Services API. Upon module completion, the IIO subsystem posts a single score (0.0 to 1.0) to the AGS lineitem endpoint associated with the assignment. The platform uses the client_credentials OAuth 2.0 flow to obtain an access token from Canvas before posting the score.
+Score semantics: a score of 1.0 indicates successful completion (badge awarded). A score of 0.0 indicates the student reached Phase 4 but did not meet the assessment threshold. No score is posted for incomplete sessions.
+Protocol note  LTI 1.3 requires the platform to be registered as an external tool in Canvas by an LMS administrator. Registration requires the platform's OIDC login URL, redirect URI, JWKS URL, and target link URI. These must be provided to the Canvas administrator before any student can launch the tool.
+2.2 SAP sandbox — OAuth 2.0 + OData REST API
+The SAP integration is read-only. Its sole purpose is to verify that a student has created the required documents (Inquiry, Quotation, Sales Order) in the SAP sandbox before the checkout conversation is unlocked. No data is written to SAP by the platform.
+2.2.1 Authentication
+The platform authenticates to SAP using the OAuth 2.0 Client Credentials flow against SAP's built-in OAuth 2.0 Authorization Server. The platform holds a client ID and client secret (stored in the secrets manager, never in application code or configuration files). Access tokens are short-lived (typically 1 hour) and are cached and refreshed automatically by the SAP connector.
+SAML note  SAML 2.0 was considered as an alternative for SAP authentication. OAuth 2.0 Client Credentials is preferred for this use case because the platform is acting as a system integration (not a human user) and because token refresh is simpler to manage programmatically than SAML assertion renewal. If the institution's SAP instance does not support OAuth 2.0, SAML 2.0 SP-initiated SSO with a service account is the fallback.
+2.2.2 Document verification query
+The verification query uses the SAP OData v4 REST API to check for the existence of the three required document types associated with the student's SAP user ID. The query is read-only and returns a boolean result (all required documents present / not all present) along with the document numbers for audit logging.
+The SAP user ID is obtained from the identity map (see Section 3.2). If no SAP user ID exists in the map for the current Canvas user, the verification gate fails with a specific error code that instructs the student to contact their instructor.
+2.3 Credly — OIDC / OAuth 2.0 REST API
+Credly's Acclaim platform is used for badge issuance. The platform integrates with Credly's REST API to issue a badge assertion to a student upon successful completion of the assessment.
+2.3.1 Authentication
+The Credly Acclaim API uses OAuth 2.0 with the Authorization Code flow for initial setup (performed once by an administrator) and stores the resulting refresh token in the secrets manager. At runtime, the platform exchanges the refresh token for a short-lived access token before each badge issuance call.
+SAML / OIDC note  Credly supports SAML 2.0 and OIDC for SSO into the Credly web interface (for students claiming badges). This is a separate concern from the API integration used for badge issuance. The platform's badge issuance uses the REST API only; SAML/OIDC SSO for the student-facing Credly experience is managed by the institution's identity provider and is outside the scope of this subsystem.
+2.3.2 Badge issuance
+Badge issuance is triggered by the IIO subsystem when the Conversational Assessment subsystem posts a completion event with badge_awarded: true to the event bus. The IIO subsystem calls the Credly Acclaim API with the student's email address and the badge template ID for the completed module. Credly returns an assertion ID which is stored in the session record.
+Badge template IDs are stored in the module configuration table (one record per module), not hardcoded. Adding a new module badge requires only a database record update.
+
+3. Identity management
+3.1 Identity sources
+The platform receives student identity from three sources, each using a different identifier scheme:
+Canvas: a platform-scoped UUID delivered in the LTI 1.3 JWT sub claim. Stable across all sessions for a given student in a given Canvas instance.
+SAP: a SAP username or employee number, provisioned by the institution's IT department when the student is granted access to the SAP sandbox.
+Credly: the student's email address, used as the recipient identifier for badge issuance. Assumed to be the institution's standard email address.
+The IIO subsystem is responsible for maintaining the mapping between these identifiers and resolving them at runtime.
+3.2 Identity map
+The identity map is a database table that stores the relationship between a student's Canvas UUID and their SAP username. It is populated by an administrative import process (CSV upload or manual entry) before the module goes live with students. It is not populated automatically at launch time.
+
+Field
+Type
+Required
+Description
+canvas_uuid
+string
+Yes
+The Canvas platform-scoped user UUID from the LTI JWT sub claim. Primary lookup key.
+sap_username
+string
+Yes
+The SAP username or user ID for this student in the institution's SAP sandbox.
+email
+string
+Yes
+Institution email address. Used as Credly recipient identifier. Should match Canvas enrollment email.
+display_name
+string
+No
+Student display name for logging and instructor-facing views. Sourced from Canvas LTI claims on first launch.
+created_at
+timestamp
+Yes
+Timestamp of record creation.
+last_verified_at
+timestamp
+No
+Timestamp of the most recent successful SAP query for this student. Used for cache invalidation.
+
+Pre-launch requirement  The identity map must be populated before any student can complete Phase 2. A launch without a matching SAP identity record will succeed through Phase 1 and Phase 2 display, but the SAP verification gate will return a user-facing error. The platform must display a clear, actionable message in this case rather than a generic error.
+3.3 Identity resolution at runtime
+At LTI launch, the IIO subsystem performs the following identity resolution steps in order:
+Extract the Canvas UUID from the validated LTI JWT sub claim.
+Look up the canvas_uuid in the identity map. If not found, create a partial record with canvas_uuid, email (from LTI claims), and display_name. Flag the record as incomplete (no SAP username).
+If a complete record exists, use the sap_username for all subsequent SAP queries in this session.
+Store the resolved identity in the session record for the duration of the session.
+3.4 Session token
+After successful LTI validation and identity resolution, the IIO subsystem issues a short-lived session token (JWT, signed with the platform's private key, 8-hour expiry). This token is used by all subsequent requests from the student's browser. It carries the session_id, canvas_uuid, and the current phase. It does not carry the SAP username (that remains server-side only).
+
+4. Session lifecycle and workflow orchestration
+The IIO subsystem owns the session lifecycle. It creates sessions, tracks phase progression, enforces gates between phases, handles resume logic, and terminates sessions on completion or expiry.
+4.1 Session states
+A session moves through the following states in sequence. Backward transitions are not permitted.
+
+State
+Description
+Entry condition
+LAUNCHED
+LTI launch received and validated. Identity resolved. Session record created.
+Valid LTI 1.3 JWT received.
+CHECKIN
+Student is completing Phase 1 check-in survey.
+Session token issued to browser.
+ACTIVITY
+Student is in Phase 2. Check-in responses saved.
+All check-in questions answered and submitted.
+SAP_PENDING
+SAP verification query in progress. Student has clicked "I have completed the activity."
+Student submits activity completion.
+SAP_VERIFIED
+All required SAP documents confirmed present. Phase 3 unlocked.
+SAP query returns all required documents.
+CHECKOUT
+Student is in Phase 3 checkout conversation.
+SAP_VERIFIED state reached.
+EVALUATING
+Checkout conversation concluded. Evaluation being generated.
+Agent signals conversation end.
+COMPLETED
+Evaluation generated. Badge issued (if applicable). Grade posted to Canvas.
+Evaluation result received from Conversational Assessment subsystem.
+RETRY
+Student elected to retry the checkout conversation. New child session created.
+Student selects retry on Phase 4 screen. Assessment threshold not met.
+EXPIRED
+Session exceeded maximum age (72 hours) without reaching COMPLETED.
+Session age > 72 hours and state != COMPLETED.
+
+4.2 Phase gates
+Phase gates are enforced server-side by the IIO subsystem. The browser cannot advance to the next phase without a server-side state transition. Attempts to access a phase out of sequence return HTTP 403 with a machine-readable error code.
+4.2.1 Gate: Check-in → Activity
+Condition: all check-in questions have been answered and the responses have been saved to the session record. No minimum response quality is enforced — this gate is purely a completion check.
+4.2.2 Gate: Activity → Checkout (SAP verification)
+Condition: the SAP verification query returns a positive result for all required document types defined in the module configuration. This is the most significant gate in the workflow. The verification flow is:
+Student clicks "I have completed the activity." Session transitions to SAP_PENDING.
+IIO subsystem submits an asynchronous SAP verification job.
+Browser polls the session status endpoint every 3 seconds.
+On success: session transitions to SAP_VERIFIED, browser is redirected to Phase 3.
+On failure (documents not found): session remains in ACTIVITY state. A user-facing message indicates which document types are missing. The student may retry after completing the missing steps.
+On SAP connectivity error: session remains in ACTIVITY state. A user-facing message indicates a temporary system issue and advises the student to try again in a few minutes. The error is logged with full details.
+Timeout  The SAP verification query has a 15-second timeout. If no response is received within 15 seconds, the IIO subsystem treats it as a connectivity error and does not advance the student. The timeout is configurable per module in the module configuration table.
+4.2.3 Gate: Checkout → Summary
+Condition: the Conversational Assessment subsystem posts a ASSESSMENT_COMPLETE event to the event bus with a valid evaluation payload. The IIO subsystem transitions the session to EVALUATING, waits for the evaluation record to be written, then transitions to COMPLETED and triggers the post-completion workflow (grade return + badge issuance).
+4.3 Resume logic
+If a student's browser session is interrupted (tab closed, network loss, session token expiry within the 8-hour window), they can resume by relaunching the tool from Canvas. The LTI launch handler checks for an existing non-terminal session for the same canvas_uuid and module_id. If found:
+Sessions in CHECKIN, ACTIVITY, SAP_PENDING, or SAP_VERIFIED states are resumed from the beginning of the current phase.
+Sessions in CHECKOUT state are resumed at the current conversation turn. The full transcript is reloaded.
+Sessions in EVALUATING or COMPLETED states redirect the student directly to the Phase 4 summary screen.
+Sessions in EXPIRED state are treated as new sessions. A user-facing message informs the student that their previous session expired and they are starting fresh.
+4.4 Retry sessions
+A retry is a new session linked to the parent session. The IIO subsystem:
+Creates a new session record with attempt_number = parent.attempt_number + 1 and prior_session_id = parent.session_id.
+Copies the check-in responses from the parent session into the new session (the student does not repeat check-in).
+Skips the SAP verification gate (documents were already verified in the parent session).
+Passes the parent session's evaluation result to the Conversational Assessment subsystem as additional context for the retry conversation.
+The student begins a retry at Phase 3 (checkout conversation). Phase 2 is displayed in a read-only summary view for reference.
+Retry limit  The maximum number of retry attempts per student per module is configurable in the module configuration table. The default is 2 (one original attempt plus two retries). After the maximum is reached, the student is advised to contact their instructor. The IIO subsystem enforces this limit at session creation time.
+
+5. Completion and results
+5.1 Post-completion workflow
+When a session transitions to COMPLETED, the IIO subsystem executes the following steps in order. Steps 2 and 3 are independent and may execute in parallel.
+Write the final session record: set completed_at, store the evaluation payload, set badge_awarded flag.
+Post grade to Canvas (Section 5.2).
+Issue badge to Credly if badge_awarded is true (Section 5.3).
+Publish a SESSION_COMPLETED event to the event bus (Section 6).
+Update the student-facing Phase 4 screen with the final evaluation, badge (if awarded), and any retry option.
+If either step 2 or step 3 fails, the session remains in COMPLETED state (the student's result is not lost). The failed operation is retried up to 3 times with exponential backoff. Persistent failures are logged and flagged for manual review.
+5.2 Grade return to Canvas
+The IIO subsystem posts a single score to the Canvas AGS lineitem endpoint associated with the assignment. The score is derived from the evaluation result as follows:
+badge_awarded = true → score 1.0 (full credit / completion).
+badge_awarded = false, at least one rubric dimension rated "Developing" or above → score 0.5 (partial credit, attempted).
+badge_awarded = false, one or more dimensions rated "Needs further work" → score 0.0 (not yet meeting threshold).
+The score mapping is configurable per module in the module configuration table. The defaults above apply when no custom mapping is specified.
+Instructor override  Canvas allows instructors to override scores manually in the gradebook. The platform does not re-post scores once a manual override has been applied. A GRADE_POSTED event in the event log records the platform-submitted score independently of any subsequent manual changes.
+5.3 Badge issuance
+Badge issuance is triggered only when badge_awarded is true. The IIO subsystem calls the Credly Acclaim API with:
+recipient_email: from the identity map.
+badge_template_id: from the module configuration table.
+issued_at: the session completed_at timestamp.
+evidence_url: a platform-hosted URL that renders a printable summary of the student's evaluation (accessible without login, protected by a signed token with 90-day expiry).
+Credly returns an assertion_id which is stored in the session record. The assertion_id can be used to revoke the badge if necessary (e.g. in cases of academic misconduct). Badge revocation is a manual administrative action and is not automated by the platform.
+
+6. Audit logging and event bus
+All significant platform events are published to an internal event bus and written to a persistent audit log. The event bus is used for internal diagnostics, operational monitoring, and inter-subsystem communication. It does not integrate with external systems in the current version.
+6.1 Event log schema
+
+Field
+Type
+Required
+Description
+event_id
+uuid
+Yes
+Auto-generated unique identifier for the event.
+event_type
+string
+Yes
+Event type identifier. See Section 6.2 for the full event catalog.
+session_id
+uuid
+No
+The session this event belongs to. Null for system-level events.
+canvas_uuid
+string
+No
+The Canvas user identifier of the student, if applicable.
+module_id
+string
+No
+The module identifier, if applicable.
+occurred_at
+timestamp
+Yes
+UTC timestamp of the event.
+payload
+json
+No
+Event-specific data. Schema varies by event_type. See Section 6.2.
+severity
+string
+Yes
+One of: INFO, WARN, ERROR. Used for log filtering and alerting.
+source
+string
+Yes
+The subsystem component that emitted the event (e.g. "lti-service", "sap-connector", "grade-service").
+
+6.2 Event catalog
+
+Event type
+Trigger
+Key payload fields
+LTI_LAUNCH_RECEIVED
+LTI 1.3 JWT received from Canvas.
+lti_context_id, resource_link_id, canvas_uuid
+LTI_LAUNCH_VALIDATED
+JWT signature and claims verified successfully.
+canvas_uuid, module_id, session_id
+LTI_LAUNCH_FAILED
+JWT validation failed.
+error_code, raw_error (sanitized)
+SESSION_CREATED
+New session record created.
+session_id, canvas_uuid, module_id, attempt_number
+SESSION_RESUMED
+Existing session resumed after browser reconnect.
+session_id, resumed_from_phase
+CHECKIN_COMPLETED
+All check-in responses submitted.
+session_id, question_count
+ACTIVITY_SUBMITTED
+Student clicks "I have completed the activity."
+session_id
+SAP_VERIFICATION_START
+SAP document query initiated.
+session_id, sap_username, required_doc_types
+SAP_VERIFICATION_PASS
+All required SAP documents confirmed.
+session_id, document_numbers[]
+SAP_VERIFICATION_FAIL
+One or more required documents not found.
+session_id, missing_doc_types[]
+SAP_VERIFICATION_ERROR
+SAP query failed due to connectivity or auth error.
+session_id, error_code, http_status
+CHECKOUT_STARTED
+Phase 3 checkout conversation begun.
+session_id
+CHECKOUT_TURN
+One conversation turn completed.
+session_id, turn_number, role
+ASSESSMENT_COMPLETE
+Evaluation generated by Conversational Assessment subsystem.
+session_id, badge_awarded, dimension_ratings{}
+SESSION_COMPLETED
+Session reached COMPLETED state.
+session_id, badge_awarded, attempt_number
+GRADE_POSTED
+Score posted to Canvas AGS.
+session_id, score, ags_endpoint
+GRADE_POST_FAILED
+Canvas AGS post failed.
+session_id, error_code, attempt_count
+BADGE_ISSUED
+Badge assertion created in Credly.
+session_id, credly_assertion_id, badge_template_id
+BADGE_ISSUE_FAILED
+Credly API call failed.
+session_id, error_code, attempt_count
+SESSION_EXPIRED
+Session exceeded maximum age without completing.
+session_id, last_state, age_hours
+RETRY_CREATED
+Retry session created.
+session_id, prior_session_id, attempt_number
+
+6.3 Retention and access
+All events are written to the audit log synchronously before the triggering operation is considered complete. Events are retained for a minimum of 90 days. After 90 days, events may be archived to cold storage. No events are deleted within the retention window.
+The audit log is accessible to platform administrators via a simple query interface (filter by session_id, canvas_uuid, event_type, date range, severity). It is not user-facing — students and instructors do not have direct access to the log.
+ERROR-severity events trigger an in-application alert to the platform administrator. No external alerting integration (email, Slack, PagerDuty) is required in the current version.
+
+7. Internal API
+The IIO subsystem exposes a REST API consumed by the Conversational Assessment subsystem and the student-facing browser client. All endpoints require a valid session token (see Section 3.4) except the LTI launch endpoints, which are unauthenticated by design.
+7.1 LTI endpoints
+
+Method
+Path
+Description
+GET
+/lti/oidc/login
+OIDC login initiation endpoint. Receives the login hint from Canvas and redirects to Canvas for authentication.
+POST
+/lti/launch
+LTI launch endpoint. Receives the signed JWT from Canvas, validates it, resolves identity, creates or resumes a session, issues a session token, and redirects the student to the appropriate wizard phase.
+GET
+/.well-known/jwks.json
+Platform public JWKS endpoint. Required by Canvas to verify platform-signed tokens.
+
+7.2 Session endpoints
+
+Method
+Path
+Description
+GET
+/session/:id
+Returns the current session record including state, phase_reached, and check-in responses. Used by the wizard to restore state on resume.
+POST
+/session/:id/checkin
+Submits check-in responses. Transitions session from CHECKIN to ACTIVITY. Validates that all required questions are answered.
+POST
+/session/:id/verify-sap
+Initiates the SAP verification job. Transitions session to SAP_PENDING. Returns immediately; client polls for result.
+GET
+/session/:id/verify-status
+Returns the current SAP verification status (PENDING, VERIFIED, FAILED, ERROR) and any error details. Used for browser polling.
+POST
+/session/:id/complete
+Called by the Conversational Assessment subsystem when the evaluation is ready. Accepts the evaluation payload, transitions session to COMPLETED, and triggers the post-completion workflow.
+POST
+/session/:id/retry
+Creates a retry session linked to the current session. Returns the new session_id and token. Enforces retry limit.
+
+7.3 Module configuration endpoint
+
+Method
+Path
+Description
+GET
+/module/:id/config
+Returns the module configuration needed by the IIO subsystem: required SAP document types, badge template ID, score mapping, retry limit, SAP verification timeout, and max session age.
+
+8. Data model
+8.1 Module configuration table
+
+Field
+Type
+Required
+Description
+module_id
+string
+Yes
+Unique identifier for the module. Must match the resource_link_id or a configured alias in the LTI launch.
+module_title
+string
+Yes
+Display name. Must match the module_title in the Conversational Assessment recipe store.
+recipe_id
+uuid
+Yes
+Foreign key to the Conversational Assessment recipe store. The active recipe version is resolved at session creation.
+required_sap_doc_types
+string[]
+Yes
+List of SAP document type codes that must exist in SAP before Phase 3 is unlocked. E.g. ["VA11","VA21","VA01"].
+badge_template_id
+string
+No
+Credly badge template ID for this module. If null, no badge is issued on completion.
+score_mapping
+json
+No
+Custom score mapping object. If null, default mapping from Section 5.2 applies.
+retry_limit
+integer
+Yes
+Maximum number of retry attempts. Default: 2.
+sap_timeout_seconds
+integer
+Yes
+SAP verification query timeout. Default: 15.
+max_session_age_hours
+integer
+Yes
+Hours before an incomplete session is expired. Default: 72.
+
+8.2 Identity map table
+Defined in Section 3.2.
+
+8.3 Session table (IIO-owned fields)
+The session table is shared between the IIO subsystem and the Conversational Assessment subsystem. The IIO subsystem owns the fields listed below. All other session fields are defined in the Conversational Assessment PRD.
+
+Field
+Type
+Required
+Description
+session_id
+uuid
+Yes
+Primary key.
+module_id
+string
+Yes
+Foreign key to module configuration table.
+canvas_uuid
+string
+Yes
+Canvas user identifier from LTI JWT.
+lti_context_id
+string
+Yes
+Canvas course/section context from LTI JWT.
+lis_result_sourcedid
+string
+No
+LIS result sourcedId from LTI JWT. Used for grade return.
+ags_endpoint
+string
+No
+AGS lineitem endpoint URL from LTI JWT. Used for grade return.
+state
+string
+Yes
+Current session state. See Section 4.1.
+started_at
+timestamp
+Yes
+Session creation timestamp.
+completed_at
+timestamp
+No
+Null until state = COMPLETED.
+sap_verified_at
+timestamp
+No
+Timestamp of successful SAP verification.
+sap_doc_refs
+json
+No
+SAP document numbers returned by verification query. Stored for audit.
+grade_posted_at
+timestamp
+No
+Timestamp of successful Canvas grade post.
+grade_posted_score
+float
+No
+Score value posted to Canvas (0.0 – 1.0).
+credly_assertion_id
+string
+No
+Credly assertion ID returned on badge issuance.
+badge_issued_at
+timestamp
+No
+Timestamp of successful badge issuance.
+attempt_number
+integer
+Yes
+Starts at 1. Incremented for each retry.
+prior_session_id
+uuid
+No
+For retry sessions: references the previous attempt's session_id.
+
+9. Security requirements
+9.1 Secrets management
+No credentials, API keys, client secrets, or private keys may appear in application code, configuration files, or version control. All secrets are stored in a dedicated secrets manager (e.g. HashiCorp Vault, AWS Secrets Manager, or equivalent). The following secrets are required:
+LTI platform private key (RSA 2048-bit minimum) — used to sign session tokens and the JWKS response.
+Canvas LTI client ID and registration data — used to validate incoming LTI JWTs.
+SAP OAuth 2.0 client ID and client secret — used to obtain SAP access tokens.
+Credly OAuth 2.0 refresh token — used to obtain Credly access tokens for badge issuance.
+Platform database credentials.
+9.2 LTI security
+The LTI 1.3 launch flow must implement the full OIDC security model as specified by the IMS Global LTI 1.3 specification. Specifically:
+State and nonce parameters must be validated on every launch to prevent replay attacks.
+JWT signatures must be verified against the Canvas JWKS endpoint on every launch.
+The JWKS cache must be refreshed at least every 24 hours.
+Redirect URIs must be pre-registered and validated exactly — no wildcard matching.
+9.3 Data minimization
+The platform stores the minimum personal data required for operation. Specifically:
+SAP usernames are stored server-side only and are never transmitted to the browser.
+LTI JWT payloads are logged only at DEBUG level (not in the production audit log) to avoid logging PII unnecessarily.
+Credly badge assertions include the student's email address. This is required by Credly's API and cannot be avoided. Authors should be aware that this constitutes a disclosure of student email to Credly.
+9.4 Evidence URL security
+The evidence_url posted to Credly (Section 5.3) is a platform-hosted page that displays the student's evaluation summary. It must be protected by a signed token with a defined expiry (default 90 days) to prevent unauthenticated enumeration of student evaluations. The token is included in the URL as a query parameter and is validated on every request.
+
+10. Non-functional requirements
+10.1 Availability
+The IIO subsystem must be available whenever Canvas is available. Planned maintenance windows should be coordinated with the LMS administrator. The SAP and Credly integrations are non-blocking for session progress up to their respective gates — a SAP outage prevents Phase 3 from being unlocked but does not affect Phase 1 or Phase 2.
+10.2 Latency
+LTI launch to wizard display: under 2 seconds (p95) under normal load.
+SAP verification query: under 5 seconds (p95). Timeout at 15 seconds (configurable).
+Grade post to Canvas: under 3 seconds (p95). Retried asynchronously on failure.
+Badge issuance to Credly: under 5 seconds (p95). Retried asynchronously on failure.
+10.3 Reliability
+Grade posting and badge issuance must be retried automatically on failure (up to 3 attempts with exponential backoff) before being flagged for manual review. A student's completion status must not be lost due to a transient failure in either downstream system.
+10.4 Observability
+Every external API call (Canvas AGS, SAP OData, Credly Acclaim) must log: the request timestamp, response status code, response latency, and any error details. This is the minimum required for diagnosing integration issues in production.
+
+11. Open questions
+The identity map assumes a one-to-one relationship between Canvas UUID and SAP username. Are there cases where a student might have multiple SAP accounts (e.g. different usernames for different modules)? If so, the identity map schema needs a module-scoped SAP username field.
+The SAP verification query is defined as checking for the existence of required document types by SAP username. Does the SAP OData API support this query pattern against your institution's SAP instance, or will a custom RFC function module be required? This should be confirmed with the SAP administrator before build.
+Canvas LTI 1.3 registration requires administrative access to the Canvas instance. Who is the Canvas administrator at your institution, and what is the lead time for registering a new external tool? This is often a blocking dependency for the PoC timeline.
+The score mapping (Section 5.2) defaults to 1.0 / 0.5 / 0.0 based on badge award status and dimension ratings. Does this mapping align with your institution's grading policy, or should the module support pass/fail only (1.0 or 0.0)?
+Credly badge issuance requires the student's email address. Is the email address in the identity map always the student's institution email, or could it be a personal email? Badge notifications from Credly go to the recipient email — wrong email means the student never receives the notification.
+The retry limit defaults to 2 (one original plus two retries). Should the limit be per-module (configurable) or platform-wide? And should instructors be able to grant additional attempts on a per-student basis? If so, the identity map or a separate entitlements table would need a manual override field.
+The evidence_url token expiry defaults to 90 days. After expiry, the Credly badge still exists but the linked evidence page becomes inaccessible. Is this acceptable, or should the evidence URL be permanent (no expiry)?
