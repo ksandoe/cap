@@ -16,7 +16,7 @@ import {
   DynamoDBDocumentClient, GetCommand, PutCommand,
   UpdateCommand, DeleteCommand, QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { USE_LOCAL_DB }  from '../config/env';
+import { USE_LOCAL_DB }   from '../config/env';
 import { localSessionDb } from './localStore';
 
 const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
@@ -50,6 +50,8 @@ const ddbSessionDb = {
   },
 
   async findActiveSession(canvasUuid: string, moduleId: string) {
+    // TODO: requires GSI on canvasUuid + moduleId
+    // Placeholder: scan is acceptable for PoC scale
     const r = await ddb.send(new QueryCommand({
       TableName: TABLE,
       IndexName: 'canvasUuid-moduleId-index',

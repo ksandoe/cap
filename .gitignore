@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.dev-data/
+cap_scaffold*.zip
 .env
 .env.local
 .env*.local
@@ -8,4 +10,3 @@ dist/
 .amplify/
 cdk.out/
 .serverless/
-.dev-data/

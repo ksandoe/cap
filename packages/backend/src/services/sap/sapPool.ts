@@ -12,11 +12,11 @@
  * On activity exit (completion, expiry, or error), the account
  * is reset via the SAP reset endpoint and returned to 'available'.
  *
- * When USE_LOCAL_DB=true, delegates to the JSON-file store in
- * db/localStore.ts so local dev works without AWS.
- *
  * TODO: implement stale-lock reclamation (account locked > N hours → force release)
  * TODO: implement SAP account reset call
+ *
+ * When USE_LOCAL_DB=true, delegates to the JSON-file store in
+ * db/localStore.ts so local dev works without AWS.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';

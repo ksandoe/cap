@@ -4,8 +4,10 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3000,
-    proxy: { '/api': { target: 'http://localhost:3001', rewrite: p => p.replace(/^\/api/, '') } },
+    port: 3002,
+    proxy: {
+      '/api': { target: 'http://localhost:3001', rewrite: p => p.replace(/^\/api/, '') },
+    },
   },
   resolve: {
     alias: { '@cap/shared': '../shared/src' },

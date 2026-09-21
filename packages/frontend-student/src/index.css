@@ -98,3 +98,10 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   nav, .actions, .chat-input { display: none !important; }
   body { background: #fff; }
 }
+
+/* Content blocks (learning activity) */
+.block { margin: 20px 0; padding: 16px 20px; border: 1px solid #d8dee9; border-radius: 8px; }
+.block h3 { margin-top: 0; }
+.block.sap { border-left: 4px solid #1D4E8C; }
+.concurrent-pair { display: flex; gap: 16px; flex-wrap: wrap; }
+.concurrent-pair .block { flex: 1 1 340px; }

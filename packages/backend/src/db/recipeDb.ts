@@ -6,6 +6,9 @@
  * PK: moduleId  SK: version (number)
  * GSI: isActive-index for active recipe lookup
  *
+ * TODO: recipes belong in Aurora (Master PRD §5.2) — migrate this
+ * access layer to auroraDb once the recipes table is live.
+ *
  * When USE_LOCAL_DB=true, delegates to the JSON-file store in
  * localStore.ts so local dev works without AWS.
  */
@@ -14,8 +17,8 @@ import {
   DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { Recipe } from '@cap/shared';
-import { USE_LOCAL_DB }   from '../config/env';
-import { localRecipeDb }  from './localStore';
+import { USE_LOCAL_DB }  from '../config/env';
+import { localRecipeDb } from './localStore';
 
 const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
 const TABLE = process.env.DYNAMODB_TABLE_RECIPES!;
@@ -34,7 +37,7 @@ const ddbRecipeDb = {
 
   async saveRecipe(recipe: Partial<Recipe>): Promise<Recipe> {
     const versions = await ddbRecipeDb.listVersions(recipe.moduleId!);
-    const nextVer  = versions.length ? Math.max(...versions.map((v: any) => v.version)) + 1 : 1;
+    const nextVer  = versions.length ? Math.max(...versions.map((v:any) => v.version)) + 1 : 1;
     const saved    = {
       ...recipe, version: nextVer, isActive: true,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),

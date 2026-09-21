@@ -1,34 +1,40 @@
 /**
  * eventLogger.ts
  *
- * Writes audit events to DynamoDB (cap-sessions table, events prefix)
+ * Writes audit events to Aurora (audit_log table, 90-day retention)
  * and to stdout (CloudWatch Logs in Lambda).
  *
- * All events carry: event_id, event_type, occurred_at, severity, source.
+ * All events carry: event_type, occurred_at, severity, source, payload.
  * No student PII is logged — sessionId and tempUserId only.
+ *
+ * When USE_LOCAL_DB=true or Aurora is not configured, events are
+ * console-only (audit_log write skipped).
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 import { EventType }    from '@cap/shared';
 import { USE_LOCAL_DB } from '../config/env';
-
-const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
-const TABLE = process.env.DYNAMODB_TABLE_SESSIONS!;
+import { auroraConfigured, query } from '../db/auroraDb';
 
 type Severity = 'INFO' | 'WARN' | 'ERROR';
 
 async function log(severity: Severity, eventType: EventType, payload: Record<string, unknown> = {}) {
   const entry = {
-    pk:          `event_${uuidv4()}`,
-    sk:          new Date().toISOString(),
-    eventType, severity, payload, source: 'backend',
-    ttl: Math.floor(Date.now() / 1000) + 90 * 24 * 3600, // 90-day retention
+    event_id:    uuidv4(),
+    event_type:  eventType,
+    occurred_at: new Date().toISOString(),
+    severity,
+    payload,
+    source:      'backend',
   };
   console.log(`[${severity}] ${eventType}`, payload);
-  if (USE_LOCAL_DB) return; // local dev: console-only audit log
+  if (USE_LOCAL_DB || !auroraConfigured()) return; // local dev: console-only audit log
   try {
-    await ddb.send(new PutCommand({ TableName: TABLE, Item: entry }));
+    await query(
+      `INSERT INTO audit_log (event_id, event_type, occurred_at, severity, source, payload)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [entry.event_id, entry.event_type, entry.occurred_at, severity, entry.source,
+       JSON.stringify(payload)],
+    );
   } catch (err) {
     console.error('Failed to write audit log entry:', err);
   }

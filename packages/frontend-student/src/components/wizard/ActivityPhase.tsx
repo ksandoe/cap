@@ -1,16 +1,22 @@
 /**
- * ActivityPhase.tsx — Phase 2: activity instructions.
+ * ActivityPhase.tsx — Phase 2: the learning activity.
  *
- * Shows the content stub (summary + resource links) and the numbered
- * activity steps. Understanding notes are never shown to the student.
+ * Renders the recipe's content blocks in the author-defined sequence
+ * (Master PRD §3.2): conceptual blocks, instructional blocks (numbered
+ * steps — understanding notes are never shown), and SAP activity blocks.
+ * A concurrent pair renders its instructional and SAP blocks adjacent.
  *
  * "I have completed the activity" → confirmation → POST verify-sap →
  * poll verify-status every 3s → advance on SAP_VERIFIED, or show which
  * document types are missing / a connectivity error and allow retry.
+ *
+ * TODO (Phase 2): gate enforcement per block, concurrent-pair layouts
+ * (side-by-side ≥1200px, modal/tabbed 768–1199px), block completion state.
  */
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
+import { ContentBlock, InstructionalBlock, SapBlock, ConcurrentPair } from '@cap/shared';
 
 const POLL_INTERVAL_MS = 3_000;
 const POLL_TIMEOUT_MS  = 60_000; // client-side ceiling; SAP query itself times out server-side
@@ -47,7 +53,7 @@ export function ActivityPhase() {
         if (status === 'SAP_VERIFIED') {
           stopPolling();
           setPhase(3);
-        } else if (status === 'ACTIVITY' && sapVerificationError) {
+        } else if ((status === 'LEARNING' || status === 'ACTIVITY') && sapVerificationError) {
           stopPolling();
           const missing = sapVerificationError.missingTypes?.length
             ? `The following items weren't found yet: ${sapVerificationError.missingTypes.join(', ')}. ` +
@@ -71,8 +77,12 @@ export function ActivityPhase() {
     setVerifying(false);
   }
 
-  const stub  = recipe?.contentStub;
-  const steps = recipe?.activitySteps ?? [];
+  const stub = recipe?.contentStub;
+
+  // Render the learning activity in the authored sequence order
+  const items = recipe?.sequence ?? [];
+  const blockById = new Map((recipe?.contentBlocks ?? []).map(b => [b.blockId, b]));
+  const pairById  = new Map((recipe?.concurrentPairs ?? []).map(p => [p.pairId, p]));
 
   return (
     <div>
@@ -91,11 +101,21 @@ export function ActivityPhase() {
         </ul>
       )}
 
-      <ol className="steps">
-        {steps.map(s => (
-          <li key={s.stepNumber}>{s.description}</li>
-        ))}
-      </ol>
+      {items.map((item, i) => {
+        if (item.kind === 'pair') {
+          const pair = pairById.get(item.pairId);
+          const instr = pair && blockById.get(pair.instructionalId) as InstructionalBlock | undefined;
+          const sap   = pair && blockById.get(pair.sapId) as SapBlock | undefined;
+          return (
+            <div key={item.pairId} className="concurrent-pair">
+              {instr && <BlockView block={instr} />}
+              {sap   && <BlockView block={sap} />}
+            </div>
+          );
+        }
+        const block = blockById.get(item.blockId);
+        return block ? <BlockView key={item.blockId} block={block} /> : null;
+      })}
 
       {error && <div className="notice error" role="alert">{error}</div>}
 
@@ -117,5 +137,35 @@ export function ActivityPhase() {
         <p className="muted" role="status">Checking your work — this usually takes a few seconds…</p>
       )}
     </div>
+  );
+}
+
+function BlockView({ block }: { block: ContentBlock }) {
+  if (block.type === 'conceptual') {
+    return (
+      <section className="block conceptual">
+        <h3>{block.title}</h3>
+        <p style={{ lineHeight: 1.7 }}>{block.body}</p>
+        {block.videoUrl && (
+          <p><a href={block.videoUrl} target="_blank" rel="noreferrer">Watch: {block.title}</a></p>
+        )}
+      </section>
+    );
+  }
+  if (block.type === 'instructional') {
+    return (
+      <section className="block instructional">
+        <h3>{block.title}</h3>
+        <ol className="steps">
+          {block.steps.map(s => <li key={s.stepNumber}>{s.description}</li>)}
+        </ol>
+      </section>
+    );
+  }
+  return (
+    <section className="block sap">
+      <h3>{block.title}</h3>
+      <p style={{ lineHeight: 1.7 }}>{block.taskPrompt}</p>
+    </section>
   );
 }

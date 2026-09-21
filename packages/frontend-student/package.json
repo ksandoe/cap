@@ -1,5 +1,5 @@
 {
-  "name": "@cap/frontend",
+  "name": "@cap/frontend-student",
   "version": "0.1.0",
   "scripts": {
     "dev":   "vite",

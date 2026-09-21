@@ -19,8 +19,10 @@ import { compileContext } from './contextCompiler';
 import { callModel }     from './llmProvider';
 import { logger }        from '../eventLogger';
 import { EVENTS }        from '@cap/shared';
-import { MOCK_AI }       from '../../config/env';
+import { LLM_MODE }      from '../../config/env';
 import { mockCheckinQuestions, mockConversationTurn, mockEvaluation } from './mockAi';
+
+const MOCK_AI = LLM_MODE === 'mock';
 
 export async function generateCheckinQuestions(req: Request, res: Response): Promise<void> {
   const { sessionId } = req.session!;
