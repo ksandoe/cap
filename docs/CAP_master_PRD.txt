@@ -1,0 +1,449 @@
+
+MASTER PRODUCT REQUIREMENTS DOCUMENT
+Conversational Assessment Platform
+CAP — Master PRD
+
+Version 1.0  ·  Draft  ·  September 2026
+Supersedes: Conversational Assessment PRD v1.0  ·  IIO Subsystem PRD v1.0
+
+Companion documents
+
+Conversational Assessment PRD v1.0
+Detailed authoring form, context compiler, and AI engine specification. Superseded by this document at the system level but retained for component-level detail.
+IIO Subsystem PRD v1.0
+Detailed LTI, SAP, Credly, and event bus specification. Superseded by this document at the system level but retained for component-level detail.
+CAP User Stories v1.0
+30 user stories across four roles. Referenced throughout this document.
+CAP Application Scaffold
+Monorepo scaffold (packages/frontend, packages/backend, packages/shared). Implementation baseline.
+
+1. Product vision and context
+1.1 Vision statement
+The Conversational Assessment Platform (CAP) is a technology-enabled learning environment that replaces traditional summative quizzes with structured, AI-driven reflective conversations. CAP guides students through a domain-specific learning activity — combining conceptual reading, step-by-step instruction, and hands-on software practice — and then assesses their genuine understanding through an adaptive dialogue that probes what they did, why it matters, and how it connects to their future careers.
+CAP is domain-independent. A non-technical domain expert can author a complete learning module — including the activity sequence, the AI agent's conversational behavior, and the evaluation rubric — through a structured form, with no code changes required to deploy a new module.
+1.2 Origin and prior work
+CAP emerged from a specific instructional challenge: students completing SAP ERP exercises in a business curriculum could demonstrate task completion (creating inquiry, quotation, and sales order documents) without demonstrating conceptual understanding of the underlying business process. A summative quiz could test recall but not articulation, process reasoning, or career transfer.
+Two subsystem PRDs were drafted prior to this document — the Conversational Assessment PRD (covering the AI agent, authoring form, and evaluation) and the Identity, Integration & Orchestration (IIO) Subsystem PRD (covering LTI, SAP, Credly, and the event bus). As the design matured, it became clear that these subsystems are more tightly coupled than originally anticipated, and that a unified system architecture — with a clear separation between the student-facing learning environment and the administrative tools — was needed. This document supersedes both prior PRDs at the system level.
+1.3 Core design principles
+Domain-independent: the system operates from authored content. New modules require no code changes.
+Assessment over completion: the goal is to verify understanding, not task execution. SAP completion is a gate, not a grade.
+Adaptive and humane: the AI agent behaves as a mentor or interviewer — probing, scaffolding, and encouraging — never as an examiner.
+FERPA-first: no student PII is stored on the platform. Ephemeral session data is destroyed on completion. De-identified research data is stored separately under explicit governance.
+Loosely coupled activities: the learning activity and the reflecting activity are sequential but independent. Each can be iterated without affecting the other.
+Flexible student experience: within instructor-defined macro constraints, students can navigate learning content in a way that suits their screen and working style.
+Research-ready: de-identified interaction data is captured systematically for educational research, with appropriate consent and governance.
+
+2. System overview
+2.1 Two applications, one platform
+CAP is deployed as two distinct React applications sharing a single backend API and database layer. This separation reflects a fundamental difference in user context and interaction paradigm between the two primary audiences.
+
+Application
+Primary users
+Access method
+Interaction paradigm
+Student App
+Students
+LTI 1.3 launch from Canvas
+Focused wizard — linear, immersive, no navigation chrome
+Admin App
+Domain experts, instructors, administrators
+Direct URL, role-based login
+Rich dashboard — forms, tables, version history, analytics
+
+Both applications are deployed on AWS Amplify and call the same Express.js backend running on AWS Lambda via API Gateway. The backend connects to a shared Aurora PostgreSQL database for persistent content and research data, and to DynamoDB for ephemeral session state and the SAP account pool.
+2.2 High-level architecture
+
+Layer
+Component
+Technology
+Purpose
+Frontend
+Student App
+React + Vite, AWS Amplify
+LTI-launched wizard: learning activity + reflecting activity
+Frontend
+Admin App
+React + Vite, AWS Amplify
+Authoring, instructor dashboard, admin tools
+Backend
+API Server
+Express.js on AWS Lambda
+All business logic, integrations, AI proxy, orchestration
+Backend
+Orchestrator
+Express.js service
+Session lifecycle, phase gates, post-completion workflow
+Data
+Aurora PostgreSQL
+AWS Aurora Serverless v2
+Recipes, module config, de-identified research data, audit log
+Data
+DynamoDB
+AWS DynamoDB
+Ephemeral session state, SAP account pool
+Data
+S3
+AWS S3
+Uploaded background documentation, exported reports
+Secrets
+Secrets Manager
+AWS Secrets Manager
+All API keys, credentials, JWT secrets
+External
+Canvas LMS
+LTI 1.3 + AGS REST API
+Launch, identity, grade return
+External
+SAP Sandbox
+OAuth 2.0 + OData REST
+Read-only task verification
+External
+Credly
+OAuth 2.0 REST API
+Badge issuance
+External
+OpenAI API
+REST API 
+Check-in generation, conversation, evaluation
+
+2.3 Student session lifecycle
+A student session begins with a Canvas LTI launch and ends with a grade returned to Canvas and the session record destroyed. Between those two points, the student moves through two sequential major phases:
+Learning activity: an authored sequence of conceptual, instructional, and SAP content blocks. The macro sequence is instructor-defined; the student has flexibility in how they navigate instructions and SAP activity concurrently.
+Reflecting activity: a structured three-part sequence — check-in survey, AI conversation, and evaluation summary — that begins only after the learning activity is verified complete.
+The orchestration layer wraps the entire session, managing identity (tempuser), SAP account assignment, phase gates, grade return, badge issuance, and session destruction.
+2.4 Relationship between the two phases
+The learning activity and reflecting activity are sequential and loosely coupled. The learning activity has no knowledge of the assessment that follows; the reflecting activity receives the completed activity context (which steps the student performed, in what sequence) but does not embed or replay the activity itself. This loose coupling means either phase can be updated independently — a new SAP exercise does not require changes to the assessment agent, and a revised rubric does not require changes to the activity.
+Design evolution  Earlier versions of the design embedded the learning activity inside the assessment wizard. This was revised: the activity and assessment are now sequential but independent, connected only by the SAP completion gate and the context the orchestrator passes to the assessment agent.
+
+3. Student application
+The Student App is the primary user-facing product. It is a focused, distraction-free wizard that guides a student from Canvas launch through the complete learning and assessment experience. It is accessed exclusively via LTI 1.3 launch from a Canvas assignment — there is no direct URL entry point for students.
+3.1 Orchestration layer
+The orchestration layer is invisible to students but governs everything they experience. It is the first thing that runs on LTI launch and the last thing that runs on completion.
+3.1.1 LTI launch and identity
+On Canvas launch the orchestrator receives and validates the LTI 1.3 JWT, assigns a temporary session identity (tempuser), acquires a SAP sandbox account from the pool, creates the session record in DynamoDB, issues a short-lived session JWT to the browser, and routes the student to the correct wizard phase (new session → learning activity; resumable session → last reached phase).
+No student PII is stored on the platform. The Canvas UUID is used server-side only for session resume lookup and is never transmitted to the browser or stored in Aurora.
+3.1.2 Phase gates
+Three gates are enforced server-side. No client-side action can bypass them:
+Learning activity → Reflecting activity: all required SAP documents must be verified present via OData query. This is the primary completion gate.
+Check-in → Conversation: all check-in questions must be answered and submitted.
+Conversation → Evaluation: the AI agent must signal conversation completion before the evaluation is generated.
+3.1.3 Post-completion workflow
+On session completion the orchestrator executes in order: writes the evaluation to Aurora (de-identified, no session link to student identity); posts the grade to Canvas AGS; issues the Credly badge if awarded; releases and resets the SAP account; destroys the DynamoDB session record. Grade posting and badge issuance are retried up to three times with exponential backoff before being flagged for manual review.
+3.2 Learning activity
+The learning activity is an authored sequence of content blocks that the student works through before the reflecting activity begins. It is the "what they did" that the assessment agent later probes.
+3.2.1 Content block types
+Three types of content blocks can be included in a module, interleaved in any author-defined sequence:
+
+Block type
+Description
+Student interaction
+Conceptual
+Background reading, short video (< 5 min), or explanatory content that provides the conceptual foundation for the activity.
+Read, watch. Completion is self-reported or inferred from scroll/time.
+Instructional
+Numbered, step-by-step instructions for the SAP activity. Each step has a description, optional outcome tag, and optional understanding note.
+Read alongside SAP. Student can view instructions and SAP simultaneously or via modal — author cannot restrict this.
+SAP activity
+A prompt or set of tasks to be completed in the SAP sandbox. The student works in a separate browser tab or embedded frame (if SAP supports it).
+Perform SAP transactions. Completion is verified by the orchestrator via OData query — not self-reported.
+
+3.2.2 Sequencing model
+The author defines the macro sequence of content blocks using a simple ordering model with optional gates:
+Ordered blocks: the author arranges blocks in a sequence. Students work through them in that order.
+Gate blocks: the author can mark any block as a gate. A gate block must be completed before the next block in the sequence is unlocked. SAP activity blocks are always gates.
+Concurrent blocks: the author can group an instructional block and a SAP activity block as a concurrent pair. The student can view and interact with both simultaneously — the UI offers side-by-side, modal, or tabbed layouts depending on screen width.
+Within a concurrent pair, the student has full flexibility. They can read a step, switch to SAP, return to the instructions, re-read a step, and switch back — in any order. The UI does not enforce a step-by-step lockstep within the pair.
+UI modalities  The Student App must support at minimum two concurrent-pair layouts: side-by-side (for screens ≥ 1200px wide) and modal/tabbed (for screens between 768px and 1199px). Mobile (< 768px) is not supported in the initial release.
+3.2.3 SAP account management
+Each student session is assigned one SAP sandbox account from a pre-provisioned pool. The assignment is random, exists only for the session duration, and is stored server-side only — it is never exposed to the student or browser. On session exit (completion, expiry, or error), the account is reset via the SAP reset API and returned to the available pool. If a student retries the assessment, they receive a different SAP account than in their previous attempt.
+3.3 Reflecting activity
+The reflecting activity begins only after the learning activity is verified complete. It consists of three sequential parts.
+3.3.1 Check-in
+A short survey (3–4 questions) that establishes the student's prior knowledge and experience with the domain. Questions are generated by the AI from the module's domain context at session start. Responses are stored in the session record and injected into the AI agent's system prompt at the start of the conversation, personalizing the assessment to the student's baseline. Check-in responses are also stored in Aurora (de-identified) for research purposes.
+Response formats: 5-point Likert scale, multiple choice, or short free text (max 150 characters). Check-in is ungraded — no feedback is shown to the student.
+3.3.2 Conversation with AI agent
+An adaptive text-based dialogue between the student and the AI agent. The agent is informed by the module recipe (learning outcomes, key concepts, activity steps, probing rules, rubric dimensions), the student's check-in responses, and any background documentation provided by the author.
+The conversation proceeds through four internal phases managed by the agent:
+Opening (2–3 turns): acknowledges the activity, references check-in, asks an open first question.
+Process understanding (4–6 turns): probes understanding of what the student did and why. Uses probe-eligible activity steps for direct questioning; uses context-only steps as background.
+Durable skills and career transfer (3–4 turns): connects the activity to transferable skills and the student's future career using author-specified prompts.
+Wrap-up (1–2 turns): offers one strength observation and one development area, then signals completion.
+The agent always asks one question per turn, validates effort before redirecting, and never uses the words "correct" or "incorrect." The agent's tone and behavior are governed by the recipe's tone guidance and probing rules.
+3.3.3 Evaluation
+At the conclusion of the conversation, the AI generates a structured evaluation based on the rubric dimensions in the recipe. The evaluation is displayed to the student and written to Aurora (de-identified).
+The evaluation contains: a rating for each rubric dimension (Strong / Developing / Needs further work) with a 2–3 sentence narrative; a per-learning-outcome status (achieved / partial / not addressed); and a 3–5 sentence overall summary with one strength and one development area.
+If all dimensions are rated Developing or above, the badge is awarded and the Credly issuance is triggered. If one or more dimensions are rated Needs further work, the student is offered a retry (subject to the module's retry limit).
+
+4. Administrative application
+The Admin App is a separate React application accessed directly (not via LTI) by domain experts, instructors, and platform administrators. It provides authoring tools, instructor dashboards, and administrative interfaces. It shares the backend API and Aurora database with the Student App but has its own Amplify deployment and its own authentication flow (role-based login, not LTI).
+4.1 Authoring module (domain expert)
+The authoring module is where domain experts create and maintain instructional recipes. A recipe is the complete specification of a learning module — it defines everything the system needs to deliver the student experience without code changes.
+4.1.1 Recipe structure
+
+Section
+Fields
+Notes
+Module identity
+Title, description, module ID
+Module ID links the recipe to the Canvas assignment and module config.
+Learning outcomes
+Numbered list (2–8). One sentence each.
+Used by AI for question generation, step tagging inference, and evaluation.
+Key concepts
+Term + definition pairs.
+Used by AI to detect vocabulary gaps and ground probing questions.
+Content blocks
+Ordered sequence of conceptual, instructional, and SAP blocks. Concurrent pair groupings. Gate flags.
+Defines the learning activity structure. See Section 3.2.
+Activity steps
+Numbered steps within instructional blocks. Each: description (required), outcome tag(s) (optional), understanding note (optional).
+Steps with all three fields are probe-eligible in the conversation. Sparse steps are context-only.
+Instructional recipe
+Rubric dimensions (2–6), probing rules (if/then), vague answer triggers, career transfer prompts, tone guidance, max turns.
+Governs the AI agent's conversational behavior and the evaluation structure.
+Background docs
+PDF/DOCX uploads (max 5 × 10 MB), pasted text (max 10,000 chars), external URLs (max 5).
+Stored in S3. Indexed by context compiler at session start. Not shown to students.
+Content stub
+Summary text (100–300 words), optional resource links.
+Displayed to students as the module introduction in the learning activity.
+
+4.1.2 Recipe versioning
+Every save creates a new version. The previous version is retained and marked inactive. Only one version can be active per module at a time. Active versions take effect for all new sessions; in-progress sessions continue on the version they started with. Authors can view but not edit previous versions. Rolling back creates a new version (copy of the target), not an overwrite.
+4.1.3 Authoring tools
+Check-in preview: generates and displays sample check-in questions from the current (unsaved) recipe without saving.
+Step coverage summary: shows which learning outcomes have at least one tagged step, prompting the author to address gaps.
+Validation log: append-only notes field where authors and instructors record observations from real sessions to inform future revisions.
+4.2 Instructor module
+Instructors monitor student progress, review conversation transcripts, validate AI evaluations, and manage exceptional cases.
+Module dashboard: lists all sessions for a module with completion status, badge awarded, attempt number, and timestamp. No student PII is displayed — identity linkage is done in the Canvas gradebook.
+Transcript viewer: displays the full conversation transcript alongside the AI evaluation for completed sessions.
+AI evaluation review: instructors can annotate each dimension rating as agree / partially agree / disagree. Disagreements are surfaced to the domain expert as flags in the validation log.
+Retry grant: instructors can grant an additional retry attempt to a specific student who has reached the module's retry limit. The action is logged with a required reason.
+CSV export: exports session results (no PII) for external analysis.
+4.3 Research module
+The research module provides access to de-identified interaction data stored in Aurora for educational research purposes. Access is governed by a separate research role with explicit consent and data governance requirements.
+Data browser: queries de-identified transcripts, evaluations, check-in responses, and interaction timing data by module, date range, and outcome.
+Export: downloads de-identified datasets in CSV or JSON format for analysis.
+Consent management: tracks which student sessions were conducted under which consent configuration. Research data is only stored for sessions where the applicable consent conditions were met.
+FERPA note  De-identified data in Aurora contains no direct student identifiers (no name, email, Canvas UUID, or SAP username). The de-identification process is defined in the Data Model section and reviewed by the institution's IRB before research data collection begins.
+4.4 Administrator module
+Platform administrators manage infrastructure, integrations, and module configuration.
+Module configuration: create and update module records (required SAP doc types, badge template ID, retry limit, SAP timeout, score mapping, max session age).
+SAP pool management: bulk import SAP accounts, view pool utilization (available / in-use / stale), force-release stale accounts.
+Audit log viewer: query the event log by session ID, event type, severity, and date range. ERROR-severity events are surfaced in a dashboard without manual query.
+Integration health: shows last-known status of Canvas, SAP, Credly, and OpenAI integrations derived from recent event log entries.
+Secrets management: documentation and tooling for rotating credentials in AWS Secrets Manager without redeployment.
+
+5. Data architecture
+CAP uses three data stores with distinct purposes, governance rules, and retention policies. The choice of store for each data type is driven by the FERPA-first principle: student-identifiable data is kept ephemeral and minimal; de-identified research data is kept separately and governed explicitly.
+5.1 DynamoDB — ephemeral operational data
+DynamoDB holds data that exists only to support active sessions. All student-linked records are destroyed on session completion or expiry.
+
+Table
+Purpose
+Retention
+PII?
+cap-sessions
+Active session state: phase, SAP username (server-side), check-in responses, transcript in-flight, evaluation in-flight.
+TTL = session age (default 8h). Deleted on completion.
+Canvas UUID (server-side only, never returned to browser). Destroyed on completion.
+cap-sap-pool
+SAP sandbox account pool: username, status (available/in_use), assigned session ID, assigned timestamp.
+Permanent. Account records persist; assignment data cleared on release.
+No student PII. SAP usernames are system accounts, not student identifiers.
+
+5.2 Aurora PostgreSQL — persistent content and research data
+Aurora holds all data that must persist beyond a session: authored recipes, module configuration, de-identified research data, and the audit log. No student-identifiable data is stored in Aurora.
+
+Schema / table
+Purpose
+PII?
+recipes
+Instructional recipes with full version history. Includes module identity, learning outcomes, content blocks, activity steps, instructional recipe fields, and metadata.
+None.
+module_config
+Per-module operational settings: required SAP doc types, badge template ID, retry limit, SAP timeout, score mapping, session TTL.
+None.
+research.sessions
+De-identified session record: cohort_id (module + academic period), attempt_number, phase_reached, completion_status, started_at, completed_at. No session_id linkable to a student.
+None. Cohort ID is not student-specific.
+research.checkin_responses
+De-identified check-in question/response pairs linked to research session ID only.
+None.
+research.transcripts
+De-identified conversation transcripts: turn number, role (agent/student), content, timestamp offset from session start (not wall clock).
+None. Timestamp is relative, not absolute.
+research.evaluations
+De-identified evaluation results: dimension ratings, narratives, outcome statuses, overall summary, badge awarded.
+None.
+research.interaction_timing
+Timing data per content block and activity step: time_on_block (seconds), step_sequence_observed. Linked to research session ID only.
+None.
+audit_log
+Operational event log: event type, severity, source, occurred_at, payload (session ID and module ID only — no student identity).
+None. Session ID is ephemeral and not linked to student identity in Aurora.
+validation_log
+Append-only notes from authors and instructors against a recipe version. Includes role, timestamp, note text.
+Instructor role identifier only — no personal identity.
+
+5.3 S3 — binary content
+S3 holds uploaded background documentation (PDFs, DOCX files) associated with recipes, and exported reports. No student data is stored in S3. Files are organized by recipe ID and version. Pre-signed URLs with short expiry (15 minutes) are used for file access — no public bucket access.
+5.4 De-identification process
+When a student session completes, the orchestrator executes the following de-identification steps before writing to Aurora:
+Strip all direct identifiers: session ID, Canvas UUID, SAP username, tempuser ID are not written to Aurora.
+Assign a research cohort ID: a non-identifying composite key of module ID and academic period (e.g. "SAP-SALES-2026-FALL"). This allows cohort-level analysis without individual tracking.
+Replace absolute timestamps with relative offsets: all event timestamps are stored as seconds elapsed since session start, not as wall-clock times. This prevents timing-based re-identification.
+Strip names and identifiers from transcript content: a text filter removes patterns matching email addresses, proper names preceded by "I am" or "My name is", and student IDs before transcript storage.
+IRB requirement  The de-identification process and research data schema must be reviewed and approved by the institution's IRB before research data collection begins. The research.* tables should not be populated in production until IRB approval is confirmed.
+
+6. External integrations
+6.1 Canvas LMS — LTI 1.3 + AGS
+Canvas is the system of record for student enrollment and grades. The integration is bidirectional: inbound (LTI 1.3 launch carrying student identity and assignment context) and outbound (grade return via LTI Advantage Assignment and Grade Services).
+Launch: OIDC login initiation → Canvas authentication → signed JWT to platform → session creation.
+Grade return: single score (0.0–1.0) posted to Canvas AGS lineitem on session completion. Score mapping: badge awarded = 1.0; partial pass = 0.5; below threshold = 0.0. Mapping is configurable per module.
+Registration requirement: the platform must be registered as an LTI 1.3 external tool in Canvas by an LMS administrator before any student can launch. Registration requires OIDC login URL, redirect URI, JWKS URL, and target link URI.
+6.2 SAP sandbox — OAuth 2.0 + OData
+The SAP integration is read-only. Its purpose is to verify that required documents exist in the sandbox before the reflecting activity is unlocked. No data is written to SAP by the platform.
+Authentication: OAuth 2.0 Client Credentials flow against SAP's Authorization Server. Tokens cached and refreshed automatically.
+Verification query: OData v4 query for required document types by SAP username. Returns document numbers for audit logging.
+Account pool: pre-provisioned SAP sandbox accounts managed in DynamoDB. One account assigned per session, reset and returned to pool on exit.
+6.3 Credly — OAuth 2.0 REST
+Credly issues digital badge assertions to students who meet the assessment threshold. Badge template IDs are stored per module in the module_config table.
+Authentication: stored OAuth 2.0 refresh token exchanged for short-lived access tokens at runtime.
+Issuance: POST to Credly Acclaim API with recipient email (from LTI claims, used transiently — not stored in Aurora), badge template ID, and evidence URL.
+Evidence URL: a platform-hosted page rendering the student's evaluation summary, protected by a signed token with 90-day expiry.
+Assertion ID: returned by Credly on successful issuance, stored in the DynamoDB session record until session destruction.
+6.4 OpenAI API
+The OpenAI API powers three distinct AI functions. All calls are server-side — the API key is never exposed to the browser.
+Check-in question generation: one call per session at session start. Returns 3–4 structured questions with format specifications.
+Conversation turns: one call per student turn during the reflecting activity. Full conversation history included in each call (stateless API, stateful client).
+Evaluation generation: one call at conversation conclusion. Returns structured evaluation JSON.
+Token budget  The context compiler manages token usage across the system prompt. Priority order: core recipe fields → activity steps → check-in summary → background documentation (up to remaining budget). Production implementations should use vector retrieval for documentation sets exceeding the context limit.
+
+7. Non-functional requirements
+7.1 Privacy and compliance
+No student PII is stored persistently on the platform. The Canvas UUID is used server-side only for session resume and is not written to Aurora.
+All DynamoDB session records are destroyed on session completion. Destruction is logged in the audit log.
+De-identified research data in Aurora is governed by IRB-approved protocols. The research.* schema must not be populated before IRB approval.
+The platform must maintain a current data inventory document specifying what data is held where and for how long. This document is the primary artifact for FERPA data requests.
+Credly badge issuance requires the student's email address. This is a disclosure of student email to a third party and must be covered by the institution's terms of service with Credly.
+7.2 Security
+All secrets (API keys, JWT secrets, database credentials, OAuth tokens) are stored in AWS Secrets Manager. No secrets appear in code, configuration files, or version control.
+LTI 1.3 state and nonce parameters must be validated on every launch to prevent replay attacks.
+Session JWTs are short-lived (8 hours), signed HS256, and carry no student PII — only session ID, tempuser ID, module ID, and current phase.
+SAP usernames are held server-side only and never transmitted to the browser.
+The evidence URL issued to Credly is protected by a signed token with 90-day expiry.
+The Admin App requires role-based authentication. Domain expert, instructor, administrator, and researcher roles have distinct permission sets.
+7.3 Performance
+
+Operation
+Target (p95)
+Notes
+LTI launch → wizard display
+< 2 s
+Includes JWT validation, identity resolution, SAP pool acquisition, session creation.
+SAP verification query
+< 5 s
+Timeout at 15 s (configurable). Client polls every 3 s.
+AI conversation turn
+< 8 s
+Typing indicator shown during response. No caching.
+Evaluation generation
+< 15 s
+One-shot call at conversation end. Progress indicator shown.
+Grade post to Canvas
+< 3 s
+Retried async on failure. Does not block student-facing completion screen.
+
+7.4 Reliability
+Grade posting and badge issuance are retried up to 3 times with exponential backoff before being flagged for manual review.
+SAP pool acquisition uses conditional DynamoDB writes to prevent double-assignment under concurrent load.
+A SAP outage prevents the reflecting activity from being unlocked but does not affect the learning activity.
+An OpenAI API outage prevents the reflecting activity from proceeding. A user-facing message advises the student to try again later; their session is preserved.
+7.5 Scalability
+Aurora Serverless v2 scales automatically to handle class-sized concurrent load (estimated 10–50 concurrent sessions per module in initial deployment).
+Lambda scales automatically. Cold start latency is acceptable given the 2s LTI launch target.
+The SAP pool size must be provisioned to exceed the expected peak concurrent session count for a module. A minimum pool size warning is configurable in the admin dashboard.
+7.6 Accessibility
+The Student App must be operable with a keyboard alone.
+All form inputs must have visible labels. Color must not be the sole indicator of status or meaning.
+Minimum contrast ratio 4.5:1 for body text.
+The concurrent-pair layout must degrade gracefully: on narrower screens the SAP activity and instructions are presented in a tabbed or modal layout rather than side-by-side.
+Screen widths below 768px (mobile) are not supported in the initial release.
+
+8. Phased delivery
+8.1 Phase 1 — Proof of concept
+Validate the core interaction model: authoring form, AI conversation, and rubric evaluation. No LMS integration, no SAP, no badge issuance. Single domain (SAP Sales Process used as test case).
+Student App: check-in, static activity display (no SAP gate), checkout conversation, evaluation summary.
+Admin App: recipe authoring form, check-in preview, recipe versioning.
+Backend: context compiler, OpenAI proxy, in-memory session state.
+Data: Aurora for recipes only. No research schema.
+Success criteria: non-technical author completes recipe in < 60 min; conversation rated as "like a conversation not a test" by 3 independent reviewers; evaluation rated as fair and specific by students.
+8.2 Phase 2 — Integrated pilot
+Add Canvas LTI launch, SAP account pool, SAP verification gate, grade return, and Credly badge issuance. Deploy with a real student cohort.
+Student App: full orchestration layer, SAP concurrent-pair UI, session resume.
+Admin App: instructor dashboard, transcript viewer, CSV export, SAP pool management.
+Backend: LTI service, SAP connector, grade service, badge service, full event logging.
+Data: DynamoDB session store, cap-sap-pool. Aurora adds module_config and audit_log.
+Success criteria: 95% of sessions complete without manual intervention; SAP pool exhaustion does not occur; grade return succeeds for all completed sessions.
+8.3 Phase 3 — Research and scale
+Add de-identified research data collection, researcher module, and multi-module support.
+Research schema populated (post IRB approval).
+Admin App: researcher module with data browser and export.
+Student App: consent flow (if required by IRB).
+Multi-module: additional modules authored and deployed without code changes.
+8.4 Future considerations
+Voice-based conversation interface.
+xAPI / LRS integration for institutional learning analytics.
+Session save across devices (requires careful design — options include Canvas custom data API or encrypted browser storage with server-held key).
+Embedded SAP frame (if SAP instance supports iframe embedding without additional auth).
+Automated recipe quality scoring based on validation log patterns.
+
+9. Open questions
+The following questions are unresolved and should be addressed before or during Phase 2 build.
+
+#
+Question
+Owner
+Blocking?
+1
+Does the institution's Canvas instance support LTI 1.3? What is the lead time for registering a new external tool with the Canvas administrator?
+IT / Canvas admin
+Yes — Phase 2
+2
+Does the SAP OData API on the institution's hosted instance support document existence queries by username? Or is a custom RFC function module required?
+SAP admin
+Yes — Phase 2
+3
+What is the expected peak concurrent student count per module? This determines the minimum SAP pool size and Aurora scaling configuration.
+Instructor / admin
+Yes — Phase 2
+4
+Does SAP support iframe embedding without additional authentication, or will students always work in a separate tab? This affects the concurrent-pair UI design.
+SAP admin
+No — Phase 2 UI
+5
+What is the IRB approval process and timeline for the research data schema? Which student populations require explicit consent vs. being covered by existing institutional agreements?
+Research team / IRB
+Yes — Phase 3
+6
+For the Admin App authentication — does the institution have an existing SSO (SAML/OIDC) that should be used for domain expert, instructor, and administrator login? Or should the platform manage its own user accounts?
+IT / admin
+No — Phase 2
+7
+Does the Credly account have badge templates already defined for the target modules? What is the badge template ID for the SAP Sales Process pilot?
+Admin / Credly account holder
+No — Phase 2
+8
+Should the retry conversation explicitly reference the student's prior attempt ("Last time we discussed X...") or use the prior evaluation silently as context? This affects the agent's system prompt design.
+Instructional design team
+No — Phase 2
+9
+What is the institution's policy on storing student email addresses in Credly? Credly badge issuance requires the recipient email — this is a third-party disclosure that may need to be covered in course terms of service.
+Legal / compliance
+No — Phase 2
+10
+For the text-based de-identification filter on transcripts — who defines and maintains the list of identifier patterns? Is a commercial de-identification service (e.g. AWS Comprehend Medical or a general NLP service) appropriate, or is a rule-based filter sufficient?
+Research team / IRB
+No — Phase 3
