@@ -15,6 +15,8 @@
 // config/env must be imported first — it loads .env before other modules read it
 import { USE_LOCAL_DB } from './config/env';
 import express         from 'express';
+import fs              from 'fs';
+import path            from 'path';
 import { ltiRouter }        from './routes/lti';
 import { sessionRouter }    from './routes/session';
 import { recipeRouter }     from './routes/recipe';
@@ -29,6 +31,21 @@ export const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
+
+// CORS — deployed frontends call the API cross-origin. Lock down with
+// ALLOWED_ORIGINS (comma-separated); default allows any origin (demo only).
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim()).filter(Boolean);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.length === 0 || (origin && ALLOWED_ORIGINS.includes(origin))) {
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGINS.length ? origin! : '*');
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  }
+  if (req.method === 'OPTIONS') { res.status(204).end(); return; }
+  next();
+});
 
 // ── Public ────────────────────────────────────────────────────────────────────
 app.use('/lti', ltiRouter);
@@ -54,6 +71,23 @@ app.use('/recipe',     authMiddleware, recipeRouter);
 
 // ── Admin App routes (login is public; authMiddleware applied inside router) ──
 app.use('/admin',      adminRouter);
+
+// ── Static SPA hosting ────────────────────────────────────────────────────────
+// In the deployed demo both frontends are bundled alongside the Lambda code
+// (public/student, public/admin) and served from the same origin:
+//   Student App → /           Admin App → /admin-app/
+// In local dev these directories don't exist — Vite serves the apps instead.
+const publicDir   = path.join(__dirname, 'public');
+const studentDist = path.join(publicDir, 'student');
+const adminDist   = path.join(publicDir, 'admin');
+if (fs.existsSync(studentDist)) {
+  app.use('/admin-app', express.static(adminDist));
+  app.get(/^\/admin-app(\/.*)?$/, (_req, res) =>
+    res.sendFile(path.join(adminDist, 'index.html')));
+  app.use(express.static(studentDist));
+  app.get(/^\/(launch|wizard|error)?$/, (_req, res) =>
+    res.sendFile(path.join(studentDist, 'index.html')));
+}
 
 app.use(errorHandler);
 

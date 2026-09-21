@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { API_BASE } from '../services/api';
 
 const ROLE_HOME: Record<string, string> = {
   author:     '/author/recipes',
@@ -30,7 +31,7 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true); setError('');
     try {
-      const resp = await fetch('/api/admin/auth/login', {
+      const resp = await fetch(`${API_BASE}/admin/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

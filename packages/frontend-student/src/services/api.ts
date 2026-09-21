@@ -4,7 +4,10 @@
  */
 import { useSessionStore } from '../store/sessionStore';
 
-const BASE = '/api'; // proxied to backend in dev; real URL in prod
+// '/api' is proxied to the backend by Vite in dev; in deployed builds
+// VITE_API_URL points at the API Gateway endpoint (e.g. https://xxx.execute-api...).
+export const API_BASE = (import.meta as any).env?.VITE_API_URL ?? '/api';
+const BASE = API_BASE;
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = useSessionStore.getState().token;

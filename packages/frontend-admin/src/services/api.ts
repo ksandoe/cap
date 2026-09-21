@@ -5,7 +5,10 @@
  */
 import { useAuthStore } from '../store/authStore';
 
-const BASE = '/api';
+// '/api' is proxied to the backend by Vite in dev; in deployed builds
+// VITE_API_URL points at the API Gateway endpoint.
+export const API_BASE = (import.meta as any).env?.VITE_API_URL ?? '/api';
+const BASE = API_BASE;
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = useAuthStore.getState().token;

@@ -12,6 +12,7 @@
  * with ENABLE_DEV_ROUTES=true).
  */
 import { useEffect, useState } from 'react';
+import { API_BASE } from '../services/api';
 
 interface Module { moduleId: string; moduleTitle: string }
 
@@ -27,7 +28,7 @@ export function DevLaunchPage() {
   const [loadErr,  setLoadErr]  = useState(false);
 
   useEffect(() => {
-    fetch('/api/dev/modules')
+    fetch(`${API_BASE}/dev/modules`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(d => setModules(d.modules))
       .catch(() => setLoadErr(true));
@@ -98,7 +99,7 @@ export function DevLaunchPage() {
               </div>
             </div>
             <a
-              href={`/api/dev/launch?moduleId=${encodeURIComponent(m.moduleId)}&persona=${persona}`}
+              href={`${API_BASE}/dev/launch?moduleId=${encodeURIComponent(m.moduleId)}&persona=${persona}`}
               style={{
                 padding: '9px 18px', background: '#1D4E8C', color: '#fff',
                 borderRadius: 6, textDecoration: 'none', fontWeight: 600,

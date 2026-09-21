@@ -8,11 +8,16 @@
  * Data lives in packages/backend/.dev-data/local-db.json.
  */
 import fs   from 'fs';
+import os   from 'os';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Recipe, CheckinResponse } from '@cap/shared';
 
-const DATA_DIR  = path.resolve(__dirname, '../../.dev-data');
+// In Lambda the deployment dir is read-only — use /tmp (per-container,
+// still ephemeral; acceptable for demo use per USE_LOCAL_DB semantics).
+const DATA_DIR  = process.env.AWS_LAMBDA_FUNCTION_NAME
+  ? path.join(os.tmpdir(), 'cap-dev-data')
+  : path.resolve(__dirname, '../../.dev-data');
 const DATA_FILE = path.join(DATA_DIR, 'local-db.json');
 
 type Item = Record<string, any>;
