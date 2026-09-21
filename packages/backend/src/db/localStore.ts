@@ -190,6 +190,15 @@ export function findAdminUser(email: string) {
   return table('admin_users').find(u => u.email === email) ?? null;
 }
 
+/** Modules visible to the dev launchpad (distinct active recipes). */
+export function listModules(): { moduleId: string; moduleTitle: string }[] {
+  const seen = new Map<string, string>();
+  for (const r of table('cap-recipes')) {
+    if (r.isActive && !seen.has(r.moduleId)) seen.set(r.moduleId, r.moduleTitle);
+  }
+  return [...seen.entries()].map(([moduleId, moduleTitle]) => ({ moduleId, moduleTitle }));
+}
+
 // ── sessionDb ────────────────────────────────────────────────────────────────
 
 export const localSessionDb = {

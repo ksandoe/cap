@@ -38,8 +38,8 @@ app.get('/.well-known/jwks.json', (_req, res) => {
 });
 app.get('/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
-// ── Dev-only routes (simulated LTI launch for local development) ─────────────
-if (process.env.NODE_ENV !== 'production') {
+// ── Dev/demo routes (Canvas launchpad; never enable in real production) ──────
+if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_DEV_ROUTES === 'true') {
   if (USE_LOCAL_DB) {
     require('./db/localStore').seedLocalStore();
     console.log('[dev] USE_LOCAL_DB — JSON-file store active, external calls simulated');
