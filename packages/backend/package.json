@@ -5,7 +5,6 @@
     "dev": "tsx watch src/app.ts",
     "build": "tsc && npm run bundle",
     "bundle": "esbuild dist/lambda/handler.js --bundle --platform=node --target=node20 --outfile=dist/bundle.js",
-    "migrate": "tsx scripts/migrate.ts",
     "typecheck": "tsc --noEmit",
     "test": "jest"
   },
@@ -30,7 +29,6 @@
     "@types/pg":      "^8.11.0",
     "@types/uuid":    "^9.0.0",
     "esbuild":        "^0.20.0",
-    "node-pg-migrate": "^7.9.1",
     "tsx":            "^4.23.13",
     "typescript":     "^5.0.0"
   }

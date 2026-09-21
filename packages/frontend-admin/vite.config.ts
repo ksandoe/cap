@@ -2,8 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  // Deployed demo serves this app under /admin-app/ on the API origin.
-  base: process.env.VITE_BASE ?? '/',
+  // The Admin App is always served under /admin-app/ (deployed demo hosts both
+  // SPAs on the API origin; locally this becomes localhost:3002/admin-app/).
+  base: '/admin-app/',
   plugins: [react()],
   server: {
     port: 3002,
