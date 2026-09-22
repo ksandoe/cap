@@ -7,6 +7,7 @@
  * view, and a JSON export of the session data.
  */
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, decodeSessionToken } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
 import { RatingLevel } from '@cap/shared';
@@ -28,6 +29,7 @@ export function SummaryPhase() {
 
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   if (!evaluation) {
     return <p className="muted">Your evaluation is not available.</p>;
@@ -83,10 +85,18 @@ export function SummaryPhase() {
     <div>
       <h2>Your evaluation</h2>
 
-      {evaluation.badgeAwarded && (
+      {evaluation.badgeAwarded ? (
         <div className="notice success" role="status">
-          <strong>Badge awarded.</strong> Your badge has been issued — check your
-          email for a notification from Credly.
+          <strong>You passed — badge awarded.</strong> Your badge has been issued;
+          in a live course you would receive a Credly notification by email.
+        </div>
+      ) : (
+        <div className="notice warning" role="status">
+          <strong>Not passed this time.</strong> A passing evaluation requires no
+          dimension rated “Needs further work” and earns the module badge.
+          {needsWork
+            ? ' Review the dimensions below — you can retry the conversation focusing on the areas marked “Needs further work”.'
+            : ' Review the evaluation below; you may retry the conversation to strengthen your responses.'}
         </div>
       )}
 
@@ -128,7 +138,7 @@ export function SummaryPhase() {
       <p style={{ lineHeight: 1.7 }}>{evaluation.overallSummary}</p>
 
       <div className="actions">
-        {needsWork && (
+        {!evaluation.badgeAwarded && (
           <button className="primary" onClick={retry} disabled={retrying}>
             {retrying ? 'Starting…' : `Retry the conversation (attempt ${attemptNumber + 1})`}
           </button>
@@ -138,6 +148,9 @@ export function SummaryPhase() {
         </button>
         <button className="secondary" onClick={exportJson}>
           Download session data (JSON)
+        </button>
+        <button className="secondary" onClick={() => navigate('/')}>
+          Return to course
         </button>
       </div>
 

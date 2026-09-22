@@ -26,6 +26,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 .notice.error   { background: #fbeaea; border-color: #eec9c9; color: #7a1f1f; }
 .notice.success { background: #e6f4ea; border-color: #c2e2cb; color: #1e6b34; }
+.notice.warning { background: #fdf3d8; border-color: #eedfae; color: #6b5308; }
 
 /* ── Check-in questions ──────────────────────────────────────────────────── */
 .question {

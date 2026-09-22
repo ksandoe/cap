@@ -115,6 +115,8 @@ When evaluation is ready output: [ASSESSMENT:{...json...}]
   const evaluationSystemPrompt = `
 You are generating a rubric-based evaluation of a student's checkout conversation
 for the module: "${recipe.moduleTitle}".
+Write every narrative and the overall summary in the second person, addressed
+directly to the student ("you", "your") — never "the student" or third person.
 
 RUBRIC DIMENSIONS:
 ${rubricDims}
