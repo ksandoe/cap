@@ -19,9 +19,8 @@
 import { Router, Request, Response } from 'express';
 import { asyncRouter } from '../middleware/asyncRouter';
 import { createSession }        from '../services/orchestrator/orchestratorService';
-import { LOCAL_DEMO_MODULE_ID, listModules } from '../db/localStore';
-import { USE_LOCAL_DB }         from '../config/env';
-import { auroraConfigured, query } from '../db/auroraDb';
+import { LOCAL_DEMO_MODULE_ID } from '../db/localStore';
+import { recipeDb }             from '../db/recipeDb';
 import { logger }               from '../services/eventLogger';
 import { EVENTS }               from '@cap/shared';
 
@@ -35,18 +34,8 @@ const PERSONAS: Record<string, string> = {
 };
 
 devRouter.get('/modules', async (_req: Request, res: Response) => {
-  if (USE_LOCAL_DB) {
-    res.json({ modules: listModules() });
-    return;
-  }
-  if (auroraConfigured()) {
-    const r = await query<{ module_id: string; module_title: string }>(
-      `SELECT module_id, payload->>'moduleTitle' AS module_title
-       FROM recipes WHERE is_active = true ORDER BY module_id`);
-    res.json({ modules: r.rows.map(m => ({ moduleId: m.module_id, moduleTitle: m.module_title })) });
-    return;
-  }
-  res.json({ modules: [] });
+  const modules = await recipeDb.listActiveModules();
+  res.json({ modules });
 });
 
 devRouter.get('/launch', async (req: Request, res: Response) => {

@@ -14,7 +14,7 @@
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
-  DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand,
+  DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { Recipe } from '@cap/shared';
 import { USE_LOCAL_DB }  from '../config/env';
@@ -62,6 +62,20 @@ const ddbRecipeDb = {
       ExpressionAttributeValues: { ':mid': moduleId },
     }));
     return r.Items ?? [];
+  },
+
+  async listActiveModules() {
+    // Scan is fine at PoC/demo scale — recipes table is small.
+    const r = await ddb.send(new ScanCommand({
+      TableName: TABLE,
+      FilterExpression: 'isActive = :t',
+      ExpressionAttributeValues: { ':t': true },
+    }));
+    const seen = new Map<string, string>();
+    for (const item of r.Items ?? []) {
+      if (!seen.has(item.moduleId)) seen.set(item.moduleId, item.moduleTitle);
+    }
+    return [...seen.entries()].map(([moduleId, moduleTitle]) => ({ moduleId, moduleTitle }));
   },
 };
 

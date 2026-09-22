@@ -259,7 +259,17 @@ export const localRecipeDb = {
   async listVersions(moduleId: string) {
     return table('cap-recipes').filter(r => r.moduleId === moduleId);
   },
+  async listActiveModules() {
+    return listModules();
+  },
 };
+
+/** Demo seed data (recipe + SAP pool) — used by scripts/seed-demo.ts to
+ *  push the same content into DynamoDB when running against live tables. */
+export function demoSeedData() {
+  seedLocalStore();
+  return { recipes: [...table('cap-recipes')], sapPool: [...table('cap-sap-pool')] };
+}
 
 // ── sapPool ──────────────────────────────────────────────────────────────────
 
