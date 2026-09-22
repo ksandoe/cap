@@ -12,6 +12,7 @@
  * with ENABLE_DEV_ROUTES=true).
  */
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { API_BASE } from '../services/api';
 
 interface Module { moduleId: string; moduleTitle: string }
@@ -23,6 +24,7 @@ const PERSONAS = [
 ];
 
 export function DevLaunchPage() {
+  const notice = (useLocation().state as any)?.notice as string | undefined;
   const [persona,  setPersona]  = useState(PERSONAS[0].key);
   const [modules,  setModules]  = useState<Module[] | null>(null);
   const [loadErr,  setLoadErr]  = useState(false);
@@ -44,6 +46,13 @@ export function DevLaunchPage() {
           BUS 340 — Business Process Management
         </h1>
       </header>
+
+      {notice && (
+        <p style={{ padding: '10px 14px', background: '#fdf3d7', border: '1px solid #e0c97f',
+                    borderRadius: 6, fontSize: 13, color: '#6b5308', marginBottom: 20 }}>
+          {notice}
+        </p>
+      )}
 
       <section style={{ marginBottom: 28 }}>
         <label htmlFor="persona" style={{ fontWeight: 600, fontSize: 14, color: '#333' }}>
