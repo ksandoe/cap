@@ -26,6 +26,7 @@
  * POST /admin/auth/login           → admin login (public)
  */
 import { Router } from 'express';
+import { asyncRouter } from '../middleware/asyncRouter';
 import { requireRole }    from '../middleware/requireRole';
 import { authMiddleware } from '../middleware/auth';
 import * as instructor from '../services/admin/instructorService';
@@ -33,7 +34,7 @@ import * as researcher  from '../services/admin/researcherService';
 import * as adminSvc    from '../services/admin/adminService';
 import { handleAdminLogin } from '../services/admin/authService';
 
-export const adminRouter = Router();
+export const adminRouter = asyncRouter();
 
 // ── Auth (public within admin routes) ────────────────────────────────────────
 adminRouter.post('/auth/login', handleAdminLogin);

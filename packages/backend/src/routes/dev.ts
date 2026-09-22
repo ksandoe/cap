@@ -17,6 +17,7 @@
  * relaunching the same module as the same persona resumes their session.
  */
 import { Router, Request, Response } from 'express';
+import { asyncRouter } from '../middleware/asyncRouter';
 import { createSession }        from '../services/orchestrator/orchestratorService';
 import { LOCAL_DEMO_MODULE_ID, listModules } from '../db/localStore';
 import { USE_LOCAL_DB }         from '../config/env';
@@ -24,7 +25,7 @@ import { auroraConfigured, query } from '../db/auroraDb';
 import { logger }               from '../services/eventLogger';
 import { EVENTS }               from '@cap/shared';
 
-export const devRouter = Router();
+export const devRouter = asyncRouter();
 
 // Demo personas — stable identities so each "student" keeps their own session
 const PERSONAS: Record<string, string> = {

@@ -19,7 +19,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  if (!resp.ok) throw new Error(`API error ${resp.status}: ${await resp.text()}`);
+  if (!resp.ok) {
+    const text = await resp.text();
+    // Ephemeral demo store: a session record can vanish (redeploy / instance
+    // recycle) while the JWT is still valid. Bounce to the launchpad with a
+    // notice rather than dead-ending on an error inside a phase.
+    if (text.includes('SESSION_NOT_FOUND')) {
+      window.location.assign('/?notice=session-expired');
+      return new Promise<T>(() => {}); // navigation in progress
+    }
+    throw new Error(`API error ${resp.status}: ${text}`);
+  }
   return resp.json();
 }
 

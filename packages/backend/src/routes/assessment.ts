@@ -6,13 +6,14 @@
  * POST /assessment/evaluate           — Generate final rubric evaluation
  */
 import { Router } from 'express';
+import { asyncRouter } from '../middleware/asyncRouter';
 import {
   generateCheckinQuestions,
   processConversationTurn,
   generateEvaluation,
 } from '../services/assessment/assessmentService';
 
-export const assessmentRouter = Router();
+export const assessmentRouter = asyncRouter();
 
 assessmentRouter.post('/checkin-questions', generateCheckinQuestions);
 assessmentRouter.post('/turn',              processConversationTurn);

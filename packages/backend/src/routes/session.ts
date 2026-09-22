@@ -9,12 +9,13 @@
  * POST /session/:id/retry         — Create retry session
  */
 import { Router } from 'express';
+import { asyncRouter } from '../middleware/asyncRouter';
 import {
   getSession, submitCheckin, initiateSapVerification,
   getSapVerificationStatus, completeSession, createRetry,
 } from '../services/orchestrator/orchestratorService';
 
-export const sessionRouter = Router();
+export const sessionRouter = asyncRouter();
 
 sessionRouter.get( '/:id',               getSession);
 sessionRouter.post('/:id/checkin',       submitCheckin);

@@ -24,7 +24,11 @@ const PERSONAS = [
 ];
 
 export function DevLaunchPage() {
-  const notice = (useLocation().state as any)?.notice as string | undefined;
+  const location = useLocation();
+  const notice = (location.state as any)?.notice
+    ?? (new URLSearchParams(location.search).get('notice') === 'session-expired'
+          ? 'Your previous session expired — pick a persona and relaunch.'
+          : undefined);
   const [persona,  setPersona]  = useState(PERSONAS[0].key);
   const [modules,  setModules]  = useState<Module[] | null>(null);
   const [loadErr,  setLoadErr]  = useState(false);
