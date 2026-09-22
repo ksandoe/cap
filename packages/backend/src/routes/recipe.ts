@@ -7,11 +7,15 @@
  */
 import { Router } from 'express';
 import { asyncRouter } from '../middleware/asyncRouter';
-import { getRecipe, upsertRecipe, listVersions, previewCheckin } from '../services/assessment/recipeService';
+import { requireRole } from '../middleware/requireRole';
+import { getRecipe, upsertRecipe, listVersions, previewCheckin, listAllRecipes } from '../services/assessment/recipeService';
 
 export const recipeRouter = asyncRouter();
 
+// Authoring surface — requires an admin JWT with author/admin role.
+// GET /:moduleId stays open to student session tokens (the wizard needs it).
+recipeRouter.get( '/',                           requireRole(['author','admin']), listAllRecipes);
+recipeRouter.post('/',                           requireRole(['author','admin']), upsertRecipe);
+recipeRouter.post('/:moduleId/preview-checkin',  requireRole(['author','admin']), previewCheckin);
 recipeRouter.get( '/:moduleId',                  getRecipe);
-recipeRouter.post('/',                           upsertRecipe);
-recipeRouter.get( '/:moduleId/list',             listVersions);
-recipeRouter.post('/:moduleId/preview-checkin',  previewCheckin);
+recipeRouter.get( '/:moduleId/list',             requireRole(['author','admin']), listVersions);

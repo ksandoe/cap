@@ -33,7 +33,7 @@ export function compileContext(recipe: Recipe, session: Partial<Session>): Compi
       && step.understandingNote;
 
     const outcomeNames = (step.outcomeTagIndices ?? [])
-      .map(i => recipe.learningOutcomes[i])
+      .map(i => (recipe.learningOutcomes ?? [])[i])
       .filter(Boolean)
       .join(', ');
 
@@ -46,7 +46,7 @@ export function compileContext(recipe: Recipe, session: Partial<Session>): Compi
   }).join('\n\n');
 
   const checkinProfile = formatCheckinProfile(session.checkinResponses ?? []);
-  const rubricDims = recipe.rubricDimensions
+  const rubricDims = (recipe.rubricDimensions ?? [])
     .map(d => `- ${d.name}: ${d.description}`).join('\n');
   const probeRules = (recipe.probingRules ?? [])
     .map(r => `IF: ${r.trigger}\nTHEN: ${r.followUp}`).join('\n\n');
@@ -59,8 +59,8 @@ Generate exactly 3-4 questions to assess prior knowledge and experience.
 MODULE: ${recipe.moduleTitle}
 DESCRIPTION: ${recipe.moduleDescription}
 LEARNING OUTCOMES:
-${recipe.learningOutcomes.map((o,i) => `${i+1}. ${o}`).join('\n')}
-KEY CONCEPTS: ${recipe.keyConcepts.map(c => c.term).join(', ')}
+${(recipe.learningOutcomes ?? []).map((o,i) => `${i+1}. ${o}`).join('\n')}
+KEY CONCEPTS: ${(recipe.keyConcepts ?? []).map(c => c.term).join(', ')}
 
 Generate questions targeting: prior professional/academic experience,
 self-assessed comfort with key concepts, and relevant tool exposure.
@@ -80,10 +80,10 @@ STUDENT PROFILE (from check-in):
 ${checkinProfile}
 
 LEARNING OUTCOMES:
-${recipe.learningOutcomes.map((o,i) => `${i+1}. ${o}`).join('\n')}
+${(recipe.learningOutcomes ?? []).map((o,i) => `${i+1}. ${o}`).join('\n')}
 
 KEY CONCEPTS:
-${recipe.keyConcepts.map(c => `- ${c.term}: ${c.definition}`).join('\n')}
+${(recipe.keyConcepts ?? []).map(c => `- ${c.term}: ${c.definition}`).join('\n')}
 
 ACTIVITY STEPS:
 ${stepContext}
@@ -122,7 +122,7 @@ RUBRIC DIMENSIONS:
 ${rubricDims}
 
 LEARNING OUTCOMES:
-${recipe.learningOutcomes.map((o,i) => `${i+1}. ${o}`).join('\n')}
+${(recipe.learningOutcomes ?? []).map((o,i) => `${i+1}. ${o}`).join('\n')}
 
 Rate each dimension as: Strong | Developing | Needs further work
 Write a 2-3 sentence narrative per dimension referencing specific student statements.

@@ -77,6 +77,11 @@ const ddbRecipeDb = {
     }
     return [...seen.entries()].map(([moduleId, moduleTitle]) => ({ moduleId, moduleTitle }));
   },
+
+  async listAllRecipes() {
+    const r = await ddb.send(new ScanCommand({ TableName: TABLE }));
+    return r.Items ?? [];
+  },
 };
 
 export const recipeDb = USE_LOCAL_DB ? localRecipeDb : ddbRecipeDb;

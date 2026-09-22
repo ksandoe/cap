@@ -15,8 +15,15 @@ export async function getRecipe(req: Request, res: Response): Promise<void> {
   res.json(recipe);
 }
 
+/** GET /recipe — all recipe versions across modules (Admin App list page). */
+export async function listAllRecipes(_req: Request, res: Response): Promise<void> {
+  res.json({ recipes: await recipeDb.listAllRecipes() });
+}
+
 export async function upsertRecipe(req: Request, res: Response): Promise<void> {
-  const saved = await recipeDb.saveRecipe(req.body);
+  const body = { ...req.body };
+  if (!body.recipeId) body.recipeId = crypto.randomUUID();
+  const saved = await recipeDb.saveRecipe(body);
   res.json(saved);
 }
 

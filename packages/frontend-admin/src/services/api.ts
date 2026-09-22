@@ -26,10 +26,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const adminApi = {
   recipe: {
+    list:          ()                 => request<{ recipes: any[] }>('GET', '/recipe'),
     get:           (moduleId: string) => request<any>('GET',  `/recipe/${moduleId}`),
     listVersions:  (moduleId: string) => request<any>('GET',  `/recipe/${moduleId}/list`),
     save:          (recipe: any)      => request<any>('POST', '/recipe', recipe),
-    previewCheckin:(moduleId: string) => request<any>('POST', `/recipe/${moduleId}/preview-checkin`),
+    previewCheckin:(moduleId: string, recipe?: any) => request<{ questions: any[] }>('POST', `/recipe/${moduleId}/preview-checkin`, recipe ? { recipe } : {}),
   },
   sessions: {
     list:        (moduleId: string)   => request<any>('GET',  `/admin/sessions?moduleId=${moduleId}`),

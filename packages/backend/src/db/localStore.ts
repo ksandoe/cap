@@ -262,6 +262,9 @@ export const localRecipeDb = {
   async listActiveModules() {
     return listModules();
   },
+  async listAllRecipes() {
+    return [...table('cap-recipes')];
+  },
 };
 
 /** Demo seed data (recipe + SAP pool) — used by scripts/seed-demo.ts to
