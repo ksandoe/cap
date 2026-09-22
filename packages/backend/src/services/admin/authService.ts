@@ -29,11 +29,11 @@ export async function handleAdminLogin(req: Request, res: Response): Promise<voi
 
   let role: AdminRole | null = null;
 
-  if (USE_LOCAL_DB) {
+  if (USE_LOCAL_DB || !auroraConfigured()) {
     const user = findAdminUser(email);
-    // Dev store holds plaintext passwords — local only, never in production
+    // Dev store holds plaintext passwords — local/demo only, never in production
     if (user && user.password === password) role = user.role as AdminRole;
-  } else if (auroraConfigured()) {
+  } else {
     // TODO: verify bcrypt hash — dev seeds use plaintext; Aurora must store hashes
     const r = await query<{ role: AdminRole }>(
       'SELECT role FROM admin_users WHERE email = $1 AND hashed_password = $2',

@@ -14,6 +14,7 @@
  */
 // config/env must be imported first — it loads .env before other modules read it
 import { USE_LOCAL_DB } from './config/env';
+import { auroraConfigured } from './db/auroraDb';
 import express         from 'express';
 import fs              from 'fs';
 import path            from 'path';
@@ -57,9 +58,9 @@ app.get('/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOStrin
 
 // ── Dev/demo routes (Canvas launchpad; never enable in real production) ──────
 if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_DEV_ROUTES === 'true') {
-  if (USE_LOCAL_DB) {
+  if (USE_LOCAL_DB || !auroraConfigured()) {
     require('./db/localStore').seedLocalStore();
-    console.log('[dev] USE_LOCAL_DB — JSON-file store active, external calls simulated');
+    console.log('[dev] JSON-file store active (local dev or demo without Aurora)');
   }
   app.use('/dev', require('./routes/dev').devRouter);
 }
