@@ -47,7 +47,7 @@ export function DevLaunchPage() {
           Canvas course (simulated)
         </div>
         <h1 style={{ margin: '4px 0 0', color: '#1D4E8C', fontSize: 26 }}>
-          BUS 340 — Business Process Management
+          MINS 301 — Corporate Technology Integration
         </h1>
       </header>
 
