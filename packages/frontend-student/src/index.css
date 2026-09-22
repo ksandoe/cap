@@ -1,0 +1,107 @@
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #f8f8f7; color: #333; }
+
+h2 { color: #1D4E8C; margin: 0 0 8px; font-size: 22px; }
+h3 { color: #1D4E8C; margin: 24px 0 8px; font-size: 17px; }
+.muted { color: #777; font-size: 14px; line-height: 1.6; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+button { font: inherit; cursor: pointer; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+.primary {
+  padding: 10px 20px; border: none; border-radius: 6px;
+  background: #1D4E8C; color: #fff; font-weight: 600;
+}
+.secondary {
+  padding: 10px 20px; border: 1px solid #c5c5c2; border-radius: 6px;
+  background: #fff; color: #333; margin-left: 8px;
+}
+.actions { display: flex; gap: 8px; margin-top: 24px; flex-wrap: wrap; }
+.actions .secondary { margin-left: 0; }
+
+/* ── Notices ─────────────────────────────────────────────────────────────── */
+.notice {
+  padding: 14px 18px; border-radius: 6px; margin: 16px 0;
+  background: #eef3fa; border: 1px solid #cfdeef; line-height: 1.5;
+}
+.notice.error   { background: #fbeaea; border-color: #eec9c9; color: #7a1f1f; }
+.notice.success { background: #e6f4ea; border-color: #c2e2cb; color: #1e6b34; }
+
+/* ── Check-in questions ──────────────────────────────────────────────────── */
+.question {
+  border: 1px solid #e2e2e0; border-radius: 8px; background: #fff;
+  padding: 16px 18px; margin: 14px 0;
+}
+.question legend { font-weight: 600; padding: 0 4px; }
+.question input[type="text"] {
+  width: 100%; padding: 8px 10px; border: 1px solid #c5c5c2;
+  border-radius: 6px; font: inherit; margin-top: 4px;
+}
+.options { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.option { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.option input { accent-color: #1D4E8C; }
+
+/* ── Activity phase ──────────────────────────────────────────────────────── */
+.resource-links { list-style: none; padding: 0; margin: 12px 0 20px; }
+.resource-links li { margin: 6px 0; }
+.resource-links a { color: #1D4E8C; }
+.tag {
+  display: inline-block; margin-left: 8px; padding: 1px 8px;
+  background: #e3ecf7; color: #1D4E8C; border-radius: 999px; font-size: 12px;
+}
+.steps { padding-left: 22px; }
+.steps li {
+  background: #fff; border: 1px solid #e2e2e0; border-radius: 8px;
+  padding: 12px 16px; margin: 8px 0; line-height: 1.5;
+}
+
+/* ── Checkout chat ───────────────────────────────────────────────────────── */
+.chat {
+  background: #fff; border: 1px solid #e2e2e0; border-radius: 8px;
+  min-height: 280px; max-height: 55vh; overflow-y: auto;
+  padding: 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.bubble {
+  max-width: 78%; padding: 10px 14px; border-radius: 12px;
+  line-height: 1.55; white-space: pre-wrap;
+}
+.bubble.agent   { align-self: flex-start; background: #eef3fa; color: #222; }
+.bubble.student { align-self: flex-end;   background: #1D4E8C; color: #fff; }
+.bubble.typing  { color: #999; font-size: 20px; letter-spacing: 2px; }
+.chat-input { display: flex; gap: 8px; margin-top: 12px; }
+.chat-input input {
+  flex: 1; padding: 10px 12px; border: 1px solid #c5c5c2;
+  border-radius: 6px; font: inherit;
+}
+
+/* ── Summary / evaluation ────────────────────────────────────────────────── */
+.dimensions { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+.dimension {
+  background: #fff; border: 1px solid #e2e2e0; border-radius: 8px;
+  padding: 14px 18px;
+}
+.dimension-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.dimension p { margin: 8px 0 0; line-height: 1.6; color: #444; }
+.rating { padding: 2px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.outcomes { list-style: none; padding: 0; }
+.outcomes li {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid #eee; line-height: 1.5;
+}
+.outcome-status { flex-shrink: 0; font-size: 12px; font-weight: 700; width: 130px; }
+.outcome-status.achieved      { color: #1e6b34; }
+.outcome-status.partial       { color: #8a6d00; }
+.outcome-status.not_addressed { color: #9c2323; }
+
+/* ── Print (Phase 4 summary) ─────────────────────────────────────────────── */
+@media print {
+  nav, .actions, .chat-input { display: none !important; }
+  body { background: #fff; }
+}
+
+/* Content blocks (learning activity) */
+.block { margin: 20px 0; padding: 16px 20px; border: 1px solid #d8dee9; border-radius: 8px; }
+.block h3 { margin-top: 0; }
+.block.sap { border-left: 4px solid #1D4E8C; }
+.concurrent-pair { display: flex; gap: 16px; flex-wrap: wrap; }
+.concurrent-pair .block { flex: 1 1 340px; }

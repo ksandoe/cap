@@ -6,10 +6,12 @@
  * GET  /recipe/:moduleId/list    — List versions for a module
  */
 import { Router } from 'express';
-import { getRecipe, upsertRecipe, listVersions } from '../services/assessment/recipeService';
+import { asyncRouter } from '../middleware/asyncRouter';
+import { getRecipe, upsertRecipe, listVersions, previewCheckin } from '../services/assessment/recipeService';
 
-export const recipeRouter = Router();
+export const recipeRouter = asyncRouter();
 
-recipeRouter.get( '/:moduleId',        getRecipe);
-recipeRouter.post('/',                 upsertRecipe);
-recipeRouter.get( '/:moduleId/list',   listVersions);
+recipeRouter.get( '/:moduleId',                  getRecipe);
+recipeRouter.post('/',                           upsertRecipe);
+recipeRouter.get( '/:moduleId/list',             listVersions);
+recipeRouter.post('/:moduleId/preview-checkin',  previewCheckin);

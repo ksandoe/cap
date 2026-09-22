@@ -8,11 +8,16 @@
  * Data lives in packages/backend/.dev-data/local-db.json.
  */
 import fs   from 'fs';
+import os   from 'os';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Recipe, CheckinResponse } from '@cap/shared';
 
-const DATA_DIR  = path.resolve(__dirname, '../../.dev-data');
+// In Lambda the deployment dir is read-only — use /tmp (per-container,
+// still ephemeral; acceptable for demo use per USE_LOCAL_DB semantics).
+const DATA_DIR  = process.env.AWS_LAMBDA_FUNCTION_NAME
+  ? path.join(os.tmpdir(), 'cap-dev-data')
+  : path.resolve(__dirname, '../../.dev-data');
 const DATA_FILE = path.join(DATA_DIR, 'local-db.json');
 
 type Item = Record<string, any>;
@@ -83,27 +88,55 @@ function seedRecipe(): void {
       { trigger: 'Student names transaction codes without describing the business outcome',
         followUp: 'Ask what the business achieves with that document.' },
     ],
-    activitySteps: [
-      { stepNumber: 1,
-        description: 'Log into SAP and review the customer master record for customer 1001.',
-        outcomeTagIndices: [1],
-        understandingNote: 'Student should recognize that master data is maintained once and reused across documents.' },
-      { stepNumber: 2,
-        description: 'Create an Inquiry (VA11) for customer 1001 requesting material M-001.',
-        outcomeTagIndices: [0],
-        understandingNote: 'An inquiry is a non-binding customer request — it is not a commitment to purchase.' },
-      { stepNumber: 3,
-        description: 'Create a Quotation (VA21) that references the inquiry you created.',
-        outcomeTagIndices: [0],
-        understandingNote: 'A quotation is a binding offer with prices, quantities, and validity dates; referencing the inquiry carries the data forward.' },
-      { stepNumber: 4,
-        description: 'Create a Sales Order (VA01) that references the quotation.',
-        outcomeTagIndices: [0, 1],
-        understandingNote: 'The order pulls data from the quotation — the document flow means nothing is re-keyed.' },
-      { stepNumber: 5,
-        description: 'Open the document flow view and confirm your three documents are linked.',
-        outcomeTagIndices: [],
-        understandingNote: '' },
+    // Content block model (Master PRD §3.2): conceptual → concurrent pair
+    // (instructional + SAP activity, both visible simultaneously).
+    contentBlocks: [
+      { blockId: 'cb-concept-1', type: 'conceptual',
+        title: 'Background: the SAP sales document flow',
+        body: 'SAP ERP tracks the sales process as a chain of linked documents: ' +
+          'Inquiry → Quotation → Sales Order. Each document references its ' +
+          'predecessor, so master data and line items carry forward without ' +
+          're-keying. Understanding *why* each document exists matters more ' +
+          'than memorizing transaction codes.',
+        isGate: false },
+      { blockId: 'cb-instr-1', type: 'instructional',
+        title: 'Sales document exercise',
+        isGate: true,
+        steps: [
+          { stepNumber: 1,
+            description: 'Log into SAP and review the customer master record for customer 1001.',
+            outcomeTagIndices: [1],
+            understandingNote: 'Student should recognize that master data is maintained once and reused across documents.' },
+          { stepNumber: 2,
+            description: 'Create an Inquiry (VA11) for customer 1001 requesting material M-001.',
+            outcomeTagIndices: [0],
+            understandingNote: 'An inquiry is a non-binding customer request — it is not a commitment to purchase.' },
+          { stepNumber: 3,
+            description: 'Create a Quotation (VA21) that references the inquiry you created.',
+            outcomeTagIndices: [0],
+            understandingNote: 'A quotation is a binding offer with prices, quantities, and validity dates; referencing the inquiry carries the data forward.' },
+          { stepNumber: 4,
+            description: 'Create a Sales Order (VA01) that references the quotation.',
+            outcomeTagIndices: [0, 1],
+            understandingNote: 'The order pulls data from the quotation — the document flow means nothing is re-keyed.' },
+          { stepNumber: 5,
+            description: 'Open the document flow view and confirm your three documents are linked.',
+            outcomeTagIndices: [],
+            understandingNote: '' },
+        ] },
+      { blockId: 'cb-sap-1', type: 'sap',
+        title: 'SAP sandbox exercise',
+        taskPrompt: 'In your assigned SAP sandbox, create an Inquiry (VA11), a ' +
+          'Quotation (VA21) referencing it, and a Sales Order (VA01) referencing ' +
+          'the quotation — all for customer 1001, material M-001.',
+        isGate: true },
+    ],
+    concurrentPairs: [
+      { pairId: 'pair-1', instructionalId: 'cb-instr-1', sapId: 'cb-sap-1' },
+    ],
+    sequence: [
+      { kind: 'block', blockId: 'cb-concept-1' },
+      { kind: 'pair',  pairId:  'pair-1' },
     ],
     rubricDimensions: [
       { name: 'Process understanding',   description: 'Explains the inquiry–quotation–order sequence and why each document exists.' },
@@ -137,10 +170,38 @@ function seedRecipe(): void {
   } as Recipe);
 }
 
+function seedAdminUsers(): void {
+  const users = table('admin_users');
+  if (users.length) return;
+  // Dev-only admin login — production uses Aurora admin_users + institutional SSO
+  users.push(
+    { email: 'admin@cap.local',      password: 'dev-admin-password',      role: 'admin' },
+    { email: 'author@cap.local',     password: 'dev-author-password',     role: 'author' },
+    { email: 'instructor@cap.local', password: 'dev-instructor-password', role: 'instructor' },
+    { email: 'researcher@cap.local', password: 'dev-researcher-password', role: 'researcher' },
+  );
+}
+
 export function seedLocalStore(): void {
   seedSapPool();
   seedRecipe();
+  seedAdminUsers();
   save();
+}
+
+// ── adminUsers (dev auth for the Admin App) ───────────────────────────────────
+
+export function findAdminUser(email: string) {
+  return table('admin_users').find(u => u.email === email) ?? null;
+}
+
+/** Modules visible to the dev launchpad (distinct active recipes). */
+export function listModules(): { moduleId: string; moduleTitle: string }[] {
+  const seen = new Map<string, string>();
+  for (const r of table('cap-recipes')) {
+    if (r.isActive && !seen.has(r.moduleId)) seen.set(r.moduleId, r.moduleTitle);
+  }
+  return [...seen.entries()].map(([moduleId, moduleTitle]) => ({ moduleId, moduleTitle }));
 }
 
 // ── sessionDb ────────────────────────────────────────────────────────────────
@@ -198,7 +259,17 @@ export const localRecipeDb = {
   async listVersions(moduleId: string) {
     return table('cap-recipes').filter(r => r.moduleId === moduleId);
   },
+  async listActiveModules() {
+    return listModules();
+  },
 };
+
+/** Demo seed data (recipe + SAP pool) — used by scripts/seed-demo.ts to
+ *  push the same content into DynamoDB when running against live tables. */
+export function demoSeedData() {
+  seedLocalStore();
+  return { recipes: [...table('cap-recipes')], sapPool: [...table('cap-sap-pool')] };
+}
 
 // ── sapPool ──────────────────────────────────────────────────────────────────
 

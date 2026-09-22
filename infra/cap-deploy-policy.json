@@ -1,0 +1,87 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LambdaManageCapFunctions",
+      "Effect": "Allow",
+      "Action": "lambda:*",
+      "Resource": "arn:aws:lambda:us-east-1:501517924477:function:cap-*"
+    },
+    {
+      "Sid": "LambdaList",
+      "Effect": "Allow",
+      "Action": "lambda:ListFunctions",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ApiGatewayManage",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET", "apigateway:POST", "apigateway:PUT",
+        "apigateway:PATCH", "apigateway:DELETE"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DynamoDbCapTables",
+      "Effect": "Allow",
+      "Action": "dynamodb:*",
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:501517924477:table/cap-*",
+        "arn:aws:dynamodb:us-east-1:501517924477:table/cap-*/index/*"
+      ]
+    },
+    {
+      "Sid": "DynamoDbList",
+      "Effect": "Allow",
+      "Action": ["dynamodb:ListTables", "dynamodb:DescribeLimits"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IamCapRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole", "iam:GetRole", "iam:DeleteRole",
+        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
+        "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PassRole"
+      ],
+      "Resource": "arn:aws:iam::501517924477:role/cap-*"
+    },
+    {
+      "Sid": "SecretsManagerCapSecrets",
+      "Effect": "Allow",
+      "Action": "secretsmanager:*",
+      "Resource": "arn:aws:secretsmanager:us-east-1:501517924477:secret:cap/*"
+    },
+    {
+      "Sid": "RdsAuroraCluster",
+      "Effect": "Allow",
+      "Action": [
+        "rds:ModifyDBCluster", "rds:DescribeDBClusters",
+        "rds:DescribeDBInstances", "rds-data:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LambdaLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups", "logs:DescribeLogStreams",
+        "logs:FilterLogEvents", "logs:GetLogEvents"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-east-1:501517924477:log-group:/aws/lambda/cap-*",
+        "arn:aws:logs:us-east-1:501517924477:log-group:/aws/lambda/cap-*:*"
+      ]
+    },
+    {
+      "Sid": "S3CapBuckets",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::cap-*",
+        "arn:aws:s3:::cap-*/*"
+      ]
+    }
+  ]
+}

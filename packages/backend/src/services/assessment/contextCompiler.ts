@@ -11,7 +11,7 @@
  * TODO: implement AI-based outcome tag inference for untagged steps
  * TODO: implement token budget management for background documentation
  */
-import { Recipe, Session, CheckinResponse } from '@cap/shared';
+import { Recipe, Session, CheckinResponse, InstructionalBlock } from '@cap/shared';
 
 export interface CompiledContext {
   checkinSystemPrompt:    string;
@@ -19,8 +19,15 @@ export interface CompiledContext {
   evaluationSystemPrompt: string;
 }
 
+/** Flatten all ActivitySteps out of the recipe's instructional content blocks. */
+function activitySteps(recipe: Recipe) {
+  return (recipe.contentBlocks ?? [])
+    .filter((b): b is InstructionalBlock => b.type === 'instructional')
+    .flatMap(b => b.steps ?? []);
+}
+
 export function compileContext(recipe: Recipe, session: Partial<Session>): CompiledContext {
-  const stepContext = recipe.activitySteps.map(step => {
+  const stepContext = activitySteps(recipe).map(step => {
     const probeEligible = step.description
       && step.outcomeTagIndices?.length > 0
       && step.understandingNote;
@@ -58,7 +65,7 @@ KEY CONCEPTS: ${recipe.keyConcepts.map(c => c.term).join(', ')}
 Generate questions targeting: prior professional/academic experience,
 self-assessed comfort with key concepts, and relevant tool exposure.
 Each question must specify: questionKey, questionText, responseType (likert|multiple_choice|short_text), options (if applicable).
-Respond ONLY with a valid JSON array of question objects.
+Respond ONLY with a JSON object of the form {"questions": [ ...question objects... ]}.
 `.trim();
 
   // ── Checkout conversation system prompt ────────────────────────────────────

@@ -56,10 +56,12 @@ export async function createSession(ltiContext: {
 
   const session = {
     sessionId, tempUserId, moduleId: ltiContext.moduleId,
-    recipeId:   recipe?.recipeId ?? null,
+    recipeId:      recipe?.recipeId ?? null,
+    recipeVersion: recipe?.version  ?? 1,
     state:      'LAUNCHED' as const,
     phaseReached: PHASES.CHECKIN,
     attemptNumber: 1,
+    completedBlockIds: [] as string[],
     canvasUuid:         ltiContext.canvasUuid,   // server-side only — resume lookup
     ltiContextId:       ltiContext.ltiContextId,
     ltiResourceLinkId:  ltiContext.ltiResourceLinkId,
@@ -97,7 +99,7 @@ export async function submitCheckin(req: Request, res: Response): Promise<void> 
   const { responses } = req.body;
 
   await sessionDb.updateSession(id, {
-    state: 'ACTIVITY', phaseReached: PHASES.ACTIVITY,
+    state: 'LEARNING', phaseReached: PHASES.ACTIVITY,
     checkinResponses: responses,
   });
 
@@ -131,11 +133,11 @@ async function runSapVerification(sessionId: string, sapUsername: string, module
       });
       logger.info(EVENTS.SAP_VERIFICATION_PASS, { sessionId, docs: result.foundDocs });
     } else {
-      await sessionDb.updateSession(sessionId, { state: 'ACTIVITY', sapVerificationError: { missingTypes: result.missingTypes } });
+      await sessionDb.updateSession(sessionId, { state: 'LEARNING', sapVerificationError: { missingTypes: result.missingTypes } });
       logger.warn(EVENTS.SAP_VERIFICATION_FAIL, { sessionId, missingTypes: result.missingTypes });
     }
   } catch (err) {
-    await sessionDb.updateSession(sessionId, { state: 'ACTIVITY', sapVerificationError: { error: String(err) } });
+    await sessionDb.updateSession(sessionId, { state: 'LEARNING', sapVerificationError: { error: String(err) } });
     logger.error(EVENTS.SAP_VERIFICATION_ERROR, { sessionId, error: String(err) });
   }
 }
@@ -205,6 +207,7 @@ export async function createRetry(req: Request, res: Response): Promise<void> {
     attemptNumber:     (parent?.attemptNumber ?? req.body.attemptNumber ?? 1) + 1,
     priorSessionId:    req.params.id,
     sapUsername,
+    completedBlockIds: parent?.completedBlockIds ?? [],
     startedAt:         new Date().toISOString(),
     completedAt:       undefined,
     transcript:        undefined,
