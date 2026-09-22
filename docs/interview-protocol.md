@@ -25,8 +25,8 @@ the reaction is the data. Don't preempt criticism by explaining stubs up front.
 | Check-in questions | Real flow, real state machine | Questions come from the seed recipe, not AI-generated yet |
 | Activity steps | Real content-block model | Content is demo text, not real SAP exercises |
 | "SAP verification" | Real state transitions | Always succeeds — no real SAP connection yet |
-| Checkout conversation | Real chat UI and flow | May be scripted mock responses — ask them to imagine it responds like a thoughtful TA |
-| Evaluation/summary | Real rubric display | May be mock scores — depends whether the test API key is active |
+| Checkout conversation | Real chat UI and flow, real AI (gpt-4o-mini test key) | Question quality is limited by the small model — the official key may use a larger one |
+| Evaluation/summary | Real rubric display, real AI scoring | Same model caveat |
 | Badge / grade | Flow exists | Credly and Canvas grade return are stubs |
 | Admin login | Real role gating | Dev passwords — real login will be campus SSO |
 | Session persistence | Resume works during a session | Sessions are wiped on redeploy — by design for the demo |

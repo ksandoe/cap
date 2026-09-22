@@ -65,7 +65,7 @@ KEY CONCEPTS: ${recipe.keyConcepts.map(c => c.term).join(', ')}
 Generate questions targeting: prior professional/academic experience,
 self-assessed comfort with key concepts, and relevant tool exposure.
 Each question must specify: questionKey, questionText, responseType (likert|multiple_choice|short_text), options (if applicable).
-Respond ONLY with a valid JSON array of question objects.
+Respond ONLY with a JSON object of the form {"questions": [ ...question objects... ]}.
 `.trim();
 
   // ── Checkout conversation system prompt ────────────────────────────────────

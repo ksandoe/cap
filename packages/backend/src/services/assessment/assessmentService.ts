@@ -16,7 +16,7 @@ import { Request, Response } from 'express';
 import { sessionDb }     from '../../db/sessionDb';
 import { recipeDb }      from '../../db/recipeDb';
 import { compileContext } from './contextCompiler';
-import { callModel }     from './llmProvider';
+import { callModel, extractJson } from './llmProvider';
 import { logger }        from '../eventLogger';
 import { EVENTS }        from '@cap/shared';
 import { LLM_MODE }      from '../../config/env';
@@ -34,10 +34,11 @@ export async function generateCheckinQuestions(req: Request, res: Response): Pro
     ? mockCheckinQuestions()
     : await callModel(checkinSystemPrompt, [
         { role: 'user', content: 'Generate the check-in questions now.' },
-      ]);
+      ], { json: true });
 
   try {
-    const questions = JSON.parse(raw);
+    const parsed = extractJson<any>(raw);
+    const questions = Array.isArray(parsed) ? parsed : parsed.questions;
     res.json({ questions });
   } catch {
     res.status(500).json({ error: 'Failed to parse check-in questions from AI response.' });
@@ -72,11 +73,10 @@ export async function generateEvaluation(req: Request, res: Response): Promise<v
     ? mockEvaluation(recipe!)
     : await callModel(evaluationSystemPrompt, [
         { role: 'user', content: `Here is the full conversation transcript:\n\n${JSON.stringify(transcript)}` },
-      ]);
+      ], { json: true });
 
   try {
-    const evaluation = JSON.parse(raw.replace(/```json|```/g, '').trim());
-    res.json({ evaluation });
+    res.json({ evaluation: extractJson(raw) });
   } catch {
     res.status(500).json({ error: 'Failed to parse evaluation from AI response.' });
   }

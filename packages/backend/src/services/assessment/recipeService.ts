@@ -5,7 +5,7 @@
 import { Request, Response } from 'express';
 import { recipeDb } from '../../db/recipeDb';
 import { compileContext } from './contextCompiler';
-import { callModel }      from './llmProvider';
+import { callModel, extractJson } from './llmProvider';
 import { LLM_MODE }       from '../../config/env';
 import { mockCheckinQuestions } from './mockAi';
 
@@ -40,10 +40,11 @@ export async function previewCheckin(req: Request, res: Response): Promise<void>
     ? mockCheckinQuestions()
     : await callModel(checkinSystemPrompt, [
         { role: 'user', content: 'Generate the check-in questions now.' },
-      ]);
+      ], { json: true });
 
   try {
-    res.json({ questions: JSON.parse(raw), sample: true });
+    const parsed = extractJson<any>(raw);
+    res.json({ questions: Array.isArray(parsed) ? parsed : parsed.questions, sample: true });
   } catch {
     res.status(500).json({ error: 'Failed to parse check-in questions from AI response.' });
   }

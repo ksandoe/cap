@@ -16,10 +16,24 @@ import axios from 'axios';
 
 export interface ChatMessage { role: string; content: string }
 
+/**
+ * Extracts the first JSON value (object or array) from a model response.
+ * Tolerates markdown code fences and surrounding prose.
+ */
+export function extractJson<T = unknown>(raw: string): T {
+  const cleaned = raw.replace(/```(?:json)?/g, '').trim();
+  const start   = cleaned.search(/[\[{]/);
+  if (start === -1) throw new Error('no JSON found in model response');
+  const slice = cleaned.slice(start);
+  try { return JSON.parse(slice); } catch { /* trailing prose */ }
+  const last = Math.max(slice.lastIndexOf(']'), slice.lastIndexOf('}'));
+  return JSON.parse(slice.slice(0, last + 1));
+}
+
 export async function callModel(
   systemPrompt: string,
   messages: ChatMessage[],
-  opts: { maxTokens?: number } = {},
+  opts: { maxTokens?: number; json?: boolean } = {},
 ): Promise<string> {
   const baseUrl   = (process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1').replace(/\/$/, '');
   const apiKey    = process.env.OPENAI_API_KEY!;
@@ -40,6 +54,7 @@ export async function callModel(
     ],
     max_tokens:  opts.maxTokens ?? 1024,
     temperature: 0.7,
+    ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
   }, { headers, timeout: 30_000 });
 
   return resp.data.choices?.[0]?.message?.content ?? '';
