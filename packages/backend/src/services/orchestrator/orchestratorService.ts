@@ -159,8 +159,9 @@ export async function completeSession(req: Request, res: Response): Promise<void
   logger.info(EVENTS.ASSESSMENT_COMPLETE, { sessionId: id, badgeAwarded: evaluation.badgeAwarded });
 
   // Post-completion workflow (parallel where possible)
+  const ratings = evaluation.dimensionRatings ?? evaluation.dimensions ?? [];
   const score = evaluation.badgeAwarded ? 1.0
-    : evaluation.dimensionRatings.some((d: any) => d.rating !== 'Needs further work') ? 0.5 : 0.0;
+    : ratings.some((d: any) => d.rating !== 'Needs further work') ? 0.5 : 0.0;
 
   await Promise.allSettled([
     postGradeToCanvas(session, score),

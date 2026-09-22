@@ -128,7 +128,13 @@ Write a 3-5 sentence overall summary (one strength, one development area, forwar
 For each learning outcome, assess: achieved | partial | not_addressed.
 Award badge if NO dimension is rated "Needs further work".
 
-Respond ONLY with valid JSON matching the Evaluation type schema.
+Respond ONLY with a JSON object of exactly this shape:
+{
+  "dimensionRatings": [ { "dimensionName": "<dimension name>", "rating": "Strong|Developing|Needs further work", "narrative": "..." } ],
+  "outcomeSummary":   [ { "outcomeIndex": <0-based index>, "outcomeText": "<outcome>", "status": "achieved|partial|not_addressed" } ],
+  "overallSummary":   "...",
+  "badgeAwarded":     true|false
+}
 `.trim();
 
   return { checkinSystemPrompt, checkoutSystemPrompt, evaluationSystemPrompt };

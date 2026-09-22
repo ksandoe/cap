@@ -79,7 +79,16 @@ export async function generateEvaluation(req: Request, res: Response): Promise<v
       ], { json: true });
 
   try {
-    res.json({ evaluation: extractJson(raw) });
+    const parsed = extractJson<any>(raw);
+    // Normalize to the Evaluation shape — small models improvise field names.
+    res.json({ evaluation: {
+      sessionId,
+      dimensionRatings: parsed.dimensionRatings ?? parsed.dimensions ?? parsed.dimension_ratings ?? [],
+      outcomeSummary:   parsed.outcomeSummary   ?? parsed.outcomes   ?? parsed.outcome_summary   ?? [],
+      overallSummary:   parsed.overallSummary   ?? parsed.overall_summary ?? parsed.summary ?? '',
+      badgeAwarded:     parsed.badgeAwarded     ?? parsed.badge_awarded  ?? false,
+      assessedAt:       parsed.assessedAt       ?? parsed.assessed_at    ?? new Date().toISOString(),
+    }});
   } catch {
     res.status(500).json({ error: 'Failed to parse evaluation from AI response.' });
   }
