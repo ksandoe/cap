@@ -5,9 +5,9 @@
  *   1. Module identity      — module ID, title, description
  *   2. Learning outcomes    — numbered list (min 2)
  *   3. Key concepts         — term + definition pairs
- *   4. Content blocks       — conceptual / instructional / SAP blocks with
- *                             gate flags, reordering, a nested step editor,
- *                             and concurrent-pair assignment
+ *   4. Steps & content      — module steps; each step holds ordered content
+ *                             blocks: rich text, embedded tool, knowledge
+ *                             check, checklist, branching note
  *   5. Instructional recipe — rubric dimensions, probing rules, vague answer
  *                             triggers, career transfer prompts, tone, max turns
  *   6. Background docs      — pasted text + external URLs (file upload pending S3)
@@ -19,7 +19,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { adminApi } from '../../services/api';
-import type { ContentBlock, InstructionalBlock, SapBlock, ConceptualBlock, ActivityStep } from '@cap/shared';
+import type {
+  ContentBlock, ModuleStep, EmbeddedToolBlock, KnowledgeCheckBlock,
+  KnowledgeCheckQuestion, ChecklistBlock, BranchingNoteBlock, RichTextBlock,
+} from '@cap/shared';
 
 // ── style shorthands (matching the scaffold's inline-style look) ──────────────
 const input: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' };
@@ -34,8 +37,7 @@ interface Draft {
   moduleId: string; moduleTitle: string; moduleDescription: string;
   learningOutcomes: string[];
   keyConcepts: { term: string; definition: string }[];
-  contentBlocks: ContentBlock[];
-  pairings: Record<string, string>;          // instructionalBlockId → sapBlockId
+  steps: ModuleStep[];
   rubricDimensions: { name: string; description: string }[];
   probingRules: { trigger: string; followUp: string }[];
   vagueAnswerTriggers: string[];
@@ -52,49 +54,39 @@ const EMPTY: Draft = {
   moduleId: '', moduleTitle: '', moduleDescription: '',
   learningOutcomes: ['', ''],
   keyConcepts: [{ term: '', definition: '' }],
-  contentBlocks: [], pairings: {},
+  steps: [],
   rubricDimensions: [{ name: '', description: '' }],
   probingRules: [], vagueAnswerTriggers: [], careerTransferPrompts: [],
   toneGuidance: '', maxTurns: 20,
   pastedDoc: '', docLinks: [], summaryText: '', resourceLinks: [],
 };
 
+function newStep(n: number): ModuleStep {
+  return { stepId: `st-${uid()}`, stepNumber: n, title: '', description: '',
+    blocks: [], outcomeTagIndices: [], understandingNote: '' };
+}
+
+function newBlock(type: ContentBlock['type']): ContentBlock {
+  const blockId = `blk-${uid()}`;
+  switch (type) {
+    case 'rich_text':       return { blockId, type, title: '', body: '' } as RichTextBlock;
+    case 'embedded_tool':   return { blockId, type, title: '', tool: 'sap', launch: 'link', taskPrompt: '', isGate: true } as EmbeddedToolBlock;
+    case 'knowledge_check': return { blockId, type, title: '', questions: [] } as KnowledgeCheckBlock;
+    case 'checklist':       return { blockId, type, title: '', items: [] } as ChecklistBlock;
+    case 'branching_note':  return { blockId, type, trigger: '', paths: [] } as BranchingNoteBlock;
+  }
+}
+
 function fromRecipe(r: any): Draft {
-  const pairings: Record<string, string> = {};
-  for (const p of r.concurrentPairs ?? []) pairings[p.instructionalId] = p.sapId;
   const docs = r.backgroundDocs ?? [];
   return {
     ...EMPTY, ...r,
-    pairings,
+    steps:          r.steps ?? [],
     pastedDoc:      docs.find((d: any) => d.type === 'text')?.content ?? '',
     docLinks:       docs.filter((d: any) => d.type === 'link').map((d: any) => ({ url: d.content, label: d.label ?? d.content })),
     summaryText:    r.contentStub?.summaryText ?? '',
     resourceLinks:  r.contentStub?.resourceLinks ?? [],
   };
-}
-
-/** Rebuild sequence + concurrentPairs from block order + pairings. */
-function compileSequence(d: Draft) {
-  const pairs: { pairId: string; instructionalId: string; sapId: string }[] = [];
-  const pairOfBlock = new Map<string, string>(); // blockId → pairId
-  for (const [instrId, sapId] of Object.entries(d.pairings)) {
-    if (!sapId) continue;
-    const pairId = `pair-${instrId}`;
-    pairs.push({ pairId, instructionalId: instrId, sapId });
-    pairOfBlock.set(instrId, pairId);
-    pairOfBlock.set(sapId, pairId);
-  }
-  const emitted = new Set<string>();
-  const sequence = [];
-  for (const b of d.contentBlocks) {
-    const pairId = pairOfBlock.get(b.blockId);
-    if (pairId) {
-      if (!emitted.has(pairId)) { sequence.push({ kind: 'pair' as const, pairId }); emitted.add(pairId); }
-    } else {
-      sequence.push({ kind: 'block' as const, blockId: b.blockId });
-    }
-  }
-  return { concurrentPairs: pairs, sequence };
 }
 
 // ── tiny list helpers ─────────────────────────────────────────────────────────
@@ -127,6 +119,14 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const c = [...arr]; [c[i], c[j]] = [c[j], c[i]]; return c;
 }
 
+const BLOCK_LABELS: Record<ContentBlock['type'], string> = {
+  rich_text:       'Rich text',
+  embedded_tool:   'Embedded tool',
+  knowledge_check: 'Knowledge check',
+  checklist:       'Checklist',
+  branching_note:  'Branching note',
+};
+
 // ── page ──────────────────────────────────────────────────────────────────────
 export function RecipeFormPage() {
   const { id } = useParams();
@@ -147,13 +147,10 @@ export function RecipeFormPage() {
   const setItem = (field: keyof Draft, i: number, patch: any) =>
     set({ [field]: (d[field] as any[]).map((x, j) => j === i ? { ...x, ...patch } : x) } as any);
 
-  const sapBlocks  = d.contentBlocks.filter(b => b.type === 'sap') as SapBlock[];
-  const instrBlocks = d.contentBlocks.filter(b => b.type === 'instructional') as InstructionalBlock[];
-
   // Outcome coverage: which LO indices have ≥1 tagged step (AUT-04/05)
   const covered = new Set<number>();
-  for (const b of instrBlocks) for (const s of b.steps) for (const i of s.outcomeTagIndices) covered.add(i);
-  const untaggedSteps = instrBlocks.reduce((n, b) => n + b.steps.filter(s => !s.outcomeTagIndices.length).length, 0);
+  for (const s of d.steps) for (const i of s.outcomeTagIndices) covered.add(i);
+  const untaggedSteps = d.steps.filter(s => !s.outcomeTagIndices.length).length;
 
   function validate(): string[] {
     const errs: string[] = [];
@@ -162,21 +159,39 @@ export function RecipeFormPage() {
     if (!d.moduleDescription.trim()) errs.push('Module description is required.');
     if (d.learningOutcomes.filter(o => o.trim()).length < 2) errs.push('At least 2 learning outcomes are required.');
     if (!d.rubricDimensions.some(x => x.name.trim())) errs.push('At least one rubric dimension is required.');
-    for (const b of instrBlocks) for (const s of b.steps)
-      if (!s.description.trim()) errs.push(`Step ${s.stepNumber} in "${b.title || 'untitled block'}" needs a description.`);
+    if (!d.steps.length) errs.push('At least one step is required.');
+    for (const s of d.steps) {
+      if (!s.title.trim())       errs.push(`Step ${s.stepNumber} needs a title.`);
+      if (!s.description.trim()) errs.push(`Step ${s.stepNumber} needs a description (what the student does).`);
+      if (!s.blocks.length)      errs.push(`Step ${s.stepNumber} has no content blocks.`);
+      for (const b of s.blocks) {
+        if (b.type === 'rich_text' && !b.body.trim())
+          errs.push(`Rich text block in step ${s.stepNumber} has no body.`);
+        if (b.type === 'embedded_tool' && !b.title.trim())
+          errs.push(`Embedded tool block in step ${s.stepNumber} needs a title.`);
+        if (b.type === 'knowledge_check' && !b.questions.length)
+          errs.push(`Knowledge check in step ${s.stepNumber} has no questions.`);
+        if (b.type === 'knowledge_check')
+          for (const q of b.questions)
+            if (q.type === 'multiple_choice' && (q.options ?? []).filter(o => o.trim()).length < 2)
+              errs.push(`A multiple-choice question in step ${s.stepNumber} needs at least 2 options.`);
+        if (b.type === 'checklist' && !b.items.length)
+          errs.push(`Checklist in step ${s.stepNumber} has no items.`);
+        if (b.type === 'branching_note' && b.paths.length < 2)
+          errs.push(`Branching note in step ${s.stepNumber} needs at least 2 paths.`);
+      }
+    }
     return errs;
   }
 
   function toRecipe() {
-    const { concurrentPairs, sequence } = compileSequence(d);
     return {
       ...(d.recipeId ? { recipeId: d.recipeId } : {}),
       moduleId: d.moduleId.trim(), moduleTitle: d.moduleTitle.trim(),
       moduleDescription: d.moduleDescription.trim(),
       learningOutcomes: d.learningOutcomes.map(o => o.trim()).filter(Boolean),
       keyConcepts: d.keyConcepts.filter(c => c.term.trim()),
-      contentBlocks: d.contentBlocks,
-      concurrentPairs, sequence,
+      steps: d.steps.map((s, i) => ({ ...s, stepNumber: i + 1 })),
       rubricDimensions: d.rubricDimensions.filter(x => x.name.trim()),
       probingRules: d.probingRules.filter(p => p.trigger.trim()),
       vagueAnswerTriggers: d.vagueAnswerTriggers.filter(Boolean),
@@ -215,20 +230,13 @@ export function RecipeFormPage() {
     } catch (e: any) { setPreview([]); setErrors([`Preview failed: ${e.message}`]); }
   }
 
-  function setBlock(i: number, patch: Partial<ContentBlock>) {
-    const blocks = [...d.contentBlocks];
-    blocks[i] = { ...blocks[i], ...patch } as ContentBlock;
-    set({ contentBlocks: blocks });
-  }
-  function addBlock(type: ContentBlock['type']) {
-    const base = { blockId: `cb-${uid()}`, isGate: type === 'sap' };
-    const block: ContentBlock = type === 'conceptual'
-      ? { ...base, type, title: '', body: '', isGate: false } as ConceptualBlock
-      : type === 'instructional'
-        ? { ...base, type, title: '', steps: [] } as InstructionalBlock
-        : { ...base, type, title: '', taskPrompt: '', isGate: true } as SapBlock;
-    set({ contentBlocks: [...d.contentBlocks, block] });
-  }
+  const setStep  = (i: number, patch: Partial<ModuleStep>) =>
+    set({ steps: d.steps.map((s, j) => j === i ? { ...s, ...patch } : s) });
+  const addStep  = () => set({ steps: [...d.steps, newStep(d.steps.length + 1)] });
+  const delStep  = (i: number) =>
+    set({ steps: d.steps.filter((_, j) => j !== i).map((s, j) => ({ ...s, stepNumber: j + 1 })) });
+  const moveStep = (i: number, dir: -1 | 1) =>
+    set({ steps: move(d.steps, i, dir).map((s, j) => ({ ...s, stepNumber: j + 1 })) });
 
   if (loadErr) return <p style={{ color: '#a33' }}>Could not load recipe: {loadErr}</p>;
 
@@ -308,78 +316,68 @@ export function RecipeFormPage() {
           )} />
       </Section>
 
-      {/* ── 4. Content blocks ──────────────────────────────────────────── */}
-      <Section title="★ 4. Content blocks">
+      {/* ── 4. Steps & content blocks ──────────────────────────────────── */}
+      <Section title="★ 4. Steps &amp; content">
         <p style={{ fontSize: 12, color: '#777', marginTop: 0 }}>
-          Blocks display to the student in order. <strong>Gate</strong> blocks must be completed
-          before the next unlocks — SAP blocks are always gates. Pair an instructional block
-          with a SAP block to show them side by side.
+          A module is a sequence of <strong>steps</strong>; each step contains one or more
+          <strong> content blocks</strong>. Put a rich-text block next to an embedded-tool block
+          when instructions should sit beside the tool. Steps tagged to learning outcomes
+          (with an understanding note) are what the AI probes on.
         </p>
-        {d.contentBlocks.map((b, i) => (
-          <div key={b.blockId} style={{ border: '1px solid #ddd', borderRadius: 6, padding: 14, marginBottom: 10 }}>
+
+        {d.steps.map((s, i) => (
+          <div key={s.stepId} style={{ border: '1px solid #cdd7e4', borderRadius: 6, padding: 14, marginBottom: 12, background: '#fbfcfe' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#1D4E8C' }}>
-                {b.type} block {b.isGate ? '· 🔒 gate' : ''}
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#1D4E8C' }}>
+                Step {s.stepNumber}
+                {!s.outcomeTagIndices.length && <span style={{ color: '#999', fontWeight: 400 }}> · context-only</span>}
               </span>
-              <Move first={i === 0} last={i === d.contentBlocks.length - 1}
-                onUp={() => set({ contentBlocks: move(d.contentBlocks, i, -1) })}
-                onDown={() => set({ contentBlocks: move(d.contentBlocks, i, 1) })}
-                onDel={() => {
-                  const pairings = { ...d.pairings };
-                  delete pairings[b.blockId];
-                  for (const k of Object.keys(pairings)) if (pairings[k] === b.blockId) delete pairings[k];
-                  set({ contentBlocks: d.contentBlocks.filter((_, j) => j !== i), pairings });
-                }} />
+              <Move first={i === 0} last={i === d.steps.length - 1}
+                onUp={() => moveStep(i, -1)} onDown={() => moveStep(i, 1)} onDel={() => delStep(i)} />
             </div>
-            <input style={{ ...input, marginBottom: 8 }} placeholder="Block title" value={b.title}
-              onChange={e => setBlock(i, { title: e.target.value })} />
 
-            {b.type === 'conceptual' && (
-              <>
-                <textarea style={{ ...input, minHeight: 90 }} placeholder="Body (markdown supported)" value={(b as ConceptualBlock).body}
-                  onChange={e => setBlock(i, { body: e.target.value } as any)} />
-                <input style={{ ...input, marginTop: 8 }} placeholder="Video URL (optional, < 5 min)" value={(b as ConceptualBlock).videoUrl ?? ''}
-                  onChange={e => setBlock(i, { videoUrl: e.target.value } as any)} />
-              </>
-            )}
+            <input style={{ ...input, marginBottom: 8 }} placeholder="Step title (required)" value={s.title}
+              onChange={e => setStep(i, { title: e.target.value })} />
+            <textarea style={{ ...input, minHeight: 50 }} placeholder="What the student does (required — the AI probes on this)" value={s.description}
+              onChange={e => setStep(i, { description: e.target.value })} />
 
-            {b.type === 'instructional' && (
-              <StepEditor block={b as InstructionalBlock} outcomes={d.learningOutcomes}
-                onChange={steps => setBlock(i, { steps } as any)} />
-            )}
+            <div style={{ display: 'flex', gap: 10, margin: '8px 0', flexWrap: 'wrap', fontSize: 12 }}>
+              {d.learningOutcomes.map((o, oi) => o.trim() && (
+                <label key={oi} style={{ display: 'flex', gap: 4, alignItems: 'center', color: '#444' }}>
+                  <input type="checkbox" checked={s.outcomeTagIndices.includes(oi)}
+                    onChange={() => {
+                      const cur = new Set(s.outcomeTagIndices);
+                      cur.has(oi) ? cur.delete(oi) : cur.add(oi);
+                      setStep(i, { outcomeTagIndices: [...cur].sort() });
+                    }} />
+                  LO{oi + 1}
+                </label>
+              ))}
+            </div>
+            <input style={{ ...input, fontSize: 13, marginBottom: 10 }} value={s.understandingNote}
+              placeholder="Understanding note (optional) — what good understanding of this step looks like"
+              onChange={e => setStep(i, { understandingNote: e.target.value })} />
 
-            {b.type === 'sap' && (
-              <textarea style={{ ...input, minHeight: 70 }} placeholder="Task prompt — what the student does in SAP"
-                value={(b as SapBlock).taskPrompt} onChange={e => setBlock(i, { taskPrompt: e.target.value } as any)} />
-            )}
+            {s.blocks.map((b, bi) => (
+              <BlockEditor key={b.blockId} block={b}
+                onChange={nb => setStep(i, { blocks: s.blocks.map((x, j) => j === bi ? nb : x) })}
+                onMove={dir => setStep(i, { blocks: move(s.blocks, bi, dir) })}
+                onDel={() => setStep(i, { blocks: s.blocks.filter((_, j) => j !== bi) })}
+                first={bi === 0} last={bi === s.blocks.length - 1} />
+            ))}
 
-            {b.type !== 'sap' && (
-              <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, marginTop: 8 }}>
-                <input type="checkbox" checked={b.isGate}
-                  onChange={e => setBlock(i, { isGate: e.target.checked })} />
-                Gate — student must complete before continuing
-              </label>
-            )}
-
-            {b.type === 'instructional' && sapBlocks.length > 0 && (
-              <div style={{ marginTop: 10, fontSize: 13 }}>
-                <label style={lbl}>Concurrent pair with SAP block (side-by-side view)</label>
-                <select style={{ ...input, width: 'auto' }} value={d.pairings[b.blockId] ?? ''}
-                  onChange={e => set({ pairings: { ...d.pairings, [b.blockId]: e.target.value } })}>
-                  <option value="">— none —</option>
-                  {sapBlocks.map(sb => (
-                    <option key={sb.blockId} value={sb.blockId}>{sb.title || sb.blockId}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {(Object.keys(BLOCK_LABELS) as ContentBlock['type'][]).map(t => (
+                <button key={t} type="button" style={{ ...addBtn, fontSize: 12 }}
+                  onClick={() => setStep(i, { blocks: [...s.blocks, newBlock(t)] })}>
+                  + {BLOCK_LABELS[t]}
+                </button>
+              ))}
+            </div>
           </div>
         ))}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" style={addBtn} onClick={() => addBlock('conceptual')}>+ Conceptual</button>
-          <button type="button" style={addBtn} onClick={() => addBlock('instructional')}>+ Instructional</button>
-          <button type="button" style={addBtn} onClick={() => addBlock('sap')}>+ SAP activity</button>
-        </div>
+
+        <button type="button" style={addBtn} onClick={addStep}>+ Add step</button>
       </Section>
 
       {/* ── 5. Instructional recipe ────────────────────────────────────── */}
@@ -546,6 +544,164 @@ export function RecipeFormPage() {
   );
 }
 
+// ── block editor ──────────────────────────────────────────────────────────────
+function BlockEditor({ block, onChange, onMove, onDel, first, last }: {
+  block: ContentBlock;
+  onChange: (b: ContentBlock) => void;
+  onMove: (dir: -1 | 1) => void;
+  onDel: () => void;
+  first: boolean; last: boolean;
+}) {
+  return (
+    <div style={{ border: '1px solid #ddd', borderRadius: 6, padding: 12, marginBottom: 8, background: '#fff' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#666' }}>
+          {BLOCK_LABELS[block.type]}
+          {block.type === 'embedded_tool' && block.isGate ? ' · gate' : ''}
+        </span>
+        <Move first={first} last={last} onUp={() => onMove(-1)} onDown={() => onMove(1)} onDel={onDel} />
+      </div>
+
+      {block.type === 'rich_text' && (
+        <>
+          <input style={{ ...input, marginBottom: 8 }} placeholder="Heading (optional)" value={block.title ?? ''}
+            onChange={e => onChange({ ...block, title: e.target.value })} />
+          <textarea style={{ ...input, minHeight: 90 }} placeholder="Body — prose, instructions, tables (markdown)"
+            value={block.body} onChange={e => onChange({ ...block, body: e.target.value })} />
+        </>
+      )}
+
+      {block.type === 'embedded_tool' && (
+        <>
+          <input style={{ ...input, marginBottom: 8 }} placeholder="Title (required)" value={block.title}
+            onChange={e => onChange({ ...block, title: e.target.value })} />
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input style={{ ...input, flex: 1 }} placeholder="Tool name (e.g. sap)" value={block.tool}
+              onChange={e => onChange({ ...block, tool: e.target.value })} />
+            <select style={{ ...input, width: 130 }} value={block.launch}
+              onChange={e => onChange({ ...block, launch: e.target.value as 'link' | 'embed' })}>
+              <option value="link">Linked (opens out)</option>
+              <option value="embed">Embedded (framed)</option>
+            </select>
+          </div>
+          <input style={{ ...input, marginBottom: 8 }} placeholder="URL (optional)" value={block.url ?? ''}
+            onChange={e => onChange({ ...block, url: e.target.value })} />
+          <textarea style={{ ...input, minHeight: 50 }} placeholder="Task prompt — short pointer; full instructions belong in a rich-text block"
+            value={block.taskPrompt ?? ''} onChange={e => onChange({ ...block, taskPrompt: e.target.value })} />
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, marginTop: 8 }}>
+            <input type="checkbox" checked={block.isGate}
+              onChange={e => onChange({ ...block, isGate: e.target.checked })} />
+            Gate — student must complete this tool task before continuing
+          </label>
+        </>
+      )}
+
+      {block.type === 'knowledge_check' && (
+        <>
+          <input style={{ ...input, marginBottom: 8 }} placeholder="Title (optional, e.g. Quick self-check)" value={block.title ?? ''}
+            onChange={e => onChange({ ...block, title: e.target.value })} />
+          <QuestionList questions={block.questions}
+            onChange={questions => onChange({ ...block, questions })} />
+          <div style={{ fontSize: 12, color: '#888' }}>Formative only — immediate feedback, nothing recorded.</div>
+        </>
+      )}
+
+      {block.type === 'checklist' && (
+        <>
+          <input style={{ ...input, marginBottom: 8 }} placeholder="Title (optional, e.g. Before you continue)" value={block.title ?? ''}
+            onChange={e => onChange({ ...block, title: e.target.value })} />
+          <ListEditor items={block.items} addLabel="Add item"
+            onAdd={() => onChange({ ...block, items: [...block.items, { itemId: `i-${uid()}`, label: '' }] })}
+            renderItem={(it, i) => (
+              <div key={it.itemId} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                <input style={input} placeholder='"I have done X"' value={it.label}
+                  onChange={e => onChange({ ...block, items: block.items.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
+                <Move first={i === 0} last={i === block.items.length - 1}
+                  onUp={() => onChange({ ...block, items: move(block.items, i, -1) })}
+                  onDown={() => onChange({ ...block, items: move(block.items, i, 1) })}
+                  onDel={() => onChange({ ...block, items: block.items.filter((_, j) => j !== i) })} />
+              </div>
+            )} />
+          <div style={{ fontSize: 12, color: '#888' }}>Self-verification of actions taken — distinct from comprehension checks.</div>
+        </>
+      )}
+
+      {block.type === 'branching_note' && (
+        <>
+          <input style={{ ...input, marginBottom: 8 }} placeholder='Trigger condition — e.g. "Something went wrong in VA11?"' value={block.trigger}
+            onChange={e => onChange({ ...block, trigger: e.target.value })} />
+          <ListEditor items={block.paths} addLabel="Add path"
+            onAdd={() => onChange({ ...block, paths: [...block.paths, { pathId: `p-${uid()}`, label: '', body: '' }] })}
+            renderItem={(p, i) => (
+              <div key={p.pathId} style={{ marginBottom: 8, padding: 8, background: '#f7f9fc', borderRadius: 4 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                  <input style={input} placeholder='Path label — e.g. "If you see an authorization error"' value={p.label}
+                    onChange={e => onChange({ ...block, paths: block.paths.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
+                  <Move first={i === 0} last={i === block.paths.length - 1}
+                    onUp={() => onChange({ ...block, paths: move(block.paths, i, -1) })}
+                    onDown={() => onChange({ ...block, paths: move(block.paths, i, 1) })}
+                    onDel={() => onChange({ ...block, paths: block.paths.filter((_, j) => j !== i) })} />
+                </div>
+                <textarea style={{ ...input, minHeight: 40 }} placeholder="Content shown when this path applies" value={p.body}
+                  onChange={e => onChange({ ...block, paths: block.paths.map((x, j) => j === i ? { ...x, body: e.target.value } : x) })} />
+              </div>
+            )} />
+          <div style={{ fontSize: 12, color: '#888' }}>Lightweight conditional content — handles common variations without forking the module.</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function QuestionList({ questions, onChange }: {
+  questions: KnowledgeCheckQuestion[];
+  onChange: (q: KnowledgeCheckQuestion[]) => void;
+}) {
+  const setQ = (i: number, patch: Partial<KnowledgeCheckQuestion>) =>
+    onChange(questions.map((q, j) => j === i ? { ...q, ...patch } : q));
+  return (
+    <div>
+      {questions.map((q, i) => (
+        <div key={q.questionId} style={{ marginBottom: 8, padding: 8, background: '#f7f9fc', borderRadius: 4 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+            <select style={{ ...input, width: 150 }} value={q.type}
+              onChange={e => setQ(i, { type: e.target.value as KnowledgeCheckQuestion['type'] })}>
+              <option value="multiple_choice">Multiple choice</option>
+              <option value="true_false">True / False</option>
+              <option value="short_answer">Short answer</option>
+            </select>
+            <input style={input} placeholder="Question prompt" value={q.prompt}
+              onChange={e => setQ(i, { prompt: e.target.value })} />
+            <Move first={i === 0} last={i === questions.length - 1}
+              onUp={() => onChange(move(questions, i, -1))}
+              onDown={() => onChange(move(questions, i, 1))}
+              onDel={() => onChange(questions.filter((_, j) => j !== i))} />
+          </div>
+          {q.type === 'multiple_choice' && (
+            <textarea style={{ ...input, minHeight: 50, fontSize: 13 }}
+              placeholder={'Options — one per line'} value={(q.options ?? []).join('\n')}
+              onChange={e => setQ(i, { options: e.target.value.split('\n') })} />
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+            <input style={{ ...input, flex: 1, fontSize: 13 }} value={q.correctAnswer ?? ''}
+              placeholder={q.type === 'true_false' ? 'Correct answer: true / false'
+                : q.type === 'short_answer' ? 'Sample answer (revealed on demand)'
+                : 'Correct answer (must match an option)'}
+              onChange={e => setQ(i, { correctAnswer: e.target.value })} />
+            <input style={{ ...input, flex: 1, fontSize: 13 }} value={q.feedback ?? ''}
+              placeholder="Feedback shown after answering"
+              onChange={e => setQ(i, { feedback: e.target.value })} />
+          </div>
+        </div>
+      ))}
+      <button type="button" style={{ ...addBtn, fontSize: 12 }}
+        onClick={() => onChange([...questions, { questionId: `q-${uid()}`, type: 'multiple_choice', prompt: '', options: ['', ''], correctAnswer: '', feedback: '' }])}>
+        + Add question
+      </button>
+    </div>
+  );
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -567,66 +723,6 @@ function CoverageNote({ covered, total, untagged }: { covered: Set<number>; tota
       Step coverage: {total - missing.length}/{total} outcomes have at least one tagged step.
       {missing.length > 0 && <span style={{ color: '#8a6d00' }}> Untagged: {missing.map(i => `LO${i + 1}`).join(', ')}.</span>}
       {untagged > 0 && <span style={{ color: '#8a6d00' }}> {untagged} context-only step{untagged === 1 ? '' : 's'} (no outcome tag — the AI infers mapping at session start).</span>}
-    </div>
-  );
-}
-
-function StepEditor({ block, outcomes, onChange }: {
-  block: InstructionalBlock; outcomes: string[]; onChange: (steps: ActivityStep[]) => void;
-}) {
-  const steps = block.steps;
-  const setStep = (i: number, patch: Partial<ActivityStep>) =>
-    onChange(steps.map((s, j) => j === i ? { ...s, ...patch } : s)
-      .map((s, j) => ({ ...s, stepNumber: j + 1 })));
-  const del = (i: number) =>
-    onChange(steps.filter((_, j) => j !== i).map((s, j) => ({ ...s, stepNumber: j + 1 })));
-  const reorder = (i: number, dir: -1 | 1) =>
-    onChange(move(steps, i, dir).map((s, j) => ({ ...s, stepNumber: j + 1 })));
-  const toggleOutcome = (i: number, oi: number) => {
-    const cur = new Set(steps[i].outcomeTagIndices);
-    cur.has(oi) ? cur.delete(oi) : cur.add(oi);
-    setStep(i, { outcomeTagIndices: [...cur].sort() });
-  };
-
-  return (
-    <div style={{ background: '#f7f9fc', borderRadius: 4, padding: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 8 }}>
-        Activity steps — tagged steps are probe-eligible; untagged are context-only
-      </div>
-      {steps.map((s, i) => (
-        <div key={i} style={{ marginBottom: 12, padding: 10, background: '#fff',
-          border: '1px solid #e2e8f0', borderRadius: 4,
-          borderLeft: `3px solid ${s.outcomeTagIndices.length ? '#1D4E8C' : '#ccc'}` }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <span style={{ minWidth: 24, fontWeight: 700, color: '#1D4E8C', fontSize: 13, paddingTop: 8 }}>
-              {s.stepNumber}.
-            </span>
-            <div style={{ flex: 1 }}>
-              <input style={input} placeholder="Step description (required)" value={s.description}
-                onChange={e => setStep(i, { description: e.target.value })} />
-              <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap', fontSize: 12 }}>
-                {outcomes.map((o, oi) => o.trim() && (
-                  <label key={oi} style={{ display: 'flex', gap: 4, alignItems: 'center', color: '#444' }}>
-                    <input type="checkbox" checked={s.outcomeTagIndices.includes(oi)}
-                      onChange={() => toggleOutcome(i, oi)} />
-                    LO{oi + 1}
-                  </label>
-                ))}
-                {!s.outcomeTagIndices.length && <span style={{ color: '#999' }}>context-only</span>}
-              </div>
-              <input style={{ ...input, marginTop: 6, fontSize: 13 }} value={s.understandingNote}
-                placeholder="Understanding note (optional) — what good understanding looks like"
-                onChange={e => setStep(i, { understandingNote: e.target.value })} />
-            </div>
-            <Move first={i === 0} last={i === steps.length - 1}
-              onUp={() => reorder(i, -1)} onDown={() => reorder(i, 1)} onDel={() => del(i)} />
-          </div>
-        </div>
-      ))}
-      <button type="button" style={addBtn}
-        onClick={() => onChange([...steps, { stepNumber: steps.length + 1, description: '', outcomeTagIndices: [], understandingNote: '' }])}>
-        + Add step
-      </button>
     </div>
   );
 }

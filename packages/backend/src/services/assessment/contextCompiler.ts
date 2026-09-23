@@ -4,14 +4,14 @@
  * Assembles the domain context object (instructional recipe + session data)
  * into system prompts for each AI call type.
  *
- * Classifies activity steps as probe-eligible or context-only:
+ * Classifies module steps as probe-eligible or context-only:
  *   Probe-eligible: has description + outcomeTagIndices (authored or inferred) + understandingNote
  *   Context-only: description only
  *
  * TODO: implement AI-based outcome tag inference for untagged steps
  * TODO: implement token budget management for background documentation
  */
-import { Recipe, Session, CheckinResponse, InstructionalBlock } from '@cap/shared';
+import { Recipe, Session, CheckinResponse, EmbeddedToolBlock } from '@cap/shared';
 
 export interface CompiledContext {
   checkinSystemPrompt:    string;
@@ -19,15 +19,8 @@ export interface CompiledContext {
   evaluationSystemPrompt: string;
 }
 
-/** Flatten all ActivitySteps out of the recipe's instructional content blocks. */
-function activitySteps(recipe: Recipe) {
-  return (recipe.contentBlocks ?? [])
-    .filter((b): b is InstructionalBlock => b.type === 'instructional')
-    .flatMap(b => b.steps ?? []);
-}
-
 export function compileContext(recipe: Recipe, session: Partial<Session>): CompiledContext {
-  const stepContext = activitySteps(recipe).map(step => {
+  const stepContext = (recipe.steps ?? []).map(step => {
     const probeEligible = step.description
       && step.outcomeTagIndices?.length > 0
       && step.understandingNote;
@@ -37,12 +30,18 @@ export function compileContext(recipe: Recipe, session: Partial<Session>): Compi
       .filter(Boolean)
       .join(', ');
 
+    const tools = (step.blocks ?? [])
+      .filter((b): b is EmbeddedToolBlock => b.type === 'embedded_tool')
+      .map(b => b.tool || b.title);
+
     return [
-      `Step ${step.stepNumber}: ${step.description}`,
+      `Step ${step.stepNumber}: ${step.title || step.description}`,
+      step.description && step.title ? `  Task: ${step.description}` : '',
+      tools.length ? `  Interactive tool(s): ${[...new Set(tools)].join(', ')}` : '',
       probeEligible
         ? `  → PROBE-ELIGIBLE | Outcomes: ${outcomeNames} | Target: ${step.understandingNote}`
         : `  → CONTEXT-ONLY`,
-    ].join('\n');
+    ].filter(Boolean).join('\n');
   }).join('\n\n');
 
   const checkinProfile = formatCheckinProfile(session.checkinResponses ?? []);

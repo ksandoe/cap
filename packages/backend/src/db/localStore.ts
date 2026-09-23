@@ -88,55 +88,74 @@ function seedRecipe(): void {
       { trigger: 'Student names transaction codes without describing the business outcome',
         followUp: 'Ask what the business achieves with that document.' },
     ],
-    // Content block model (Master PRD §3.2): conceptual → concurrent pair
-    // (instructional + SAP activity, both visible simultaneously).
-    contentBlocks: [
-      { blockId: 'cb-concept-1', type: 'conceptual',
-        title: 'Background: the SAP sales document flow',
-        body: 'SAP ERP tracks the sales process as a chain of linked documents: ' +
-          'Inquiry → Quotation → Sales Order. Each document references its ' +
-          'predecessor, so master data and line items carry forward without ' +
-          're-keying. Understanding *why* each document exists matters more ' +
-          'than memorizing transaction codes.',
-        isGate: false },
-      { blockId: 'cb-instr-1', type: 'instructional',
-        title: 'Sales document exercise',
-        isGate: true,
-        steps: [
-          { stepNumber: 1,
-            description: 'Log into SAP and review the customer master record for customer 1001.',
-            outcomeTagIndices: [1],
-            understandingNote: 'Student should recognize that master data is maintained once and reused across documents.' },
-          { stepNumber: 2,
-            description: 'Create an Inquiry (VA11) for customer 1001 requesting material M-001.',
-            outcomeTagIndices: [0],
-            understandingNote: 'An inquiry is a non-binding customer request — it is not a commitment to purchase.' },
-          { stepNumber: 3,
-            description: 'Create a Quotation (VA21) that references the inquiry you created.',
-            outcomeTagIndices: [0],
-            understandingNote: 'A quotation is a binding offer with prices, quantities, and validity dates; referencing the inquiry carries the data forward.' },
-          { stepNumber: 4,
-            description: 'Create a Sales Order (VA01) that references the quotation.',
-            outcomeTagIndices: [0, 1],
-            understandingNote: 'The order pulls data from the quotation — the document flow means nothing is re-keyed.' },
-          { stepNumber: 5,
-            description: 'Open the document flow view and confirm your three documents are linked.',
-            outcomeTagIndices: [],
-            understandingNote: '' },
+    // Content model: module → steps → blocks. Step 1 is conceptual background;
+    // step 2 is the hands-on SAP exercise (rich-text instructions alongside an
+    // embedded-tool gate, a self-check checklist, and a troubleshooting branch).
+    steps: [
+      { stepId: 'st-1', stepNumber: 1,
+        title: 'Understand the sales document flow',
+        description: 'Read the background on the SAP sales document flow and check your understanding.',
+        outcomeTagIndices: [0],
+        understandingNote: 'Student should grasp the inquiry → quotation → order chain and why each document exists, not just the transaction codes.',
+        blocks: [
+          { blockId: 'cb-concept-1', type: 'rich_text',
+            title: 'Background: the SAP sales document flow',
+            body: 'SAP ERP tracks the sales process as a chain of linked documents: ' +
+              'Inquiry → Quotation → Sales Order. Each document references its ' +
+              'predecessor, so master data and line items carry forward without ' +
+              're-keying. Understanding *why* each document exists matters more ' +
+              'than memorizing transaction codes.' },
+          { blockId: 'cb-kc-1', type: 'knowledge_check',
+            title: 'Quick self-check',
+            questions: [
+              { questionId: 'q1', type: 'multiple_choice',
+                prompt: 'Which document commits the selling company to a price?',
+                options: ['Inquiry', 'Quotation', 'Sales Order'],
+                correctAnswer: 'Quotation',
+                feedback: 'The quotation is the binding offer; the inquiry carries no commitment.' },
+              { questionId: 'q2', type: 'true_false',
+                prompt: 'An inquiry is a commitment to purchase.',
+                correctAnswer: 'false',
+                feedback: 'An inquiry is non-binding — it only signals customer interest.' },
+            ] },
         ] },
-      { blockId: 'cb-sap-1', type: 'sap',
-        title: 'SAP sandbox exercise',
-        taskPrompt: 'In your assigned SAP sandbox, create an Inquiry (VA11), a ' +
-          'Quotation (VA21) referencing it, and a Sales Order (VA01) referencing ' +
-          'the quotation — all for customer 1001, material M-001.',
-        isGate: true },
-    ],
-    concurrentPairs: [
-      { pairId: 'pair-1', instructionalId: 'cb-instr-1', sapId: 'cb-sap-1' },
-    ],
-    sequence: [
-      { kind: 'block', blockId: 'cb-concept-1' },
-      { kind: 'pair',  pairId:  'pair-1' },
+      { stepId: 'st-2', stepNumber: 2,
+        title: 'Create the linked documents in SAP',
+        description: 'In the SAP sandbox, create an Inquiry (VA11), a Quotation (VA21) referencing it, and a Sales Order (VA01) referencing the quotation — customer 1001, material M-001 — then confirm the document flow.',
+        outcomeTagIndices: [0, 1],
+        understandingNote: 'Student should recognize that master data is maintained once and reused; referencing carries data forward so nothing is re-keyed; inquiry is non-binding while quotation is a binding offer.',
+        blocks: [
+          { blockId: 'cb-instr-1', type: 'rich_text',
+            title: 'Instructions',
+            body: '1. Log into SAP and review the customer master record for customer 1001.\n' +
+              '2. Create an Inquiry (VA11) for customer 1001 requesting material M-001.\n' +
+              '3. Create a Quotation (VA21) that references the inquiry you created.\n' +
+              '4. Create a Sales Order (VA01) that references the quotation.\n' +
+              '5. Open the document flow view and confirm your three documents are linked.' },
+          { blockId: 'cb-sap-1', type: 'embedded_tool',
+            title: 'SAP sandbox exercise',
+            tool: 'sap',
+            launch: 'link',
+            taskPrompt: 'In your assigned SAP sandbox, create an Inquiry (VA11), a ' +
+              'Quotation (VA21) referencing it, and a Sales Order (VA01) referencing ' +
+              'the quotation — all for customer 1001, material M-001.',
+            isGate: true },
+          { blockId: 'cb-cl-1', type: 'checklist',
+            title: 'Before you continue',
+            items: [
+              { itemId: 'i1', label: 'I saved the Inquiry and noted its document number.' },
+              { itemId: 'i2', label: 'I saved the Quotation and noted its document number.' },
+              { itemId: 'i3', label: 'I saved the Sales Order and confirmed the document flow links all three.' },
+            ] },
+          { blockId: 'cb-bn-1', type: 'branching_note',
+            trigger: 'Something went wrong in SAP?',
+            paths: [
+              { pathId: 'p1', label: 'A field was rejected (e.g. material not found)',
+                body: 'Double-check the test data: customer 1001, material M-001, sales org 1000, channel 10, division 00. Typos in master data fields are the most common cause.' },
+              { pathId: 'p2', label: 'You cannot find the reference option',
+                body: 'On the VA21/VA01 initial screen, use "Create with Reference" rather than typing the document into a blank form — referencing is what links your documents in the flow.' },
+            ] },
+        ] },
     ],
     rubricDimensions: [
       { name: 'Process understanding',   description: 'Explains the inquiry–quotation–order sequence and why each document exists.' },

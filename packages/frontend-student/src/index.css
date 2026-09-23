@@ -100,9 +100,31 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   body { background: #fff; }
 }
 
-/* Content blocks (learning activity) */
-.block { margin: 20px 0; padding: 16px 20px; border: 1px solid #d8dee9; border-radius: 8px; }
-.block h3 { margin-top: 0; }
-.block.sap { border-left: 4px solid #1D4E8C; }
-.concurrent-pair { display: flex; gap: 16px; flex-wrap: wrap; }
-.concurrent-pair .block { flex: 1 1 340px; }
+/* Module steps + content blocks (learning activity) */
+.step { margin: 24px 0 8px; }
+.step-num {
+  display: inline-block; min-width: 26px; text-align: center;
+  background: #1D4E8C; color: #fff; border-radius: 999px;
+  font-size: 14px; padding: 2px 0; margin-right: 6px;
+}
+.block {
+  margin: 12px 0; padding: 16px 20px;
+  border: 1px solid #d8dee9; border-radius: 8px; background: #fff;
+}
+.block h3 { margin-top: 0; font-size: 16px; }
+.block.rich { border-color: transparent; background: transparent; padding-left: 0; padding-right: 0; }
+.block.tool { border-left: 4px solid #1D4E8C; }
+.block.kc   { border-left: 4px solid #0f7b6c; }
+.block.checklist { border-left: 4px solid #8a6d00; }
+.block.branch { border-left: 4px solid #7a5ea8; }
+.tool-link { color: #1D4E8C; font-weight: 600; }
+.kc-q { padding: 10px 0; border-top: 1px solid #eee; }
+.kc-q:first-of-type { border-top: none; }
+.kc-correct   { color: #1e6b34; margin: 6px 0 0; font-size: 14px; }
+.kc-incorrect { color: #9c2323; margin: 6px 0 0; font-size: 14px; }
+.branch-path {
+  display: block; width: 100%; text-align: left;
+  padding: 8px 12px; border: 1px solid #c5c5c2; border-radius: 6px;
+  background: #fff; font-size: 14px;
+}
+.branch-path.active { border-color: #7a5ea8; background: #f4f0fa; }

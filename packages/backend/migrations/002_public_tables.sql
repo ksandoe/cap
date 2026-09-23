@@ -19,7 +19,7 @@
 --
 -- The recipe JSONB column stores the full Recipe type from packages/shared:
 --   module_title, module_description, learning_outcomes[], key_concepts[],
---   content_blocks[], concurrent_pairs[], sequence[], rubric_dimensions[],
+--   steps[] (each with blocks[]), rubric_dimensions[],
 --   probing_rules[], vague_answer_triggers[], career_transfer_prompts[],
 --   tone_guidance, max_turns, content_stub, background_docs[]
 -- ---------------------------------------------------------------------------
