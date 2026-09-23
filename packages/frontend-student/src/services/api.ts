@@ -4,9 +4,11 @@
  */
 import { useSessionStore } from '../store/sessionStore';
 
-// '/api' is proxied to the backend by Vite in dev; in deployed builds
-// VITE_API_URL points at the API Gateway endpoint (e.g. https://xxx.execute-api...).
-export const API_BASE = (import.meta as any).env?.VITE_API_URL ?? '/api';
+// Dev: '/api' is proxied to localhost:3001 by Vite.
+// Deployed: the Lambda serves the SPA and the API from the same origin,
+// so same-origin ('') is correct. VITE_API_URL overrides either way.
+export const API_BASE = (import.meta as any).env?.VITE_API_URL
+  ?? (typeof window !== 'undefined' && /^(localhost|127\.)/.test(window.location.hostname) ? '/api' : '');
 const BASE = API_BASE;
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
