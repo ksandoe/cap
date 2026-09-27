@@ -63,13 +63,19 @@ async function ddbAcquire(sessionId: string): Promise<string> {
 
 async function ddbRelease(sapUsername: string): Promise<void> {
   // TODO: call SAP reset endpoint before releasing
-  await ddb.send(new UpdateCommand({
-    TableName:        TABLE,
-    Key:              { sapUsername },
-    UpdateExpression: 'SET #s = :available REMOVE assignedSessionId, assignedAt',
-    ExpressionAttributeNames:  { '#s': 'status' },
-    ExpressionAttributeValues: { ':available': 'available' },
-  }));
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName:        TABLE,
+      Key:              { sapUsername },
+      UpdateExpression: 'SET #s = :available REMOVE assignedSessionId, assignedAt',
+      // Don't resurrect a deleted pool row — Update on a missing key creates one
+      ConditionExpression: 'attribute_exists(sapUsername)',
+      ExpressionAttributeNames:  { '#s': 'status' },
+      ExpressionAttributeValues: { ':available': 'available' },
+    }));
+  } catch (err: any) {
+    if (err?.name !== 'ConditionalCheckFailedException') throw err;
+  }
 }
 
 export const acquireSapAccount = USE_LOCAL_DB

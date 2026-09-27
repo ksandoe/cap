@@ -26,6 +26,7 @@ export const EVENTS = {
   BADGE_ISSUE_FAILED:      'BADGE_ISSUE_FAILED',
   RETRY_CREATED:           'RETRY_CREATED',
   EVAL_RECORD_FAILED:      'EVAL_RECORD_FAILED',
+  PARAMS_MISSING:          'PARAMS_MISSING',
 } as const;
 
 export type EventType = typeof EVENTS[keyof typeof EVENTS];

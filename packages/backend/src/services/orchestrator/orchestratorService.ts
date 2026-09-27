@@ -66,6 +66,15 @@ export async function createSession(ltiContext: {
   const existing = await sessionDb.findActiveSession(ltiContext.canvasUuid, ltiContext.moduleId);
   if (existing) {
     const updates: Record<string, unknown> = { lastActivityAt: now() };
+    // Refresh the parameter binding from the account's current param row —
+    // values belong to the pooled account, so a recipe/params update since
+    // the session was created should be picked up rather than leaving
+    // literal {key} placeholders for the student.
+    if (existing.sapUsername) {
+      const params = await paramDb.getParams(existing.moduleId, existing.sapUsername);
+      if (JSON.stringify(params) !== JSON.stringify(existing.parameters))
+        updates.parameters = params;
+    }
     if (existing.state === 'SAVED') {
       updates.state = stateForPhase(existing.phaseReached);
       updates.ttl   = ttlIn(SESSION_TTL_HOURS * 3600);
@@ -89,6 +98,8 @@ export async function createSession(ltiContext: {
   const tempUserId = generateTempUserId();
   const sapUsername = await acquireSapAccount(sessionId);
   const parameters  = await paramDb.getParams(ltiContext.moduleId, sapUsername);
+  if (!Object.keys(parameters).length)
+    logger.warn(EVENTS.PARAMS_MISSING, { moduleId: ltiContext.moduleId, sapUsername });
   const started     = now();
 
   // Resolve the active recipe for this module (module config lookup TODO: cap-modules table)
