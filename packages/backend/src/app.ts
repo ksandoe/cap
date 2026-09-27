@@ -56,8 +56,10 @@ app.get('/.well-known/jwks.json', (_req, res) => {
 });
 app.get('/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
-// Recipe image assets — public read (screenshots, no student data)
-app.get('/assets/:id', async (req, res, next) => {
+// Recipe image assets — public read (screenshots, no student data).
+// NOTE: mounted at /img, NOT /assets — Vite emits the SPA bundles under
+// /assets/ and shadowing that path 404s the frontend bundles.
+app.get('/img/:id', async (req, res, next) => {
   try {
     const { assetDb } = require('./db/assetDb');
     const a = await assetDb.get(req.params.id);

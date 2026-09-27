@@ -35,7 +35,7 @@ export async function uploadImage(req: Request, res: Response): Promise<void> {
     data: bytes.toString('base64'),
     createdAt: new Date().toISOString(),
   });
-  res.json({ url: `/assets/${assetId}`, bytes: bytes.length });
+  res.json({ url: `/img/${assetId}`, bytes: bytes.length });
 }
 
 export async function getModuleConfig(req: Request, res: Response): Promise<void> {
