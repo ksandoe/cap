@@ -15,6 +15,7 @@
 import { Request, Response } from 'express';
 import { sessionDb }     from '../../db/sessionDb';
 import { recipeDb }      from '../../db/recipeDb';
+import { moduleConfigDb, DEFAULT_THRESHOLDS } from '../../db/moduleConfigDb';
 import { compileContext } from './contextCompiler';
 import { callModel, extractJson } from './llmProvider';
 import { logger }        from '../eventLogger';
@@ -90,12 +91,31 @@ export async function generateEvaluation(req: Request, res: Response): Promise<v
   try {
     const parsed = extractJson<any>(raw);
     // Normalize to the Evaluation shape — small models improvise field names.
+    const ratings = parsed.dimensionRatings ?? parsed.dimensions ?? parsed.dimension_ratings ?? [];
+    // Derive numeric scores if the model omitted them, then compute the
+    // pass/fail verdict server-side from the module's configured thresholds —
+    // the model's own badgeAwarded flag is advisory only.
+    const scoreFor = (d: any): number =>
+      typeof d.score === 'number' ? d.score
+      : d.rating === 'Strong' ? 90 : d.rating === 'Developing' ? 60 : 20;
+    const dimensionRatings = ratings.map((d: any) => ({ ...d, score: scoreFor(d) }));
+    const overallScore = typeof parsed.overallScore === 'number'
+      ? parsed.overallScore
+      : dimensionRatings.length
+        ? Math.round(dimensionRatings.reduce((a: number, d: any) => a + d.score, 0) / dimensionRatings.length)
+        : 0;
+    const cfg = await moduleConfigDb.getConfig(session.moduleId)
+      .catch(() => ({ ...DEFAULT_THRESHOLDS }));
+    const badgeAwarded = overallScore >= cfg.overallMin
+      && dimensionRatings.every((d: any) => d.score >= cfg.dimensionFloor);
+
     res.json({ evaluation: {
       sessionId,
-      dimensionRatings: parsed.dimensionRatings ?? parsed.dimensions ?? parsed.dimension_ratings ?? [],
+      dimensionRatings,
       outcomeSummary:   parsed.outcomeSummary   ?? parsed.outcomes   ?? parsed.outcome_summary   ?? [],
       overallSummary:   parsed.overallSummary   ?? parsed.overall_summary ?? parsed.summary ?? '',
-      badgeAwarded:     parsed.badgeAwarded     ?? parsed.badge_awarded  ?? false,
+      overallScore,
+      badgeAwarded,
       assessedAt:       parsed.assessedAt       ?? parsed.assessed_at    ?? new Date().toISOString(),
     }});
   } catch {

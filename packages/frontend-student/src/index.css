@@ -57,6 +57,14 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 /* ── Checkout chat ───────────────────────────────────────────────────────── */
+.convo-progress {
+  height: 4px; border-radius: 999px; background: #eef1f6;
+  overflow: hidden; margin: 4px 0 6px;
+}
+.convo-progress-bar {
+  height: 100%; background: #1D4E8C; transition: width .4s ease;
+}
+.convo-cue { margin: 0 0 10px; font-size: 13px; }
 .chat {
   background: #fff; border: 1px solid #e2e2e0; border-radius: 8px;
   min-height: 280px; max-height: 55vh; overflow-y: auto;
@@ -120,6 +128,8 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   margin: 10px 0; padding: 8px 14px; border-left: 3px solid #1D4E8C;
   background: #f4f7fb; color: #444;
 }
+.rich-body img { max-width: 100%; height: auto; border-radius: 4px; }
+.rich-body p { margin: 4px 0 8px; }
 .block.tool { border-left: 4px solid #1D4E8C; }
 .block.guided { border-left: 4px solid #1D4E8C; }
 .block.kc   { border-left: 4px solid #0f7b6c; }

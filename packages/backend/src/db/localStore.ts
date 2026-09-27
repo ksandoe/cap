@@ -396,6 +396,35 @@ export const localSapPool = {
   },
 };
 
+// ── moduleConfigDb ──────────────────────────────────────────────────────────
+
+export const localModuleConfigDb = {
+  async getConfig(moduleId: string) {
+    const row = table('cap-module-config').find(c => c.moduleId === moduleId);
+    return { moduleId, overallMin: 60, dimensionFloor: 40, ...(row ?? {}) };
+  },
+  async saveConfig(cfg: Record<string, any>) {
+    const t = table('cap-module-config');
+    const i = t.findIndex(c => c.moduleId === cfg.moduleId);
+    if (i >= 0) t[i] = cfg; else t.push(cfg);
+    save();
+  },
+};
+
+// ── evalDb ───────────────────────────────────────────────────────────────────
+
+export const localEvalDb = {
+  async saveAttempt(rec: Record<string, any>) {
+    const t = table('cap-evaluations');
+    const i = t.findIndex(r => r.attemptId === rec.attemptId);
+    if (i >= 0) t[i] = rec; else t.push(rec);
+    save();
+  },
+  async listForModule(moduleId: string) {
+    return table('cap-evaluations').filter(r => r.moduleId === moduleId);
+  },
+};
+
 // ── paramDb ──────────────────────────────────────────────────────────────────
 
 export const localParamDb = {

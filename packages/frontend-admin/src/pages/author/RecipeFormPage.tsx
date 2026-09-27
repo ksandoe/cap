@@ -135,6 +135,16 @@ const QUILL_MODULES = {
   ],
 };
 
+/** Slimmer toolbar for inline fields like guided-tool instructions. */
+const QUILL_MODULES_INLINE = {
+  toolbar: [
+    ['bold', 'italic', 'underline'],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    ['link', 'image'],
+    ['clean'],
+  ],
+};
+
 /** Visible text length of a rich-text body (strips HTML for validation). */
 function bodyText(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
@@ -189,7 +199,7 @@ export function RecipeFormPage() {
           errs.push(`Rich text block in step ${s.stepNumber} has no body.`);
         if (b.type === 'guided_tool' && !b.title.trim())
           errs.push(`Guided tool block in step ${s.stepNumber} needs a title.`);
-        if (b.type === 'guided_tool' && !b.instructions.some(i => i.text.trim()))
+        if (b.type === 'guided_tool' && !b.instructions.some(i => bodyText(i.text)))
           errs.push(`Guided tool block in step ${s.stepNumber} needs at least one instruction.`);
         if (b.type === 'knowledge_check' && !b.questions.length)
           errs.push(`Knowledge check in step ${s.stepNumber} has no questions.`);
@@ -686,9 +696,13 @@ function GuidedToolEditor({ block, onChange }: {
         onAdd={() => onChange({ ...block, instructions: [...block.instructions, { instructionId: `gi-${uid()}`, text: '', branches: [] }] })}
         renderItem={(ins: GuidedInstruction, i: number) => (
           <div key={ins.instructionId} style={{ marginBottom: 8, padding: 8, background: '#f7f9fc', borderRadius: 4 }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-              <input style={input} placeholder={'e.g. Enter {orderQty} in the Quantity field'} value={ins.text}
-                onChange={e => setIns(i, { text: e.target.value })} />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'flex-start' }}>
+              <div style={{ flex: 1, background: '#fff', borderRadius: 4 }} className="quill-inline">
+                <ReactQuill theme="snow" value={ins.text}
+                  onChange={html => setIns(i, { text: html })}
+                  placeholder={'e.g. Enter {orderQty} in the Quantity field'}
+                  modules={QUILL_MODULES_INLINE} />
+              </div>
               <Move first={i === 0} last={i === block.instructions.length - 1}
                 onUp={() => onChange({ ...block, instructions: move(block.instructions, i, -1) })}
                 onDown={() => onChange({ ...block, instructions: move(block.instructions, i, 1) })}

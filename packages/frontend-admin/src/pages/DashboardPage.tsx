@@ -24,8 +24,9 @@ const SECTIONS: {
     title: 'Instructor',
     blurb: 'Monitor module activity, review session transcripts and evaluations, manage retries.',
     links: [
-      { label: 'Modules',         to: '/instructor/modules' },
-      { label: 'Validation log',  to: '/instructor/validation' },
+      { label: 'Modules',           to: '/instructor/modules' },
+      { label: 'Validation log',    to: '/instructor/validation' },
+      { label: 'Passing thresholds',to: '/instructor/thresholds' },
     ],
   },
   {

@@ -55,8 +55,9 @@ adminRouter.post('/research/export',             requireRole(['researcher','admi
 adminRouter.get( '/research/consent',            requireRole(['researcher','admin']), researcher.getConsentConfig);
 
 // ── Admin-only routes ─────────────────────────────────────────────────────────
-adminRouter.get( '/module-config/:id',           requireRole(['admin']), adminSvc.getModuleConfig);
-adminRouter.post('/module-config',               requireRole(['admin']), adminSvc.saveModuleConfig);
+// Module config (passing thresholds) is tunable by instructors too
+adminRouter.get( '/module-config/:id',           requireRole(['instructor','admin']), adminSvc.getModuleConfig);
+adminRouter.post('/module-config',               requireRole(['instructor','admin']), adminSvc.saveModuleConfig);
 adminRouter.get( '/sap-pool/status',             requireRole(['admin']), adminSvc.getSapPoolStatus);
 adminRouter.post('/sap-pool/import',             requireRole(['admin']), adminSvc.importSapAccounts);
 adminRouter.post('/sap-pool/:username/release',  requireRole(['admin']), adminSvc.releaseSapAccount);

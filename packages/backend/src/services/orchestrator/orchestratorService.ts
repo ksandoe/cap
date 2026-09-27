@@ -32,6 +32,8 @@ import { issueBadge }         from '../badge/badgeService';
 import { sessionDb }          from '../../db/sessionDb';
 import { recipeDb }           from '../../db/recipeDb';
 import { paramDb }            from '../../db/paramDb';
+import { moduleConfigDb, DEFAULT_THRESHOLDS } from '../../db/moduleConfigDb';
+import { evalDb }             from '../../db/evalDb';
 import { logger }             from '../eventLogger';
 import { EVENTS, PHASES }     from '@cap/shared';
 
@@ -235,21 +237,47 @@ export async function saveSession(req: Request, res: Response): Promise<void> {
 
 export async function completeSession(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
-  const { evaluation } = req.body;
+  const { evaluation, transcript } = req.body;
   const session = await sessionDb.getSession(id);
   if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
 
+  // Recompute the verdict from the numeric scores + module thresholds —
+  // the posted evaluation is client-supplied, so badgeAwarded must be
+  // authoritative server-side.
+  const ratings = evaluation.dimensionRatings ?? evaluation.dimensions ?? [];
+  const cfg = await moduleConfigDb.getConfig(session.moduleId)
+    .catch(() => ({ moduleId: session.moduleId, ...DEFAULT_THRESHOLDS }));
+  const overallScore = typeof evaluation.overallScore === 'number'
+    ? evaluation.overallScore
+    : ratings.length
+      ? Math.round(ratings.reduce((a: number, d: any) => a + (d.score ?? 0), 0) / ratings.length)
+      : 0;
+  const badgeAwarded = overallScore >= cfg.overallMin
+    && ratings.every((d: any) => (d.score ?? 0) >= cfg.dimensionFloor);
+
   await sessionDb.updateSession(id, { state: 'COMPLETED', completedAt: now() });
-  logger.info(EVENTS.ASSESSMENT_COMPLETE, { sessionId: id, badgeAwarded: evaluation.badgeAwarded });
+  logger.info(EVENTS.ASSESSMENT_COMPLETE, { sessionId: id, badgeAwarded, overallScore });
+
+  // Persist the de-identified attempt for research + threshold tuning before
+  // the session record is destroyed. No canvasUuid/tempUserId is stored.
+  await evalDb.saveAttempt({
+    attemptId:     id,
+    moduleId:      session.moduleId,
+    recipeVersion: (session as any).recipeVersion ?? 1,
+    attemptNumber: (session as any).attemptNumber ?? 1,
+    evaluation:    { ...evaluation, overallScore, badgeAwarded },
+    transcript:    (transcript ?? []).filter((t: any) => !t.hidden)
+                     .map(({ role, content }: any) => ({ role, content })),
+    completedAt:   now(),
+  }).catch(err => logger.error('EVAL_RECORD_FAILED', { sessionId: id, error: String(err) }));
 
   // Post-completion workflow (parallel where possible)
-  const ratings = evaluation.dimensionRatings ?? evaluation.dimensions ?? [];
-  const score = evaluation.badgeAwarded ? 1.0
+  const score = badgeAwarded ? 1.0
     : ratings.some((d: any) => d.rating !== 'Needs further work') ? 0.5 : 0.0;
 
   await Promise.allSettled([
     postGradeToCanvas(session, score),
-    evaluation.badgeAwarded ? issueBadge(session) : Promise.resolve(),
+    badgeAwarded ? issueBadge(session) : Promise.resolve(),
   ]);
 
   // Release SAP account back to pool (reset is a stub until real SAP lands)
@@ -260,7 +288,7 @@ export async function completeSession(req: Request, res: Response): Promise<void
 
   // Destroy session record (FERPA — no persistent student data)
   await sessionDb.deleteSession(id);
-  logger.info(EVENTS.SESSION_COMPLETED, { sessionId: id, score, badgeAwarded: evaluation.badgeAwarded });
+  logger.info(EVENTS.SESSION_COMPLETED, { sessionId: id, score, badgeAwarded });
 
   res.json({ ok: true });
 }

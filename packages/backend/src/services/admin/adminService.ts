@@ -6,15 +6,27 @@
  */
 import { Request, Response } from 'express';
 import { releaseSapAccount as poolRelease } from '../sap/sapPool';
+import { moduleConfigDb, DEFAULT_THRESHOLDS } from '../../db/moduleConfigDb';
 
 export async function getModuleConfig(req: Request, res: Response): Promise<void> {
-  // TODO: query Aurora module_config for moduleId
-  res.status(501).json({ error: 'Not implemented.' });
+  const cfg = await moduleConfigDb.getConfig(req.params.id);
+  res.json({ config: cfg, defaults: DEFAULT_THRESHOLDS });
 }
 
 export async function saveModuleConfig(req: Request, res: Response): Promise<void> {
-  // TODO: upsert Aurora module_config. Does not affect in-progress sessions.
-  res.status(501).json({ error: 'Not implemented.' });
+  const { moduleId, overallMin, dimensionFloor } = req.body ?? {};
+  if (!moduleId) { res.status(400).json({ error: 'moduleId required' }); return; }
+  const clamp = (v: any, dflt: number) =>
+    typeof v === 'number' && v >= 0 && v <= 100 ? Math.round(v) : dflt;
+  const cfg = {
+    moduleId,
+    overallMin:     clamp(overallMin,     DEFAULT_THRESHOLDS.overallMin),
+    dimensionFloor: clamp(dimensionFloor, DEFAULT_THRESHOLDS.dimensionFloor),
+    updatedAt:      new Date().toISOString(),
+    updatedBy:      (req as any).session?.tempUserId,   // admin JWT carries email here
+  };
+  await moduleConfigDb.saveConfig(cfg as any);
+  res.json({ config: cfg });
 }
 
 export async function getSapPoolStatus(req: Request, res: Response): Promise<void> {

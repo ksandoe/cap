@@ -17,6 +17,25 @@ const KICKOFF =
 const PHASE_RE      = /\[PHASE:(\d)\]/g;
 const ASSESSMENT_RE = /\[ASSESSMENT:(\{.*\})\]/s;
 
+// Friendly progress cues keyed on the agent's [PHASE:n] markers, so students
+// know the conversation is finite and how far along they are.
+const CONVO_CUES: Record<number, { label: string; frac: number }> = {
+  1: { label: 'Getting started',                    frac: 0.15 },
+  2: { label: 'Reflecting on your work',            frac: 0.50 },
+  3: { label: 'Almost done — thinking ahead',       frac: 0.80 },
+  4: { label: 'Wrapping up — nearly there',         frac: 0.95 },
+};
+
+// Small models sometimes stack a second question despite the prompt. Keep
+// everything up to and including the first question mark — the contract is
+// "one question per reply", so we enforce it at the boundary.
+function singleQuestion(text: string): string {
+  const first = text.indexOf('?');
+  if (first === -1) return text;
+  const rest = text.slice(first + 1);
+  return rest.includes('?') ? text.slice(0, first + 1).trim() : text;
+}
+
 export function CheckoutPhase() {
   const sessionId      = useSessionStore(s => s.sessionId);
   const recipe         = useSessionStore(s => s.recipe);
@@ -29,7 +48,9 @@ export function CheckoutPhase() {
   const [waiting,   setWaiting]   = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error,     setError]     = useState<string | null>(null);
+  const [convoPhase, setConvoPhase] = useState(1);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef  = useRef<HTMLTextAreaElement>(null);
   const started   = useRef(false);
 
   const maxTurns = recipe?.maxTurns ?? 20;
@@ -43,10 +64,12 @@ export function CheckoutPhase() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // Keep the latest turn in view
+  // Keep the latest turn in view, and return focus to the reply box after
+  // each agent response so the student can keep typing without clicking.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [transcript, waiting]);
+    if (!waiting && !finishing) inputRef.current?.focus();
+  }, [transcript, waiting, finishing]);
 
   async function sendTurn(content: string, hidden = false) {
     if (!sessionId) return;
@@ -69,12 +92,13 @@ export function CheckoutPhase() {
           return '';
         })
         .replace(PHASE_RE, (_: string, n: string) => {
+          setConvoPhase(parseInt(n, 10));
           if (n === '4') endConversation = true;
           return '';
         })
         .trim();
 
-      if (cleaned) appendTurn('assistant', cleaned);
+      if (cleaned) appendTurn('assistant', singleQuestion(cleaned));
       setWaiting(false);
 
       const turns = useSessionStore.getState().transcript
@@ -95,8 +119,9 @@ export function CheckoutPhase() {
       const evaluation = inlineEval
         ?? (await api.assessment.evaluate(transcript)).evaluation;
       setEvaluation(evaluation);
-      // /complete destroys the session record — call it last
-      await api.session.complete(sessionId, evaluation);
+      // /complete stores the de-identified attempt, then destroys the
+      // session record — call it last.
+      await api.session.complete(sessionId, evaluation, transcript);
       setPhase(4);
     } catch (e: any) {
       setError(`Could not generate your evaluation. ${e.message}`);
@@ -112,6 +137,14 @@ export function CheckoutPhase() {
       <p className="muted">
         A short conversation about your activity — think of it as a debrief,
         not a test. Answer in your own words.
+      </p>
+
+      <div className="convo-progress" aria-hidden="true">
+        <div className="convo-progress-bar"
+          style={{ width: `${Math.round((CONVO_CUES[convoPhase]?.frac ?? 0.15) * 100)}%` }} />
+      </div>
+      <p className="muted convo-cue" role="status">
+        {CONVO_CUES[convoPhase]?.label ?? 'In conversation'}
       </p>
 
       <div className="chat" ref={scrollRef} aria-live="polite">
@@ -138,6 +171,7 @@ export function CheckoutPhase() {
           className="chat-input"
         >
           <textarea
+            ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Type your reply… (Enter to send, Shift+Enter for a new line)"

@@ -181,6 +181,25 @@ function ParamText({ text }: { text: string }) {
   );
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Instruction bodies may be rich HTML (Quill editor). Substitute {key}
+ *  placeholders as escaped values wrapped in <kbd>, then sanitize — params
+ *  can never inject markup, and author HTML is cleaned before render.
+ *  Legacy plain-text instructions keep the simple component path. */
+function InstructionText({ text }: { text: string }) {
+  const params = useSessionStore(s => s.parameters);
+  if (!/<\/?[a-z][^>]*>/i.test(text)) return <ParamText text={text} />;
+  const subbed = text.replace(/\{([a-zA-Z0-9_]+)\}/g, (m, key) =>
+    params[key] !== undefined
+      ? `<kbd class="param">${escapeHtml(String(params[key]))}</kbd>` : m);
+  return <div className="rich-body"
+    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(subbed) }} />;
+}
+
 function GuidedTool({ b }: { b: GuidedToolBlock }) {
   const [done, setDone] = useState<Set<string>>(new Set());
   const toggle = (id: string) => setDone(prev => {
@@ -251,7 +270,7 @@ function GuidedInstructionRow({ ins, done, onToggle }: {
     <li className={done ? 'guided-step done' : 'guided-step'}>
       <label className="option" style={{ alignItems: 'flex-start' }}>
         <input type="checkbox" checked={done} onChange={onToggle} style={{ marginTop: 3 }} />
-        <span><ParamText text={ins.text} /></span>
+        <div style={{ flex: 1 }}><InstructionText text={ins.text} /></div>
       </label>
       {!!ins.branches?.length && (
         <div className="guided-branches">
@@ -262,7 +281,7 @@ function GuidedInstructionRow({ ins, done, onToggle }: {
                 {openBranch === br.branchId ? '▾' : '▸'} {br.condition}
               </button>
               {openBranch === br.branchId && (
-                <p className="branch-body"><ParamText text={br.text} /></p>
+                <div className="branch-body"><InstructionText text={br.text} /></div>
               )}
             </div>
           ))}

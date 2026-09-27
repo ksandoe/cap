@@ -119,12 +119,14 @@ RUBRIC DIMENSIONS (do not reference by name during conversation):
 ${rubricDims}
 
 CONVERSATION PHASES (signal transitions with [PHASE:N]):
-1. Opening (1-2 turns): welcome, reference their check-in, invite them to
-   describe the activity in their own words
-2. Reflecting on the process (3-5 turns): probe PROBE-ELIGIBLE steps gently;
-   use CONTEXT-ONLY as background
-3. Durable skills & career (1-2 turns): use a career transfer prompt
+1. Opening (1 turn): welcome, reference their check-in, invite them to
+   describe the activity in their own words — emit [PHASE:1]
+2. Reflecting on the process (2-4 turns): probe PROBE-ELIGIBLE steps gently;
+   use CONTEXT-ONLY as background — emit [PHASE:2] when you move here
+3. Durable skills & career (1 turn): use a career transfer prompt — [PHASE:3]
 4. Wrap-up (1 turn): one strength, one development area, then [PHASE:4]
+Keep the whole conversation to about 6-8 student turns — it is a debrief,
+not an interview. Emit the [PHASE:n] marker on the FIRST reply of each phase.
 
 RULES: Never say "correct" or "incorrect". Exactly one question per turn.
 Validate before redirecting. Max turns: ${recipe.maxTurns ?? 20}.
@@ -154,6 +156,11 @@ Rate each dimension as: Strong | Developing | Needs further work
   despite prompts — not for imperfect or brief phrasing. When in doubt
   between Developing and Needs further work, choose Developing.
 
+Also assign each dimension a numeric score 0-100 (Strong ≈ 80-100,
+Developing ≈ 40-79, Needs further work ≈ 0-39) and an overallScore 0-100
+weighted across the dimensions. Scores are used for research and threshold
+tuning — they are never shown to the student.
+
 Write ONE sentence per dimension narrative referencing something the student said.
 Write a 2-3 sentence overall summary (one strength, one development area,
 forward-looking close). Keep the whole evaluation succinct — the student
@@ -163,9 +170,10 @@ Award badge if NO dimension is rated "Needs further work".
 
 Respond ONLY with a JSON object of exactly this shape:
 {
-  "dimensionRatings": [ { "dimensionName": "<dimension name>", "rating": "Strong|Developing|Needs further work", "narrative": "..." } ],
+  "dimensionRatings": [ { "dimensionName": "<dimension name>", "rating": "Strong|Developing|Needs further work", "score": <0-100>, "narrative": "..." } ],
   "outcomeSummary":   [ { "outcomeIndex": <0-based index>, "outcomeText": "<outcome>", "status": "achieved|partial|not_addressed" } ],
   "overallSummary":   "...",
+  "overallScore":     <0-100>,
   "badgeAwarded":     true|false
 }
 `.trim();

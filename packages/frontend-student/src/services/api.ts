@@ -55,7 +55,8 @@ export const api = {
     submitCheckin:    (id: string, responses: any) => request<any>('POST', `/session/${id}/checkin`, { responses }),
     verifySap:        (id: string)           => request<any>('POST', `/session/${id}/verify-sap`),
     verifyStatus:     (id: string)           => request<any>('GET',  `/session/${id}/verify-status`),
-    complete:         (id: string, evaluation: any) => request<any>('POST', `/session/${id}/complete`, { evaluation }),
+    complete:         (id: string, evaluation: any, transcript?: any[]) =>
+                        request<any>('POST', `/session/${id}/complete`, { evaluation, transcript }),
     save:             (id: string)           => request<{ ok: boolean; resumeWithinDays: number }>('POST', `/session/${id}/save`),
     retry:            (id: string, toPhase?: number) => request<any>('POST', `/session/${id}/retry`, toPhase ? { toPhase } : {}),
   },

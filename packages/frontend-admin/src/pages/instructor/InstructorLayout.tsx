@@ -12,6 +12,7 @@ import { ModuleListPage }     from './ModuleListPage';
 import { SessionListPage }    from './SessionListPage';
 import { TranscriptPage }     from './TranscriptPage';
 import { ValidationLogPage }  from './ValidationLogPage';
+import { ThresholdsPage }     from './ThresholdsPage';
 
 export function InstructorLayout() {
   return (
@@ -21,6 +22,7 @@ export function InstructorLayout() {
         <Route path="modules/:moduleId"          element={<SessionListPage />} />
         <Route path="sessions/:sessionId"        element={<TranscriptPage />} />
         <Route path="validation"                 element={<ValidationLogPage />} />
+        <Route path="thresholds"                 element={<ThresholdsPage />} />
         <Route path="*"                          element={<ModuleListPage />} />
       </Routes>
     </AppShell>

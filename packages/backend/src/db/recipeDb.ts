@@ -25,12 +25,15 @@ const TABLE = process.env.DYNAMODB_TABLE_RECIPES!;
 
 const ddbRecipeDb = {
   async getActiveRecipe(moduleId: string): Promise<Recipe | null> {
+    // NOTE: no Limit here — DynamoDB applies Limit BEFORE FilterExpression,
+    // so a limit of 1 can fetch only an inactive version and then filter it
+    // away, yielding a false negative. Query the module's (small) version
+    // list and take the first active one.
     const r = await ddb.send(new QueryCommand({
       TableName: TABLE,
       KeyConditionExpression: 'moduleId = :mid',
       FilterExpression: 'isActive = :t',
       ExpressionAttributeValues: { ':mid': moduleId, ':t': true },
-      Limit: 1,
     }));
     return (r.Items?.[0] as Recipe) ?? null;
   },
