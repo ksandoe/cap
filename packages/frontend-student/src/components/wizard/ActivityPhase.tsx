@@ -1,32 +1,35 @@
 /**
- * ActivityPhase.tsx — Phase 2: the learning activity.
+ * ActivityPhase.tsx — Phase 2: the learning activity, one wizard screen
+ * per module step.
  *
- * Renders the recipe's module steps in order; each step renders its content
- * blocks: rich text, embedded tool, knowledge check (formative, unrecorded),
- * checklist (self-verification), and branching note (conditional content).
+ * Each step renders its content blocks in order:
+ *   rich text (sanitized HTML), guided tool (instructions with per-student
+ *   {param} substitution, lightweight branches, progress bar, app frame),
+ *   knowledge check (formative, unrecorded), checklist (self-verification).
  *
- * "I have completed the activity" → confirmation → POST verify-sap →
- * poll verify-status every 3s → advance on SAP_VERIFIED, or show which
- * document types are missing / a connectivity error and allow retry.
+ * On the final step, "I have completed the activity" → confirmation →
+ * POST verify-sap → poll verify-status every 3s → advance on SAP_VERIFIED.
  *
- * TODO (Phase 2): gate enforcement per step, step completion state.
+ * TODO (Phase 2): gate enforcement per step, persisted completion state.
  */
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import { api } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
 import type {
-  ContentBlock, ModuleStep, EmbeddedToolBlock, KnowledgeCheckBlock,
-  KnowledgeCheckQuestion, ChecklistBlock, BranchingNoteBlock,
+  ContentBlock, ModuleStep, GuidedToolBlock, GuidedInstruction,
+  KnowledgeCheckBlock, KnowledgeCheckQuestion, ChecklistBlock,
 } from '@cap/shared';
 
 const POLL_INTERVAL_MS = 3_000;
 const POLL_TIMEOUT_MS  = 60_000; // client-side ceiling; SAP query itself times out server-side
 
 export function ActivityPhase() {
-  const sessionId = useSessionStore(s => s.sessionId);
-  const recipe    = useSessionStore(s => s.recipe);
-  const setPhase  = useSessionStore(s => s.setPhase);
+  const sessionId    = useSessionStore(s => s.sessionId);
+  const recipe       = useSessionStore(s => s.recipe);
+  const activityStep = useSessionStore(s => s.activityStep);
+  const setStep      = useSessionStore(s => s.setActivityStep);
+  const setPhase     = useSessionStore(s => s.setPhase);
 
   const [confirming, setConfirming] = useState(false);
   const [verifying,  setVerifying]  = useState(false);
@@ -34,6 +37,10 @@ export function ActivityPhase() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  const steps = recipe?.steps ?? [];
+  const step  = steps[activityStep];
+  const isLast = activityStep === steps.length - 1;
 
   async function startVerification() {
     if (!sessionId || verifying) return;
@@ -79,39 +86,22 @@ export function ActivityPhase() {
     setVerifying(false);
   }
 
-  const stub  = recipe?.contentStub;
-  const steps = recipe?.steps ?? [];
+  if (!step) {
+    return <p className="muted">This module has no activity steps yet.</p>;
+  }
 
   return (
     <div>
-      <h2>Your activity</h2>
+      <h2>{step.title}</h2>
+      {step.description && <p className="muted" style={{ marginTop: 0 }}>{step.description}</p>}
 
-      {stub?.summaryText && <p style={{ lineHeight: 1.7 }}>{stub.summaryText}</p>}
-
-      {!!stub?.resourceLinks?.length && (
-        <ul className="resource-links">
-          {stub.resourceLinks.map(l => (
-            <li key={l.url}>
-              <a href={l.url} target="_blank" rel="noreferrer">{l.label}</a>
-              {l.type && <span className="tag">{l.type}</span>}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {steps.map(step => <StepView key={step.stepId} step={step} />)}
+      {step.blocks.map(b => <BlockView key={b.blockId} block={b} />)}
 
       {error && <div className="notice error" role="alert">{error}</div>}
 
-      {!confirming && !verifying && (
-        <button className="primary" onClick={() => setConfirming(true)}>
-          I have completed the activity
-        </button>
-      )}
-
       {confirming && (
         <div className="notice">
-          <p>Have you finished all of the steps above?</p>
+          <p>Have you finished all of the steps in this module?</p>
           <button className="primary" onClick={startVerification}>Yes, check my work</button>
           <button className="secondary" onClick={() => setConfirming(false)}>Not yet</button>
         </div>
@@ -120,21 +110,24 @@ export function ActivityPhase() {
       {verifying && (
         <p className="muted" role="status">Checking your work — this usually takes a few seconds…</p>
       )}
+
+      <div className="step-nav">
+        <button className="secondary" disabled={activityStep === 0}
+          onClick={() => setStep(activityStep - 1)}>
+          ← Back
+        </button>
+        {!isLast && (
+          <button className="primary" onClick={() => setStep(activityStep + 1)}>
+            Next: {steps[activityStep + 1].title} →
+          </button>
+        )}
+        {isLast && !confirming && !verifying && (
+          <button className="primary" onClick={() => setConfirming(true)}>
+            I have completed the activity
+          </button>
+        )}
+      </div>
     </div>
-  );
-}
-
-// ── Step ──────────────────────────────────────────────────────────────────────
-
-function StepView({ step }: { step: ModuleStep }) {
-  return (
-    <section className="step">
-      <h3>
-        <span className="step-num">{step.stepNumber}</span> {step.title}
-      </h3>
-      {step.description && <p className="muted" style={{ marginTop: 0 }}>{step.description}</p>}
-      {(step.blocks ?? []).map(b => <BlockView key={b.blockId} block={b} />)}
-    </section>
   );
 }
 
@@ -143,10 +136,9 @@ function StepView({ step }: { step: ModuleStep }) {
 function BlockView({ block }: { block: ContentBlock }) {
   switch (block.type) {
     case 'rich_text':       return <RichText b={block} />;
-    case 'embedded_tool':   return <EmbeddedTool b={block} />;
+    case 'guided_tool':     return <GuidedTool b={block} />;
     case 'knowledge_check': return <KnowledgeCheck b={block} />;
     case 'checklist':       return <Checklist b={block} />;
-    case 'branching_note':  return <BranchingNote b={block} />;
     default:                return null;
   }
 }
@@ -166,27 +158,121 @@ function RichText({ b }: { b: Extract<ContentBlock, { type: 'rich_text' }> }) {
   );
 }
 
-function EmbeddedTool({ b }: { b: EmbeddedToolBlock }) {
+// ── Guided tool ───────────────────────────────────────────────────────────────
+//
+// Instructions with inline {param} substitution, per-instruction branches,
+// a self-reported progress bar, and the framed (or linked) application.
+
+/** Render instruction text with {key} placeholders swapped for the
+ *  student's assigned values, highlighted inline. Unknown keys render
+ *  literally so authors see their mistake rather than a blank. */
+function ParamText({ text }: { text: string }) {
+  const params = useSessionStore(s => s.parameters);
+  const parts = text.split(/(\{[a-zA-Z0-9_]+\})/g);
   return (
-    <div className="block tool">
+    <>
+      {parts.map((p, i) => {
+        const m = p.match(/^\{(.+)\}$/);
+        if (m && params[m[1]] !== undefined)
+          return <kbd key={i} className="param">{params[m[1]]}</kbd>;
+        return <span key={i}>{p}</span>;
+      })}
+    </>
+  );
+}
+
+function GuidedTool({ b }: { b: GuidedToolBlock }) {
+  const [done, setDone] = useState<Set<string>>(new Set());
+  const toggle = (id: string) => setDone(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const total = b.instructions.length;
+  const pct   = total ? Math.round((done.size / total) * 100) : 0;
+
+  const instructions = (
+    <ol className="guided-steps">
+      {b.instructions.map(ins => (
+        <GuidedInstructionRow key={ins.instructionId} ins={ins}
+          done={done.has(ins.instructionId)} onToggle={() => toggle(ins.instructionId)} />
+      ))}
+    </ol>
+  );
+
+  const frame = b.url ? (
+    <iframe src={b.url} title={b.title} className="tool-frame" />
+  ) : (
+    <div className="tool-frame tool-frame-placeholder">
+      <strong>{b.tool}</strong> workspace
+      <span className="muted" style={{ fontSize: 13 }}>
+        {b.tool === 'sap'
+          ? 'Your assigned SAP sandbox opens in a separate window — use your pool account credentials.'
+          : 'This tool opens in a separate window.'}
+      </span>
+      <span className="muted" style={{ fontSize: 12 }}>
+        (Framed embedding will appear here once the tool URL is configured)
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="block guided">
       <h3>
         {b.title}
         <span className="tag">{b.tool}</span>
         {b.isGate && <span className="tag">required</span>}
       </h3>
-      {b.taskPrompt && <p style={{ lineHeight: 1.7 }}>{b.taskPrompt}</p>}
-      {b.url && b.launch === 'embed' && (
-        <iframe src={b.url} title={b.title}
-          style={{ width: '100%', minHeight: 420, border: '1px solid #d8dee9', borderRadius: 6 }} />
-      )}
-      {b.url && b.launch === 'link' && (
-        <p><a className="tool-link" href={b.url} target="_blank" rel="noreferrer">
-          Open {b.tool} ↗
-        </a></p>
+
+      <div className="guided-progress" role="status" aria-label={`${done.size} of ${total} instructions done`}>
+        <div className="guided-progress-bar" style={{ width: `${pct}%` }} />
+        <span className="guided-progress-label">{done.size} of {total} done</span>
+      </div>
+
+      <div className={`guided-layout ${b.layout === 'side_by_side' ? 'side' : 'stacked'}`}>
+        <div className="guided-instructions">{instructions}</div>
+        <div className="guided-frame">{frame}</div>
+      </div>
+
+      {b.url && (
+        <p style={{ marginBottom: 0 }}>
+          <a className="tool-link" href={b.url} target="_blank" rel="noreferrer">
+            Open {b.tool} in a new tab ↗
+          </a>
+        </p>
       )}
     </div>
   );
 }
+
+function GuidedInstructionRow({ ins, done, onToggle }: {
+  ins: GuidedInstruction; done: boolean; onToggle: () => void;
+}) {
+  const [openBranch, setOpenBranch] = useState<string | null>(null);
+  return (
+    <li className={done ? 'guided-step done' : 'guided-step'}>
+      <label className="option" style={{ alignItems: 'flex-start' }}>
+        <input type="checkbox" checked={done} onChange={onToggle} style={{ marginTop: 3 }} />
+        <span><ParamText text={ins.text} /></span>
+      </label>
+      {!!ins.branches?.length && (
+        <div className="guided-branches">
+          {ins.branches.map(br => (
+            <div key={br.branchId}>
+              <button type="button" className="branch-link"
+                onClick={() => setOpenBranch(openBranch === br.branchId ? null : br.branchId)}>
+                {openBranch === br.branchId ? '▾' : '▸'} {br.condition}
+              </button>
+              {openBranch === br.branchId && (
+                <p className="branch-body"><ParamText text={br.text} /></p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </li>
+  );
+}
+
+// ── Knowledge check / checklist ───────────────────────────────────────────────
 
 function KnowledgeCheck({ b }: { b: KnowledgeCheckBlock }) {
   return (
@@ -264,26 +350,6 @@ function Checklist({ b }: { b: ChecklistBlock }) {
           {it.label}
         </label>
       ))}
-    </div>
-  );
-}
-
-function BranchingNote({ b }: { b: BranchingNoteBlock }) {
-  const [pathId, setPathId] = useState<string | null>(null);
-  const path = b.paths.find(p => p.pathId === pathId);
-  return (
-    <div className="block branch">
-      <h3>{b.trigger}</h3>
-      <div className="options">
-        {b.paths.map(p => (
-          <button key={p.pathId}
-            className={pathId === p.pathId ? 'branch-path active' : 'branch-path'}
-            onClick={() => setPathId(pathId === p.pathId ? null : p.pathId)}>
-            {p.label}
-          </button>
-        ))}
-      </div>
-      {path && <p style={{ lineHeight: 1.7, marginBottom: 0 }}>{path.body}</p>}
     </div>
   );
 }

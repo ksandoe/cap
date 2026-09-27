@@ -53,9 +53,30 @@ const DEMO_MODULE_ID = 'demo-sales-process';
 function seedSapPool(): void {
   const pool = table('cap-sap-pool');
   if (pool.length) return;
-  for (let i = 1; i <= 5; i++) {
-    pool.push({ sapUsername: `SAPUSER00${i}`, status: 'available' });
+  for (let i = 1; i <= 10; i++) {
+    pool.push({ sapUsername: `SAPUSER${String(i).padStart(3, '0')}`, status: 'available' });
   }
+}
+
+// Per-account parameter values for guided-tool instruction placeholders.
+// Each pooled account gets different-but-known task data — the modern
+// replacement for seeding assignments from the student's own userid.
+function seedParams(): void {
+  const params = table('cap-params');
+  if (params.length) return;
+  const pool = table('cap-sap-pool');
+  pool.forEach((a, i) => {
+    params.push({
+      moduleId: DEMO_MODULE_ID,
+      sapUsername: a.sapUsername,
+      values: {
+        customer:     `100${(i % 10) + 1}`,
+        material:     'M-001',
+        orderQty:     String(10 + (i % 10) * 5),
+        discountRate: `${i % 10}%`,
+      },
+    });
+  });
 }
 
 function seedRecipe(): void {
@@ -88,12 +109,21 @@ function seedRecipe(): void {
       { trigger: 'Student names transaction codes without describing the business outcome',
         followUp: 'Ask what the business achieves with that document.' },
     ],
-    // Content model: module → steps → blocks. Step 1 is conceptual background;
-    // step 2 is the hands-on SAP exercise (rich-text instructions alongside an
-    // embedded-tool gate, a self-check checklist, and a troubleshooting branch).
+    // Per-student parameters — values are bound at launch from the cap-params
+    // table row for the student's assigned SAP account, and substituted into
+    // guided-tool instruction text wherever {key} appears.
+    parameters: [
+      { key: 'customer',     label: 'Customer number' },
+      { key: 'material',     label: 'Material number' },
+      { key: 'orderQty',     label: 'Order quantity' },
+      { key: 'discountRate', label: 'Discount rate' },
+    ],
+    // Content model: module → steps → blocks. One screen per step in the
+    // student wizard; guided-tool blocks carry the SAP instructions with
+    // {param} placeholders, per-instruction branches, and a progress bar.
     steps: [
-      { stepId: 'st-1', stepNumber: 1,
-        title: 'Understand the sales document flow',
+      { stepId: 'st-intro', stepNumber: 1,
+        title: 'Introduction',
         description: 'Read the background on the SAP sales document flow and check your understanding.',
         outcomeTagIndices: [0],
         understandingNote: 'Student should grasp the inquiry → quotation → order chain and why each document exists, not just the transaction codes.',
@@ -119,43 +149,81 @@ function seedRecipe(): void {
                 feedback: 'An inquiry is non-binding — it only signals customer interest.' },
             ] },
         ] },
-      { stepId: 'st-2', stepNumber: 2,
-        title: 'Create the linked documents in SAP',
-        description: 'In the SAP sandbox, create an Inquiry (VA11), a Quotation (VA21) referencing it, and a Sales Order (VA01) referencing the quotation — customer 1001, material M-001 — then confirm the document flow.',
+      { stepId: 'st-inquiry', stepNumber: 2,
+        title: 'Inquiry',
+        description: 'In the SAP sandbox, create an Inquiry (VA11) for your assigned customer requesting your assigned material and quantity.',
         outcomeTagIndices: [0, 1],
-        understandingNote: 'Student should recognize that master data is maintained once and reused; referencing carries data forward so nothing is re-keyed; inquiry is non-binding while quotation is a binding offer.',
+        understandingNote: 'Student should recognize that an inquiry records customer interest without committing either party, and that master data (customer, material) is reused rather than re-keyed.',
         blocks: [
-          { blockId: 'cb-instr-1', type: 'rich_text',
-            title: 'Instructions',
-            body: '<ol>' +
-              '<li>Log into SAP and review the customer master record for customer 1001.</li>' +
-              '<li>Create an <strong>Inquiry (VA11)</strong> for customer 1001 requesting material M-001.</li>' +
-              '<li>Create a <strong>Quotation (VA21)</strong> that references the inquiry you created.</li>' +
-              '<li>Create a <strong>Sales Order (VA01)</strong> that references the quotation.</li>' +
-              '<li>Open the document flow view and confirm your three documents are linked.</li>' +
-              '</ol>' },
-          { blockId: 'cb-sap-1', type: 'embedded_tool',
-            title: 'SAP sandbox exercise',
+          { blockId: 'cb-gt-inq', type: 'guided_tool',
+            title: 'Create the inquiry (VA11)',
             tool: 'sap',
-            launch: 'link',
-            taskPrompt: 'In your assigned SAP sandbox, create an Inquiry (VA11), a ' +
-              'Quotation (VA21) referencing it, and a Sales Order (VA01) referencing ' +
-              'the quotation — all for customer 1001, material M-001.',
-            isGate: true },
-          { blockId: 'cb-cl-1', type: 'checklist',
+            layout: 'side_by_side',
+            isGate: true,
+            instructions: [
+              { instructionId: 'gi-1', text: 'Log into your assigned SAP sandbox account and open transaction VA11 (Create Inquiry).' },
+              { instructionId: 'gi-2', text: 'Enter inquiry type AF, sales org 1000, distribution channel 10, division 00.',
+                branches: [
+                  { branchId: 'gb-1', condition: 'If a field is rejected',
+                    text: 'Check the org data exactly: sales org 1000, channel 10, division 00 — typos here are the most common cause.' },
+                ] },
+              { instructionId: 'gi-3', text: 'Enter sold-to party {customer} and add material {material} with quantity {orderQty}.' },
+              { instructionId: 'gi-4', text: 'Save and note the inquiry document number.' },
+            ] },
+          { blockId: 'cb-cl-inq', type: 'checklist',
             title: 'Before you continue',
             items: [
               { itemId: 'i1', label: 'I saved the Inquiry and noted its document number.' },
-              { itemId: 'i2', label: 'I saved the Quotation and noted its document number.' },
-              { itemId: 'i3', label: 'I saved the Sales Order and confirmed the document flow links all three.' },
             ] },
-          { blockId: 'cb-bn-1', type: 'branching_note',
-            trigger: 'Something went wrong in SAP?',
-            paths: [
-              { pathId: 'p1', label: 'A field was rejected (e.g. material not found)',
-                body: 'Double-check the test data: customer 1001, material M-001, sales org 1000, channel 10, division 00. Typos in master data fields are the most common cause.' },
-              { pathId: 'p2', label: 'You cannot find the reference option',
-                body: 'On the VA21/VA01 initial screen, use "Create with Reference" rather than typing the document into a blank form — referencing is what links your documents in the flow.' },
+        ] },
+      { stepId: 'st-quotation', stepNumber: 3,
+        title: 'Quotation',
+        description: 'Create a Quotation (VA21) that references your inquiry, applying your assigned discount.',
+        outcomeTagIndices: [0, 1],
+        understandingNote: 'Student should see that the quotation is the binding offer and that referencing the inquiry carries data forward instead of re-entering it.',
+        blocks: [
+          { blockId: 'cb-gt-quot', type: 'guided_tool',
+            title: 'Create the quotation (VA21)',
+            tool: 'sap',
+            layout: 'side_by_side',
+            isGate: true,
+            instructions: [
+              { instructionId: 'gi-1', text: 'Open transaction VA21 (Create Quotation).' },
+              { instructionId: 'gi-2', text: 'Use "Create with Reference" and select the inquiry you created — do not type the data into a blank form.',
+                branches: [
+                  { branchId: 'gb-1', condition: 'If you cannot find the reference option',
+                    text: 'On the VA21 initial screen, the button is "Create with Reference" — referencing is what links your documents in the flow.' },
+                ] },
+              { instructionId: 'gi-3', text: 'Verify customer {customer}, material {material}, quantity {orderQty} carried forward, then apply a {discountRate} discount.' },
+              { instructionId: 'gi-4', text: 'Save and note the quotation document number.' },
+            ] },
+          { blockId: 'cb-cl-quot', type: 'checklist',
+            title: 'Before you continue',
+            items: [
+              { itemId: 'i1', label: 'I saved the Quotation and noted its document number.' },
+            ] },
+        ] },
+      { stepId: 'st-order', stepNumber: 4,
+        title: 'Sales Order',
+        description: 'Create a Sales Order (VA01) referencing your quotation, then confirm the document flow links all three documents.',
+        outcomeTagIndices: [0, 1],
+        understandingNote: 'Student should recognize the order as the confirmed agreement, and be able to trace the full inquiry → quotation → order document flow.',
+        blocks: [
+          { blockId: 'cb-gt-ord', type: 'guided_tool',
+            title: 'Create the sales order (VA01)',
+            tool: 'sap',
+            layout: 'side_by_side',
+            isGate: true,
+            instructions: [
+              { instructionId: 'gi-1', text: 'Open transaction VA01 (Create Sales Order) and use "Create with Reference" to reference your quotation.' },
+              { instructionId: 'gi-2', text: 'Confirm the data carried forward: customer {customer}, material {material}, quantity {orderQty}, discount {discountRate}.' },
+              { instructionId: 'gi-3', text: 'Save the sales order and note its document number.' },
+              { instructionId: 'gi-4', text: 'Open the document flow view and confirm your Inquiry, Quotation, and Sales Order are linked.' },
+            ] },
+          { blockId: 'cb-cl-ord', type: 'checklist',
+            title: 'Before you continue',
+            items: [
+              { itemId: 'i1', label: 'I saved the Sales Order and confirmed the document flow links all three documents.' },
             ] },
         ] },
     ],
@@ -206,6 +274,7 @@ function seedAdminUsers(): void {
 
 export function seedLocalStore(): void {
   seedSapPool();
+  seedParams();
   seedRecipe();
   seedAdminUsers();
   save();
@@ -253,8 +322,11 @@ export const localSessionDb = {
   async findActiveSession(canvasUuid: string, moduleId: string) {
     return table('cap-sessions').find(s =>
       s.canvasUuid === canvasUuid && s.moduleId === moduleId &&
-      s.state !== 'COMPLETED' && s.state !== 'EXPIRED'
+      s.state !== 'COMPLETED' && s.state !== 'EXPIRED' && s.state !== 'INTERRUPTED'
     ) ?? null;
+  },
+  async listSessions() {
+    return [...table('cap-sessions')];
   },
 };
 
@@ -289,11 +361,15 @@ export const localRecipeDb = {
   },
 };
 
-/** Demo seed data (recipe + SAP pool) — used by scripts/seed-demo.ts to
- *  push the same content into DynamoDB when running against live tables. */
+/** Demo seed data (recipe + SAP pool + params) — used by scripts/seed-demo.ts
+ *  to push the same content into DynamoDB when running against live tables. */
 export function demoSeedData() {
   seedLocalStore();
-  return { recipes: [...table('cap-recipes')], sapPool: [...table('cap-sap-pool')] };
+  return {
+    recipes: [...table('cap-recipes')],
+    sapPool: [...table('cap-sap-pool')],
+    params:  [...table('cap-params')],
+  };
 }
 
 // ── sapPool ──────────────────────────────────────────────────────────────────
@@ -317,6 +393,16 @@ export const localSapPool = {
     delete account.assignedSessionId;
     delete account.assignedAt;
     save();
+  },
+};
+
+// ── paramDb ──────────────────────────────────────────────────────────────────
+
+export const localParamDb = {
+  async getParams(moduleId: string, sapUsername: string): Promise<Record<string, string>> {
+    const row = table('cap-params')
+      .find(p => p.moduleId === moduleId && p.sapUsername === sapUsername);
+    return { ...(row?.values ?? {}) };
   },
 };
 

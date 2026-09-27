@@ -18,9 +18,10 @@ const ddb = DynamoDBDocumentClient.from(
 );
 const RECIPES  = process.env.DYNAMODB_TABLE_RECIPES  ?? 'cap-recipes';
 const SAP_POOL = process.env.DYNAMODB_TABLE_SAP_POOL ?? 'cap-sap-pool';
+const PARAMS   = process.env.DYNAMODB_TABLE_PARAMS   ?? 'cap-params';
 
 async function main() {
-  const { recipes, sapPool } = demoSeedData();
+  const { recipes, sapPool, params } = demoSeedData();
 
   for (const r of recipes) {
     await ddb.send(new PutCommand({ TableName: RECIPES, Item: r }));
@@ -29,6 +30,10 @@ async function main() {
   for (const a of sapPool) {
     await ddb.send(new PutCommand({ TableName: SAP_POOL, Item: a }));
     console.log(`sap acct ${a.sapUsername}`);
+  }
+  for (const p of params) {
+    await ddb.send(new PutCommand({ TableName: PARAMS, Item: p }));
+    console.log(`params  ${p.sapUsername} → ${JSON.stringify(p.values)}`);
   }
   console.log('seed complete');
 }

@@ -23,6 +23,8 @@ export type SessionState =
   | 'EVALUATING'      // evaluation being generated
   | 'COMPLETED'       // grade posted, badge issued, session destroyed
   | 'RETRY'           // retry session (links to prior session)
+  | 'SAVED'           // student intentionally paused — account+state held ~1 week
+  | 'INTERRUPTED'     // inactivity timeout — SAP account released back to pool
   | 'EXPIRED';        // TTL elapsed without completing
 
 export interface Session {
@@ -52,6 +54,11 @@ export interface Session {
   sapDocRefs?:          string[];
   sapVerificationError?: { missingTypes?: string[]; error?: string };
 
+  // Per-student parameter values bound at launch from the module's parameter
+  // table (keyed on sapUsername). Safe to expose to the browser — they are
+  // this student's own assignment values rendered into instruction text.
+  parameters?:          Record<string, string>;
+
   // Content block progress
   completedBlockIds:    string[];   // blockIds the student has completed
 
@@ -67,6 +74,8 @@ export interface Session {
   badgeIssuedAt?:       string;
   startedAt:            string;
   completedAt?:         string;
+  lastActivityAt?:      string;     // heartbeat — drives the interrupted sweep
+  savedAt?:             string;     // set on explicit Save & exit
 
   // DynamoDB TTL
   ttl:                  number;     // Unix epoch seconds

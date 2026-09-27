@@ -14,7 +14,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient, GetCommand, PutCommand,
-  UpdateCommand, DeleteCommand, QueryCommand,
+  UpdateCommand, DeleteCommand, QueryCommand, ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { USE_LOCAL_DB }   from '../config/env';
 import { localSessionDb } from './localStore';
@@ -56,15 +56,21 @@ const ddbSessionDb = {
       TableName: TABLE,
       IndexName: 'canvasUuid-moduleId-index',
       KeyConditionExpression: 'canvasUuid = :cu AND moduleId = :mid',
-      FilterExpression: '#s <> :completed AND #s <> :expired',
+      FilterExpression: '#s <> :completed AND #s <> :expired AND #s <> :interrupted',
       ExpressionAttributeNames:  { '#s': 'state' },
       ExpressionAttributeValues: {
         ':cu': canvasUuid, ':mid': moduleId,
-        ':completed': 'COMPLETED', ':expired': 'EXPIRED',
+        ':completed': 'COMPLETED', ':expired': 'EXPIRED', ':interrupted': 'INTERRUPTED',
       },
       Limit: 1,
     }));
     return r.Items?.[0] ?? null;
+  },
+
+  async listSessions() {
+    // Scan is fine at PoC/demo scale — sessions are few and short-lived.
+    const r = await ddb.send(new ScanCommand({ TableName: TABLE }));
+    return r.Items ?? [];
   },
 };
 

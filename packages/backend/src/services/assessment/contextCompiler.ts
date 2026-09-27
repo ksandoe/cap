@@ -11,7 +11,7 @@
  * TODO: implement AI-based outcome tag inference for untagged steps
  * TODO: implement token budget management for background documentation
  */
-import { Recipe, Session, CheckinResponse, EmbeddedToolBlock } from '@cap/shared';
+import { Recipe, Session, CheckinResponse, GuidedToolBlock } from '@cap/shared';
 
 export interface CompiledContext {
   checkinSystemPrompt:    string;
@@ -31,7 +31,7 @@ export function compileContext(recipe: Recipe, session: Partial<Session>): Compi
       .join(', ');
 
     const tools = (step.blocks ?? [])
-      .filter((b): b is EmbeddedToolBlock => b.type === 'embedded_tool')
+      .filter((b): b is GuidedToolBlock => b.type === 'guided_tool')
       .map(b => b.tool || b.title);
 
     return [
@@ -47,6 +47,12 @@ export function compileContext(recipe: Recipe, session: Partial<Session>): Compi
   const checkinProfile = formatCheckinProfile(session.checkinResponses ?? []);
   const rubricDims = (recipe.rubricDimensions ?? [])
     .map(d => `- ${d.name}: ${d.description}`).join('\n');
+  // This student's assigned parameter values — the "known result" the agent
+  // can sanity-check their account against (e.g. "you were assigned qty 50").
+  const paramEntries = Object.entries(session.parameters ?? {});
+  const paramLines   = paramEntries.length
+    ? paramEntries.map(([k, v]) => `- ${k} = ${v}`).join('\n')
+    : 'None assigned.';
   const probeRules = (recipe.probingRules ?? [])
     .map(r => `IF: ${r.trigger}\nTHEN: ${r.followUp}`).join('\n\n');
 
@@ -97,6 +103,9 @@ ${(recipe.keyConcepts ?? []).map(c => `- ${c.term}: ${c.definition}`).join('\n')
 ACTIVITY STEPS:
 ${stepContext}
 
+ASSIGNED PARAMETERS (this student's specific task values):
+${paramLines}
+
 INSTRUCTIONAL RULES:
 ${probeRules}
 
@@ -134,6 +143,9 @@ ${rubricDims}
 
 LEARNING OUTCOMES:
 ${(recipe.learningOutcomes ?? []).map((o,i) => `${i+1}. ${o}`).join('\n')}
+
+ASSIGNED PARAMETERS (the task values this student was given):
+${paramLines}
 
 Rate each dimension as: Strong | Developing | Needs further work
 - Strong: the student articulated the concept in their own words.

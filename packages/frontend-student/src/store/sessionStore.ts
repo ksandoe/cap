@@ -18,15 +18,19 @@ interface SessionState {
   sessionId:       string | null;
   moduleId:        string | null;
   currentPhase:    number;
+  activityStep:    number;   // index into recipe.steps during phase 2
   attemptNumber:   number;
   recipe:          Recipe | null;
+  parameters:      Record<string, string>;  // this student's assigned values
   checkinResponses: CheckinResponse[];
   transcript:      ChatTurn[];
   evaluation:      Evaluation | null;
 
   setSession:      (data: { token: string; sessionId: string; moduleId: string; currentPhase: number }) => void;
   setPhase:        (phase: number) => void;
+  setActivityStep: (i: number) => void;
   setRecipe:       (recipe: Recipe) => void;
+  setParameters:   (p: Record<string, string>) => void;
   setAttemptNumber:(n: number) => void;
   setCheckinResponses: (responses: CheckinResponse[]) => void;
   appendTurn:      (role: string, content: string, hidden?: boolean) => void;
@@ -39,8 +43,10 @@ const initial = {
   sessionId:        null,
   moduleId:         null,
   currentPhase:     1,
+  activityStep:     0,
   attemptNumber:    1,
   recipe:           null,
+  parameters:       {} as Record<string, string>,
   checkinResponses: [] as CheckinResponse[],
   transcript:       [] as ChatTurn[],
   evaluation:       null,
@@ -52,7 +58,9 @@ export const useSessionStore = create<SessionState>((set) => ({
   setSession:      ({ token, sessionId, moduleId, currentPhase }) =>
                      set({ token, sessionId, moduleId, currentPhase }),
   setPhase:        (currentPhase) => set({ currentPhase }),
+  setActivityStep: (activityStep) => set({ activityStep }),
   setRecipe:       (recipe) => set({ recipe }),
+  setParameters:   (parameters) => set({ parameters }),
   setAttemptNumber:(attemptNumber) => set({ attemptNumber }),
   setCheckinResponses: (checkinResponses) => set({ checkinResponses }),
   appendTurn:      (role, content, hidden) =>

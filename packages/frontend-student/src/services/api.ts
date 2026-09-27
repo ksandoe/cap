@@ -56,7 +56,8 @@ export const api = {
     verifySap:        (id: string)           => request<any>('POST', `/session/${id}/verify-sap`),
     verifyStatus:     (id: string)           => request<any>('GET',  `/session/${id}/verify-status`),
     complete:         (id: string, evaluation: any) => request<any>('POST', `/session/${id}/complete`, { evaluation }),
-    retry:            (id: string)           => request<any>('POST', `/session/${id}/retry`),
+    save:             (id: string)           => request<{ ok: boolean; resumeWithinDays: number }>('POST', `/session/${id}/save`),
+    retry:            (id: string, toPhase?: number) => request<any>('POST', `/session/${id}/retry`, toPhase ? { toPhase } : {}),
   },
   assessment: {
     checkinQuestions: ()                     => request<{ questions: CheckinQuestion[] }>('POST', '/assessment/checkin-questions', {}),

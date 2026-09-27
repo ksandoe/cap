@@ -9,6 +9,11 @@
 --   2. A module_config record linking the recipe to the module
 --   3. An IRB config record (approved = FALSE — research data off by default)
 --   4. A default admin user for initial setup (password must be changed)
+--
+-- Content model: module → steps → content blocks.
+-- Block types:   rich_text | guided_tool | knowledge_check | checklist.
+-- Guided-tool instructions use {key} placeholders bound per-student from the
+-- module parameter table (one row per pooled SAP account).
 -- =============================================================================
 
 BEGIN;
@@ -53,19 +58,29 @@ WITH inserted_recipe AS (
                 jsonb_build_object('term', 'SAP SD (Sales & Distribution)', 'definition', 'The SAP ERP module that manages the sales cycle, from customer inquiries through delivery and invoicing.')
             ),
 
+            -- ── Per-student parameters ───────────────────────────────────────
+            -- Keys used as {key} placeholders in guided-tool instructions.
+            -- Values come from the parameter table row for the student's
+            -- assigned SAP pool account — different-but-known task data.
+            'parameters', jsonb_build_array(
+                jsonb_build_object('key', 'customer',     'label', 'Customer number'),
+                jsonb_build_object('key', 'material',     'label', 'Material number'),
+                jsonb_build_object('key', 'orderQty',     'label', 'Order quantity'),
+                jsonb_build_object('key', 'discountRate', 'label', 'Discount rate')
+            ),
+
             -- ── Module steps ─────────────────────────────────────────────────
-            -- Content model: module → steps → content blocks.
             -- Step 1: conceptual background (rich text + knowledge check).
-            -- Steps 2–4: one step per SAP document — numbered instructions in a
-            -- rich-text block alongside an embedded-tool gate, a self-check
-            -- checklist, and a troubleshooting branching note.
+            -- Steps 2–4: one step per SAP document — a guided_tool block carries
+            -- the parameterized instructions, per-instruction branches, and the
+            -- app frame; a checklist closes each step.
             'steps', jsonb_build_array(
 
-                -- Step 1: Background
+                -- Step 1: Introduction
                 jsonb_build_object(
-                    'stepId',      'st-background',
+                    'stepId',      'st-introduction',
                     'stepNumber',  1,
-                    'title',       'The sales cycle and your SAP environment',
+                    'title',       'Introduction',
                     'description', 'Read the background on why a sale uses three linked documents, and get oriented in SAP.',
                     'outcomeTagIndices', jsonb_build_array(3),
                     'understandingNote', 'Student should grasp the inquiry → quotation → order chain and the document flow that links them, before touching the system.',
@@ -74,13 +89,13 @@ WITH inserted_recipe AS (
                             'blockId', 'blk-cycle-overview',
                             'type',    'rich_text',
                             'title',   'The sales cycle: why three documents?',
-                            'body',    E'## Why does a sale require three documents?\n\nIn real business, a customer rarely places an order out of nowhere. They first ask "can you supply this, and at what price?" — that is an **Inquiry**. The supplier responds with a formal **Quotation** committing to specific terms. Only when the customer accepts does a **Sales Order** get created, triggering the actual work of fulfilling the sale.\n\nThis three-step process protects both parties:\n- The customer can shop around without committing\n- The supplier can check inventory and capacity before committing to a price\n- The Sales Order creates a legal and operational commitment on both sides\n\nIn SAP, each step creates a distinct document with its own number, and each subsequent document *references* the one before it — this creates the **document flow**, which gives managers and auditors a traceable record of every sale.\n\n## The documents at a glance\n\n| Document | SAP Transaction | Who creates it | What it means |\n|----------|----------------|----------------|---------------|\n| Inquiry  | VA11           | Sales rep (on behalf of customer) | "We might want to buy this" — no commitment |\n| Quotation| VA21           | Sales rep      | "We will sell it at this price" — company commits |\n| Sales Order | VA01        | Sales rep      | "We are buying this" — both parties commit |'
+                            'body',    '<p>In real business, a customer rarely places an order out of nowhere. They first ask "can you supply this, and at what price?" — that is an <strong>Inquiry</strong>. The supplier responds with a formal <strong>Quotation</strong> committing to specific terms. Only when the customer accepts does a <strong>Sales Order</strong> get created, triggering the actual work of fulfilling the sale.</p><p>This three-step process protects both parties:</p><ul><li>The customer can shop around without committing</li><li>The supplier can check inventory and capacity before committing to a price</li><li>The Sales Order creates a legal and operational commitment on both sides</li></ul><p>In SAP, each step creates a distinct document with its own number, and each subsequent document <em>references</em> the one before it — this creates the <strong>document flow</strong>, which gives managers and auditors a traceable record of every sale.</p>'
                         ),
                         jsonb_build_object(
                             'blockId', 'blk-sap-navigation',
                             'type',    'rich_text',
                             'title',   'Navigating SAP for this activity',
-                            'body',    E'## Getting around SAP\n\nYou will use the SAP Easy Access menu or transaction codes (T-codes) to complete this activity. T-codes are shortcuts that take you directly to a function without navigating menus.\n\nThe three T-codes you need:\n- **VA11** — Create Inquiry\n- **VA21** — Create Quotation (with reference to your Inquiry)\n- **VA01** — Create Sales Order (with reference to your Quotation)\n\n## Working with reference documents\n\nA key skill in SAP is creating documents *with reference* to a previous document. When you create a Quotation from an Inquiry, SAP copies the relevant data automatically. This prevents data entry errors and maintains the document flow.\n\nYou will use this technique for both the Quotation (referencing the Inquiry) and the Sales Order (referencing the Quotation).\n\n## Your test data\n\nFor this activity you will use:\n- **Customer number**: 1000 (Domestic US customer)\n- **Material number**: M-01 (a standard test material)\n- **Sales organization**: 1000\n- **Distribution channel**: 10\n- **Division**: 00\n\nYour instructor has pre-loaded this data into the sandbox system.'
+                            'body',    '<p>You will use transaction codes (T-codes) to complete this activity:</p><ul><li><strong>VA11</strong> — Create Inquiry</li><li><strong>VA21</strong> — Create Quotation (with reference to your Inquiry)</li><li><strong>VA01</strong> — Create Sales Order (with reference to your Quotation)</li></ul><p>A key skill in SAP is creating documents <em>with reference</em> to a previous document — SAP copies the relevant data automatically, preventing entry errors and maintaining the document flow.</p><p>Your assigned values (customer, material, quantity, discount) appear inline in the instructions for each step.</p>'
                         ),
                         jsonb_build_object(
                             'blockId', 'blk-orient-check',
@@ -109,25 +124,58 @@ WITH inserted_recipe AS (
                 jsonb_build_object(
                     'stepId',      'st-inquiry',
                     'stepNumber',  2,
-                    'title',       'Create the Inquiry (VA11)',
-                    'description', 'Log into the SAP sandbox and create an Inquiry for customer 1000, material M-01, quantity 10. Save and note the Inquiry number.',
+                    'title',       'Inquiry',
+                    'description', 'Log into the SAP sandbox and create an Inquiry for your assigned customer, material, and quantity. Save and note the Inquiry number.',
                     'outcomeTagIndices', jsonb_build_array(0, 3),
                     'understandingNote', 'Student should understand: VA11 captures initial customer interest with no commitment from either party; the organizational fields route the inquiry to the right sales area; the validity period is a window of interest; saving creates the first document in the flow.',
                     'blocks', jsonb_build_array(
                         jsonb_build_object(
-                            'blockId', 'blk-inquiry-instructions',
-                            'type',    'rich_text',
-                            'title',   'Step-by-step instructions',
-                            'body',    E'1. Log into the SAP sandbox using the username and password provided by your instructor. You should see the SAP Easy Access screen.\n2. Enter transaction code **VA11** in the command field (top-left box) and press Enter.\n3. On the Create Inquiry screen, enter Order Type "IN" (standard inquiry), Sales Organization "1000", Distribution Channel "10", and Division "00". Press Enter.\n4. Enter Customer number "1000" in the Sold-to party field. Tab to the PO Number field and enter any reference (e.g. your initials + today''s date). Set a valid-from date (today) and valid-to date (30 days from now).\n5. Scroll down to the line items section. Enter Material "M-01" and Quantity "10". Press Enter to allow SAP to validate the material.\n6. Click the Save button (floppy disk icon) or press Ctrl+S. SAP will display an Inquiry number at the bottom of the screen — **write it down**.'
-                        ),
-                        jsonb_build_object(
-                            'blockId', 'blk-inquiry-sap',
-                            'type',    'embedded_tool',
+                            'blockId', 'blk-inquiry-tool',
+                            'type',    'guided_tool',
                             'title',   'Create your Inquiry in SAP (VA11)',
                             'tool',    'sap',
-                            'launch',  'link',
-                            'taskPrompt', 'Using the instructions above, create an Inquiry in your SAP sandbox. When you have saved the Inquiry and noted your Inquiry number, confirm below.',
-                            'isGate',  TRUE
+                            'layout',  'side_by_side',
+                            'isGate',  TRUE,
+                            'instructions', jsonb_build_array(
+                                jsonb_build_object(
+                                    'instructionId', 'gi-1',
+                                    'text', 'Log into your assigned SAP sandbox account and open transaction VA11 (Create Inquiry).',
+                                    'branches', jsonb_build_array(
+                                        jsonb_build_object(
+                                            'branchId', 'gb-1', 'condition', 'If you cannot find where to enter the T-code',
+                                            'text', 'The command field is the small box at the top-left of the SAP window. Type VA11 and press Enter — do not navigate the menu tree.'
+                                        )
+                                    )
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-2',
+                                    'text', 'Enter Order Type "IN", Sales Organization "1000", Distribution Channel "10", Division "00" — then press Enter.',
+                                    'branches', jsonb_build_array(
+                                        jsonb_build_object(
+                                            'branchId', 'gb-1', 'condition', 'If a field is rejected',
+                                            'text', 'Check the org data exactly: sales org 1000, channel 10, division 00 — typos here are the most common cause.'
+                                        )
+                                    )
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-3',
+                                    'text', 'Enter customer {customer} as the Sold-to party, add a PO reference (e.g. your initials + today''s date), and set validity dates (today → +30 days).'
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-4',
+                                    'text', 'Add material {material} with quantity {orderQty} and press Enter so SAP validates the line item.',
+                                    'branches', jsonb_build_array(
+                                        jsonb_build_object(
+                                            'branchId', 'gb-1', 'condition', 'If the material is not found',
+                                            'text', 'Re-check the material number — it must be {material} exactly. SAP validates against pre-loaded master data.'
+                                        )
+                                    )
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-5',
+                                    'text', 'Save (Ctrl+S) and write down the Inquiry number — you will need it for the Quotation.'
+                                )
+                            )
                         ),
                         jsonb_build_object(
                             'blockId', 'blk-inquiry-checklist',
@@ -137,21 +185,6 @@ WITH inserted_recipe AS (
                                 jsonb_build_object('itemId', 'i1', 'label', 'I saved the Inquiry in SAP.'),
                                 jsonb_build_object('itemId', 'i2', 'label', 'I wrote down my Inquiry number — I will need it for the Quotation.')
                             )
-                        ),
-                        jsonb_build_object(
-                            'blockId', 'blk-inquiry-trouble',
-                            'type',    'branching_note',
-                            'trigger', 'Something went wrong in VA11?',
-                            'paths',   jsonb_build_array(
-                                jsonb_build_object(
-                                    'pathId', 'p1', 'label', 'A field was rejected (e.g. material or customer not found)',
-                                    'body', 'Double-check the test data: customer 1000, material M-01, sales org 1000, channel 10, division 00. Typos in these fields are the most common cause — SAP validates them against pre-loaded master data.'
-                                ),
-                                jsonb_build_object(
-                                    'pathId', 'p2', 'label', 'You cannot find where to enter the T-code',
-                                    'body', 'The command field is the small box at the top-left of the SAP window. Type VA11 and press Enter — do not navigate through the menu tree.'
-                                )
-                            )
                         )
                     )
                 ),
@@ -160,25 +193,52 @@ WITH inserted_recipe AS (
                 jsonb_build_object(
                     'stepId',      'st-quotation',
                     'stepNumber',  3,
-                    'title',       'Create the Quotation (VA21)',
-                    'description', 'Create a Quotation with reference to your Inquiry, review the copied data and pricing, save, and note the Quotation number.',
+                    'title',       'Quotation',
+                    'description', 'Create a Quotation with reference to your Inquiry, review the copied data and pricing, apply your assigned discount, save, and note the Quotation number.',
                     'outcomeTagIndices', jsonb_build_array(1, 3),
                     'understandingNote', 'Student should understand: VA21 is the company making a formal commitment in response to the inquiry; creating with reference links the documents and copies data forward; the validity period is a price-commitment window; pricing is determined by condition records, not typed manually.',
                     'blocks', jsonb_build_array(
                         jsonb_build_object(
-                            'blockId', 'blk-quotation-instructions',
-                            'type',    'rich_text',
-                            'title',   'Step-by-step instructions',
-                            'body',    E'1. Enter transaction code **VA21** and press Enter.\n2. On the initial screen, click "Create with Reference". In the dialog, enter your **Inquiry number** from the previous step and click Copy.\n3. Review the copied data. Set a valid-from date (today) and valid-to date (14 days from now). This is the window during which the quoted price is guaranteed.\n4. Check the pricing in the line item. SAP should have determined a price based on the material and customer — note the price per unit.\n5. Save the Quotation (Ctrl+S). Note the **Quotation number** displayed at the bottom of the screen.'
-                        ),
-                        jsonb_build_object(
-                            'blockId', 'blk-quotation-sap',
-                            'type',    'embedded_tool',
+                            'blockId', 'blk-quotation-tool',
+                            'type',    'guided_tool',
                             'title',   'Create your Quotation in SAP (VA21)',
                             'tool',    'sap',
-                            'launch',  'link',
-                            'taskPrompt', 'Using the instructions above, create a Quotation with reference to your Inquiry. When you have saved it and noted your Quotation number, confirm below.',
-                            'isGate',  TRUE
+                            'layout',  'side_by_side',
+                            'isGate',  TRUE,
+                            'instructions', jsonb_build_array(
+                                jsonb_build_object(
+                                    'instructionId', 'gi-1',
+                                    'text', 'Open transaction VA21 (Create Quotation).'
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-2',
+                                    'text', 'Click "Create with Reference", enter your Inquiry number, and click Copy — do not re-type the data into a blank form.',
+                                    'branches', jsonb_build_array(
+                                        jsonb_build_object(
+                                            'branchId', 'gb-1', 'condition', 'If SAP says the Inquiry number does not exist',
+                                            'text', 'Make sure you saved the Inquiry in the previous step and copied the number exactly — leading zeros matter in SAP document numbers.'
+                                        )
+                                    )
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-3',
+                                    'text', 'Confirm the carried-forward data — customer {customer}, material {material}, quantity {orderQty} — then set validity dates (today → +14 days).'
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-4',
+                                    'text', 'Apply a {discountRate} discount to the line item and note the price SAP determined per unit.',
+                                    'branches', jsonb_build_array(
+                                        jsonb_build_object(
+                                            'branchId', 'gb-1', 'condition', 'If no price appears in the line item',
+                                            'text', 'Pricing comes from condition records for the customer/material combination. Confirm you are using customer {customer} and material {material}, then ask your instructor if it persists.'
+                                        )
+                                    )
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-5',
+                                    'text', 'Save (Ctrl+S) and write down the Quotation number.'
+                                )
+                            )
                         ),
                         jsonb_build_object(
                             'blockId', 'blk-quotation-checklist',
@@ -189,21 +249,6 @@ WITH inserted_recipe AS (
                                 jsonb_build_object('itemId', 'i2', 'label', 'I saved the Quotation and wrote down its number.'),
                                 jsonb_build_object('itemId', 'i3', 'label', 'I noted the price SAP determined for the material.')
                             )
-                        ),
-                        jsonb_build_object(
-                            'blockId', 'blk-quotation-trouble',
-                            'type',    'branching_note',
-                            'trigger', 'Something went wrong in VA21?',
-                            'paths',   jsonb_build_array(
-                                jsonb_build_object(
-                                    'pathId', 'p1', 'label', 'SAP says the Inquiry number does not exist',
-                                    'body', 'Make sure you saved the Inquiry in the previous step and copied the number exactly — leading zeros matter in SAP document numbers. You can search for it with the matchcode button beside the field.'
-                                ),
-                                jsonb_build_object(
-                                    'pathId', 'p2', 'label', 'No price appears in the line item',
-                                    'body', 'Pricing comes from condition records maintained for the customer/material combination. If the field is blank, check you are working with customer 1000 and material M-01, then contact your instructor if it persists.'
-                                )
-                            )
                         )
                     )
                 ),
@@ -212,25 +257,46 @@ WITH inserted_recipe AS (
                 jsonb_build_object(
                     'stepId',      'st-sales-order',
                     'stepNumber',  4,
-                    'title',       'Create the Sales Order (VA01)',
-                    'description', 'Create a Sales Order with reference to your Quotation, set the requested delivery date, check for availability warnings, save, and note the Sales Order number.',
+                    'title',       'Sales Order',
+                    'description', 'Create a Sales Order with reference to your Quotation, set the requested delivery date, save, and confirm the document flow.',
                     'outcomeTagIndices', jsonb_build_array(2, 3),
                     'understandingNote', 'Student should understand: VA01 is where the sale becomes a real commitment driving delivery and billing; creating from the Quotation means the customer accepted the quoted terms; the requested delivery date triggers the ATP availability check; saving kicks off downstream processes.',
                     'blocks', jsonb_build_array(
                         jsonb_build_object(
-                            'blockId', 'blk-order-instructions',
-                            'type',    'rich_text',
-                            'title',   'Step-by-step instructions',
-                            'body',    E'1. Enter transaction code **VA01** and press Enter.\n2. Select Order Type "OR" (standard order). Click "Create with Reference" and enter your **Quotation number**. Click Copy.\n3. Review the Sales Order header. Notice the requested delivery date field — enter a date 7 days from today. This is when the customer expects to receive the goods.\n4. Check the line item for any warnings or error messages (indicated by colored icons). If SAP shows a delivery date issue, note it but proceed.\n5. Save the Sales Order (Ctrl+S). Note the **Sales Order number**. You have now completed the full Inquiry → Quotation → Sales Order cycle.'
-                        ),
-                        jsonb_build_object(
-                            'blockId', 'blk-order-sap',
-                            'type',    'embedded_tool',
+                            'blockId', 'blk-order-tool',
+                            'type',    'guided_tool',
                             'title',   'Create your Sales Order in SAP (VA01)',
                             'tool',    'sap',
-                            'launch',  'link',
-                            'taskPrompt', 'Using the instructions above, create a Sales Order with reference to your Quotation. When you have saved it and noted your Sales Order number, confirm below.',
-                            'isGate',  TRUE
+                            'layout',  'side_by_side',
+                            'isGate',  TRUE,
+                            'instructions', jsonb_build_array(
+                                jsonb_build_object(
+                                    'instructionId', 'gi-1',
+                                    'text', 'Open transaction VA01 (Create Sales Order) with Order Type "OR".'
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-2',
+                                    'text', 'Click "Create with Reference", enter your Quotation number, and click Copy.'
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-3',
+                                    'text', 'Confirm the carried-forward data — customer {customer}, material {material}, quantity {orderQty}, discount {discountRate} — then enter a requested delivery date 7 days from today.'
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-4',
+                                    'text', 'Check the line item for warnings or error icons; note any delivery-date issue and proceed.',
+                                    'branches', jsonb_build_array(
+                                        jsonb_build_object(
+                                            'branchId', 'gb-1', 'condition', 'If SAP warns about the delivery date',
+                                            'text', 'The warning means the requested date fails the availability (ATP) check. Note it, accept the proposed date, and continue.'
+                                        )
+                                    )
+                                ),
+                                jsonb_build_object(
+                                    'instructionId', 'gi-5',
+                                    'text', 'Save the Sales Order, note its number, then open the document flow view and confirm Inquiry → Quotation → Sales Order are linked.'
+                                )
+                            )
                         ),
                         jsonb_build_object(
                             'blockId', 'blk-order-checklist',

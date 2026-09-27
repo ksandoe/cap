@@ -121,10 +121,64 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   background: #f4f7fb; color: #444;
 }
 .block.tool { border-left: 4px solid #1D4E8C; }
+.block.guided { border-left: 4px solid #1D4E8C; }
 .block.kc   { border-left: 4px solid #0f7b6c; }
 .block.checklist { border-left: 4px solid #8a6d00; }
 .block.branch { border-left: 4px solid #7a5ea8; }
 .tool-link { color: #1D4E8C; font-weight: 600; }
+
+/* ── Guided tool ─────────────────────────────────────────────────────────── */
+.guided-progress {
+  position: relative; height: 22px; margin: 8px 0 14px;
+  background: #eef1f6; border-radius: 999px; overflow: hidden;
+}
+.guided-progress-bar {
+  position: absolute; inset: 0 auto 0 0; background: #1D4E8C;
+  transition: width .25s ease;
+}
+.guided-progress-label {
+  position: relative; display: block; text-align: center;
+  font-size: 12px; font-weight: 600; line-height: 22px; color: #333;
+}
+.guided-layout.side {
+  display: grid; grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr);
+  gap: 16px; align-items: start;
+}
+.guided-steps { margin: 0; padding-left: 22px; }
+.guided-step { margin: 10px 0; line-height: 1.55; }
+.guided-step.done > label > span:last-child { color: #777; }
+kbd.param {
+  display: inline-block; padding: 0 6px; margin: 0 1px;
+  background: #eef3fa; border: 1px solid #cfdeef; border-radius: 4px;
+  font: 600 13px/1.5 ui-monospace, monospace; color: #1D4E8C;
+}
+.guided-branches { margin: 4px 0 4px 26px; }
+.branch-link {
+  background: none; border: none; padding: 2px 0; cursor: pointer;
+  color: #7a5ea8; font-size: 13px; font-weight: 600;
+}
+.branch-body {
+  margin: 2px 0 6px; padding: 8px 12px; line-height: 1.55; font-size: 14px;
+  background: #f4f0fa; border-left: 3px solid #7a5ea8; border-radius: 0 6px 6px 0;
+}
+.tool-frame {
+  width: 100%; min-height: 340px; border: 1px solid #d8dee9; border-radius: 6px;
+  background: #fff;
+}
+.tool-frame-placeholder {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 6px; padding: 24px; text-align: center;
+  background: repeating-linear-gradient(45deg, #fafbfd, #fafbfd 12px, #f2f5fa 12px, #f2f5fa 24px);
+  color: #555; font-size: 15px;
+}
+@media (max-width: 720px) {
+  .guided-layout.side { grid-template-columns: 1fr; }
+}
+.step-nav {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e2e0;
+}
+.step-nav .secondary { margin-left: 0; }
 .kc-q { padding: 10px 0; border-top: 1px solid #eee; }
 .kc-q:first-of-type { border-top: none; }
 .kc-correct   { color: #1e6b34; margin: 6px 0 0; font-size: 14px; }

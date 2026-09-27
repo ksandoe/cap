@@ -24,6 +24,13 @@ import { mockCheckinQuestions, mockConversationTurn, mockEvaluation } from './mo
 
 const MOCK_AI = LLM_MODE === 'mock';
 
+// Heartbeat — feeds the stale-session sweep (in-progress sessions idle
+// >24h are INTERRUPTED and their SAP accounts released).
+function touch(sessionId: string) {
+  sessionDb.updateSession(sessionId, { lastActivityAt: new Date().toISOString() })
+    .catch(() => { /* non-fatal */ });
+}
+
 export async function generateCheckinQuestions(req: Request, res: Response): Promise<void> {
   const { sessionId } = req.session!;
   const session = await sessionDb.getSession(sessionId);
@@ -52,6 +59,7 @@ export async function processConversationTurn(req: Request, res: Response): Prom
 
   const session = await sessionDb.getSession(sessionId);
   if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
+  touch(sessionId);
   const recipe  = await recipeDb.getActiveRecipe(session.moduleId);
   const { checkoutSystemPrompt } = compileContext(recipe!, session);
 
@@ -69,6 +77,7 @@ export async function generateEvaluation(req: Request, res: Response): Promise<v
 
   const session = await sessionDb.getSession(sessionId);
   if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
+  touch(sessionId);
   const recipe  = await recipeDb.getActiveRecipe(session.moduleId);
   const { evaluationSystemPrompt } = compileContext(recipe!, session);
 

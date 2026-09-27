@@ -39,15 +39,15 @@ export function SummaryPhase() {
     d => d.rating === 'Needs further work'
   );
 
-  async function retry() {
+  async function retry(toPhase: 2 | 3) {
     if (!sessionId || retrying) return;
     setRetrying(true);
     setRetryError(null);
     try {
-      const { sessionToken, redirectPhase } = await api.session.retry(sessionId);
+      const { sessionToken, redirectPhase } = await api.session.retry(sessionId, toPhase);
       const claims = decodeSessionToken(sessionToken);
       // Keep the transcript for context but start the new conversation fresh
-      useSessionStore.setState({ transcript: [], evaluation: null });
+      useSessionStore.setState({ transcript: [], evaluation: null, activityStep: 0 });
       setSession({
         token:        sessionToken,
         sessionId:    claims.sessionId,
@@ -55,7 +55,7 @@ export function SummaryPhase() {
         currentPhase: redirectPhase,
       });
       setAttempt(attemptNumber + 1);
-      setPhase(3);
+      setPhase(redirectPhase);
     } catch (e: any) {
       setRetryError(
         'A retry could not be started. If you have used all your attempts, ' +
@@ -139,9 +139,14 @@ export function SummaryPhase() {
 
       <div className="actions">
         {!evaluation.badgeAwarded && (
-          <button className="primary" onClick={retry} disabled={retrying}>
-            {retrying ? 'Starting…' : `Retry the conversation (attempt ${attemptNumber + 1})`}
-          </button>
+          <>
+            <button className="primary" onClick={() => retry(3)} disabled={retrying}>
+              {retrying ? 'Starting…' : `Retry the reflection (attempt ${attemptNumber + 1})`}
+            </button>
+            <button className="secondary" onClick={() => retry(2)} disabled={retrying}>
+              Revisit the activity
+            </button>
+          </>
         )}
         <button className="secondary" onClick={() => window.print()}>
           Print summary
@@ -158,8 +163,10 @@ export function SummaryPhase() {
 
       {needsWork && (
         <p className="muted" style={{ marginTop: 12 }}>
-          A retry focuses on the areas marked “Needs further work” — you won’t
-          repeat the check-in or the activity.
+          “Retry the reflection” starts a new conversation focusing on the areas
+          marked “Needs further work” — you won’t repeat the check-in or the
+          activity. “Revisit the activity” takes you back through the module
+          steps with a fresh exercise.
         </p>
       )}
     </div>

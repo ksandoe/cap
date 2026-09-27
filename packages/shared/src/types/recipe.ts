@@ -13,20 +13,21 @@
  *
  * Block types:
  *   - rich_text       — prose, headings, images, tables, callouts (the workhorse)
- *   - embedded_tool   — framed or linked interactive environment (SAP primary)
+ *   - guided_tool     — a framed interactive environment plus guided
+ *                       instructions: ordered steps with {param} placeholders
+ *                       and lightweight per-instruction branches, a progress
+ *                       indicator, and a configurable layout (SAP primary)
  *   - knowledge_check — formative questions w/ immediate feedback; unrecorded
  *   - checklist       — student self-confirms actions taken ("I have done X")
- *   - branching_note  — conditional content: trigger + two or more paths
  */
 
 // ── Content blocks ────────────────────────────────────────────────────────────
 
 export type ContentBlockType =
   | 'rich_text'
-  | 'embedded_tool'
+  | 'guided_tool'
   | 'knowledge_check'
-  | 'checklist'
-  | 'branching_note';
+  | 'checklist';
 
 export interface RichTextBlock {
   blockId: string;
@@ -35,15 +36,35 @@ export interface RichTextBlock {
   body:    string;              // markdown / rich text
 }
 
-export interface EmbeddedToolBlock {
-  blockId:     string;
-  type:        'embedded_tool';
-  title:       string;
-  tool:        string;          // 'sap' or a generic tool name
-  url?:        string;          // launch/embed URL
-  launch:      'link' | 'embed'; // linked out vs. framed in place
-  taskPrompt?: string;          // short pointer — full instructions live in rich text alongside
-  isGate:      boolean;         // must complete before continuing (SAP defaults true)
+// ── Guided tool ─────────────────────────────────────────────────────────────
+//
+// One instruction = one thing the student does inside the tool. Instruction
+// text may contain {paramKey} placeholders substituted per-student from the
+// module's parameter table (keyed on the assigned tool account — see
+// Recipe.parameters). A branch is a lightweight conditional variant attached
+// to a single instruction ("if you get error X → do Y").
+
+export interface GuidedBranch {
+  branchId:  string;
+  condition: string;    // the trigger — error message, scenario, choice
+  text:      string;    // what to do instead; may contain {paramKey} placeholders
+}
+
+export interface GuidedInstruction {
+  instructionId: string;
+  text:          string;          // e.g. "Enter {orderQty} in the Quantity field"
+  branches?:     GuidedBranch[];  // optional conditional variants
+}
+
+export interface GuidedToolBlock {
+  blockId:      string;
+  type:         'guided_tool';
+  title:        string;
+  tool:         string;                          // 'sap' or a generic tool name
+  url?:         string;                          // launch/embed URL
+  layout:       'stacked' | 'side_by_side';      // instructions above vs. beside the frame
+  instructions: GuidedInstruction[];             // ordered — drives the progress indicator
+  isGate:       boolean;                         // must complete before continuing (SAP defaults true)
 }
 
 export type KnowledgeCheckQuestionType = 'multiple_choice' | 'true_false' | 'short_answer';
@@ -76,25 +97,11 @@ export interface ChecklistBlock {
   items:   ChecklistItem[];
 }
 
-export interface BranchingPath {
-  pathId: string;
-  label:  string;             // e.g. "If you see an authorization error"
-  body:   string;             // rich text content for this path
-}
-
-export interface BranchingNoteBlock {
-  blockId: string;
-  type:    'branching_note';
-  trigger: string;            // the condition — error message, scenario, choice
-  paths:   BranchingPath[];   // 2+ content paths
-}
-
 export type ContentBlock =
   | RichTextBlock
-  | EmbeddedToolBlock
+  | GuidedToolBlock
   | KnowledgeCheckBlock
-  | ChecklistBlock
-  | BranchingNoteBlock;
+  | ChecklistBlock;
 
 // ── Module steps ──────────────────────────────────────────────────────────────
 
@@ -122,6 +129,12 @@ export interface Recipe {
   learningOutcomes:     string[];
   keyConcepts:          KeyConcept[];
 
+  // Per-student parameter keys used in guided-tool instructions ({key}
+  // placeholders). Values are assigned at launch from the module's parameter
+  // table — one row per tool-account in the pool — so each student gets
+  // different-but-known task data (the former "seed by userid" pattern).
+  parameters?:          ParameterDef[];
+
   // The learning activity — ordered steps, each containing ordered blocks
   steps:                ModuleStep[];
 
@@ -146,6 +159,7 @@ export interface Recipe {
 // ── Supporting types ──────────────────────────────────────────────────────────
 
 export interface KeyConcept    { term: string; definition: string; }
+export interface ParameterDef  { key: string; label: string; }
 export interface ProbingRule   { trigger: string; followUp: string; }
 export interface RubricDimension { name: string; description: string; weight?: number; }
 export interface ContentStub   { summaryText: string; resourceLinks?: ResourceLink[]; }

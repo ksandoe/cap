@@ -28,6 +28,14 @@ aws dynamodb create-table --table-name cap-sap-pool \
   --attribute-definitions AttributeName=sapUsername,AttributeType=S \
   --key-schema AttributeName=sapUsername,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST
+
+# Per-account parameter values for guided-tool {key} placeholders.
+# Item shape: { moduleId, sapUsername, values: { key: value } }
+aws dynamodb create-table --table-name cap-params \
+  --attribute-definitions AttributeName=moduleId,AttributeType=S \
+                          AttributeName=sapUsername,AttributeType=S \
+  --key-schema AttributeName=moduleId,KeyType=HASH AttributeName=sapUsername,KeyType=RANGE \
+  --billing-mode PAY_PER_REQUEST
 ```
 
 ## 2. Lambda role permissions
@@ -45,10 +53,11 @@ creating the inline policy):
 ```bash
 cd packages/backend
 DYNAMODB_TABLE_RECIPES=cap-recipes DYNAMODB_TABLE_SAP_POOL=cap-sap-pool \
+DYNAMODB_TABLE_PARAMS=cap-params \
   npx tsx scripts/seed-demo.ts
 
 aws lambda update-function-configuration --function-name cap-demo-api \
-  --environment "Variables={USE_LOCAL_DB=false,DYNAMODB_TABLE_SESSIONS=cap-sessions,DYNAMODB_TABLE_RECIPES=cap-recipes,DYNAMODB_TABLE_SAP_POOL=cap-sap-pool,AWS_REGION=us-east-1,LLM_MODE=openai,OPENAI_API_KEY=<key>,OPENAI_MODEL=gpt-4o-mini,SAP_MODE=stub,CANVAS_MODE=stub,CREDLY_MODE=stub,ENABLE_DEV_ROUTES=true,FRONTEND_URL=https://gtdqd19poa.execute-api.us-east-1.amazonaws.com,SESSION_JWT_SECRET=<secret>,SESSION_TTL_HOURS=24}"
+  --environment "Variables={USE_LOCAL_DB=false,DYNAMODB_TABLE_SESSIONS=cap-sessions,DYNAMODB_TABLE_RECIPES=cap-recipes,DYNAMODB_TABLE_SAP_POOL=cap-sap-pool,DYNAMODB_TABLE_PARAMS=cap-params,AWS_REGION=us-east-1,LLM_MODE=openai,OPENAI_API_KEY=<key>,OPENAI_MODEL=gpt-4o-mini,SAP_MODE=stub,CANVAS_MODE=stub,CREDLY_MODE=stub,ENABLE_DEV_ROUTES=true,FRONTEND_URL=https://gtdqd19poa.execute-api.us-east-1.amazonaws.com,SESSION_JWT_SECRET=<secret>,SESSION_TTL_HOURS=24,SAVED_TTL_DAYS=7}"
 ```
 
 ## 4. Aurora Data API (durable recipes/config — optional for the demo)

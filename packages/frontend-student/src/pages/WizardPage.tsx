@@ -26,6 +26,7 @@ export function WizardPage() {
   const moduleId     = useSessionStore(s => s.moduleId);
   const setPhase     = useSessionStore(s => s.setPhase);
   const setRecipe    = useSessionStore(s => s.setRecipe);
+  const setParams    = useSessionStore(s => s.setParameters);
   const setAttempt   = useSessionStore(s => s.setAttemptNumber);
   const navigate     = useNavigate();
 
@@ -40,6 +41,7 @@ export function WizardPage() {
         const session = await api.session.get(sessionId);
         if (session.phaseReached) setPhase(session.phaseReached);
         if (session.attemptNumber) setAttempt(session.attemptNumber);
+        if (session.parameters) setParams(session.parameters);
         if (moduleId) {
           const recipe = await api.recipe.get(moduleId);
           setRecipe(recipe);

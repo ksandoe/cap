@@ -6,8 +6,9 @@
  *   2. Learning outcomes    — numbered list (min 2)
  *   3. Key concepts         — term + definition pairs
  *   4. Steps & content      — module steps; each step holds ordered content
- *                             blocks: rich text, embedded tool, knowledge
- *                             check, checklist, branching note
+ *                             blocks: rich text, guided tool, knowledge
+ *                             check, checklist. Module parameters ({key}
+ *                             placeholders) are declared here too.
  *   5. Instructional recipe — rubric dimensions, probing rules, vague answer
  *                             triggers, career transfer prompts, tone, max turns
  *   6. Background docs      — pasted text + external URLs (file upload pending S3)
@@ -22,8 +23,8 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { adminApi } from '../../services/api';
 import type {
-  ContentBlock, ModuleStep, EmbeddedToolBlock, KnowledgeCheckBlock,
-  KnowledgeCheckQuestion, ChecklistBlock, BranchingNoteBlock, RichTextBlock,
+  ContentBlock, ModuleStep, GuidedToolBlock, GuidedInstruction,
+  KnowledgeCheckBlock, KnowledgeCheckQuestion, ChecklistBlock, RichTextBlock,
 } from '@cap/shared';
 
 // ── style shorthands (matching the scaffold's inline-style look) ──────────────
@@ -39,6 +40,7 @@ interface Draft {
   moduleId: string; moduleTitle: string; moduleDescription: string;
   learningOutcomes: string[];
   keyConcepts: { term: string; definition: string }[];
+  parameters: { key: string; label: string }[];
   steps: ModuleStep[];
   rubricDimensions: { name: string; description: string }[];
   probingRules: { trigger: string; followUp: string }[];
@@ -56,6 +58,7 @@ const EMPTY: Draft = {
   moduleId: '', moduleTitle: '', moduleDescription: '',
   learningOutcomes: ['', ''],
   keyConcepts: [{ term: '', definition: '' }],
+  parameters: [],
   steps: [],
   rubricDimensions: [{ name: '', description: '' }],
   probingRules: [], vagueAnswerTriggers: [], careerTransferPrompts: [],
@@ -72,10 +75,10 @@ function newBlock(type: ContentBlock['type']): ContentBlock {
   const blockId = `blk-${uid()}`;
   switch (type) {
     case 'rich_text':       return { blockId, type, title: '', body: '' } as RichTextBlock;
-    case 'embedded_tool':   return { blockId, type, title: '', tool: 'sap', launch: 'link', taskPrompt: '', isGate: true } as EmbeddedToolBlock;
+    case 'guided_tool':     return { blockId, type, title: '', tool: 'sap', url: '',
+        layout: 'side_by_side', instructions: [], isGate: true } as GuidedToolBlock;
     case 'knowledge_check': return { blockId, type, title: '', questions: [] } as KnowledgeCheckBlock;
     case 'checklist':       return { blockId, type, title: '', items: [] } as ChecklistBlock;
-    case 'branching_note':  return { blockId, type, trigger: '', paths: [] } as BranchingNoteBlock;
   }
 }
 
@@ -83,6 +86,7 @@ function fromRecipe(r: any): Draft {
   const docs = r.backgroundDocs ?? [];
   return {
     ...EMPTY, ...r,
+    parameters:     r.parameters ?? [],
     steps:          r.steps ?? [],
     pastedDoc:      docs.find((d: any) => d.type === 'text')?.content ?? '',
     docLinks:       docs.filter((d: any) => d.type === 'link').map((d: any) => ({ url: d.content, label: d.label ?? d.content })),
@@ -138,10 +142,9 @@ function bodyText(html: string): string {
 
 const BLOCK_LABELS: Record<ContentBlock['type'], string> = {
   rich_text:       'Rich text',
-  embedded_tool:   'Embedded tool',
+  guided_tool:     'Guided tool',
   knowledge_check: 'Knowledge check',
   checklist:       'Checklist',
-  branching_note:  'Branching note',
 };
 
 // ── page ──────────────────────────────────────────────────────────────────────
@@ -184,8 +187,10 @@ export function RecipeFormPage() {
       for (const b of s.blocks) {
         if (b.type === 'rich_text' && !bodyText(b.body))
           errs.push(`Rich text block in step ${s.stepNumber} has no body.`);
-        if (b.type === 'embedded_tool' && !b.title.trim())
-          errs.push(`Embedded tool block in step ${s.stepNumber} needs a title.`);
+        if (b.type === 'guided_tool' && !b.title.trim())
+          errs.push(`Guided tool block in step ${s.stepNumber} needs a title.`);
+        if (b.type === 'guided_tool' && !b.instructions.some(i => i.text.trim()))
+          errs.push(`Guided tool block in step ${s.stepNumber} needs at least one instruction.`);
         if (b.type === 'knowledge_check' && !b.questions.length)
           errs.push(`Knowledge check in step ${s.stepNumber} has no questions.`);
         if (b.type === 'knowledge_check')
@@ -194,8 +199,6 @@ export function RecipeFormPage() {
               errs.push(`A multiple-choice question in step ${s.stepNumber} needs at least 2 options.`);
         if (b.type === 'checklist' && !b.items.length)
           errs.push(`Checklist in step ${s.stepNumber} has no items.`);
-        if (b.type === 'branching_note' && b.paths.length < 2)
-          errs.push(`Branching note in step ${s.stepNumber} needs at least 2 paths.`);
       }
     }
     return errs;
@@ -208,6 +211,7 @@ export function RecipeFormPage() {
       moduleDescription: d.moduleDescription.trim(),
       learningOutcomes: d.learningOutcomes.map(o => o.trim()).filter(Boolean),
       keyConcepts: d.keyConcepts.filter(c => c.term.trim()),
+      parameters: d.parameters.filter(p => p.key.trim()).map(p => ({ key: p.key.trim(), label: p.label.trim() })),
       steps: d.steps.map((s, i) => ({ ...s, stepNumber: i + 1 })),
       rubricDimensions: d.rubricDimensions.filter(x => x.name.trim()),
       probingRules: d.probingRules.filter(p => p.trigger.trim()),
@@ -337,10 +341,33 @@ export function RecipeFormPage() {
       <Section title="★ 4. Steps &amp; content">
         <p style={{ fontSize: 12, color: '#777', marginTop: 0 }}>
           A module is a sequence of <strong>steps</strong>; each step contains one or more
-          <strong> content blocks</strong>. Put a rich-text block next to an embedded-tool block
-          when instructions should sit beside the tool. Steps tagged to learning outcomes
-          (with an understanding note) are what the AI probes on.
+          <strong> content blocks</strong> and is shown as one wizard screen to the student.
+          Steps tagged to learning outcomes (with an understanding note) are what the AI probes on.
         </p>
+
+        <div style={{ border: '1px solid #dfe7e0', borderRadius: 6, padding: 12, marginBottom: 12, background: '#f4faf6' }}>
+          <label style={lbl}>Module parameters (optional)</label>
+          <p style={{ fontSize: 12, color: '#777', marginTop: 0 }}>
+            Keys used as <code>{'{key}'}</code> placeholders in guided-tool instructions.
+            Each student's values come from the parameter table row for their assigned
+            tool account — e.g. key <code>orderQty</code> renders as <code>50</code> for one
+            student and <code>75</code> for another.
+          </p>
+          <ListEditor items={d.parameters} addLabel="Add parameter"
+            onAdd={() => set({ parameters: [...d.parameters, { key: '', label: '' }] })}
+            renderItem={(p, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                <input style={{ ...input, flex: 1 }} placeholder="key (e.g. orderQty)" value={p.key}
+                  onChange={e => setItem('parameters', i, { key: e.target.value })} />
+                <input style={{ ...input, flex: 2 }} placeholder="Label (e.g. Order quantity)" value={p.label}
+                  onChange={e => setItem('parameters', i, { label: e.target.value })} />
+                <Move first={i === 0} last={i === d.parameters.length - 1}
+                  onUp={() => set({ parameters: move(d.parameters, i, -1) })}
+                  onDown={() => set({ parameters: move(d.parameters, i, 1) })}
+                  onDel={() => set({ parameters: d.parameters.filter((_, j) => j !== i) })} />
+              </div>
+            )} />
+        </div>
 
         {d.steps.map((s, i) => (
           <div key={s.stepId} style={{ border: '1px solid #cdd7e4', borderRadius: 6, padding: 14, marginBottom: 12, background: '#fbfcfe' }}>
@@ -574,7 +601,7 @@ function BlockEditor({ block, onChange, onMove, onDel, first, last }: {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#666' }}>
           {BLOCK_LABELS[block.type]}
-          {block.type === 'embedded_tool' && block.isGate ? ' · gate' : ''}
+          {block.type === 'guided_tool' && block.isGate ? ' · gate' : ''}
         </span>
         <Move first={first} last={last} onUp={() => onMove(-1)} onDown={() => onMove(1)} onDel={onDel} />
       </div>
@@ -592,29 +619,8 @@ function BlockEditor({ block, onChange, onMove, onDel, first, last }: {
         </>
       )}
 
-      {block.type === 'embedded_tool' && (
-        <>
-          <input style={{ ...input, marginBottom: 8 }} placeholder="Title (required)" value={block.title}
-            onChange={e => onChange({ ...block, title: e.target.value })} />
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <input style={{ ...input, flex: 1 }} placeholder="Tool name (e.g. sap)" value={block.tool}
-              onChange={e => onChange({ ...block, tool: e.target.value })} />
-            <select style={{ ...input, width: 130 }} value={block.launch}
-              onChange={e => onChange({ ...block, launch: e.target.value as 'link' | 'embed' })}>
-              <option value="link">Linked (opens out)</option>
-              <option value="embed">Embedded (framed)</option>
-            </select>
-          </div>
-          <input style={{ ...input, marginBottom: 8 }} placeholder="URL (optional)" value={block.url ?? ''}
-            onChange={e => onChange({ ...block, url: e.target.value })} />
-          <textarea style={{ ...input, minHeight: 50 }} placeholder="Task prompt — short pointer; full instructions belong in a rich-text block"
-            value={block.taskPrompt ?? ''} onChange={e => onChange({ ...block, taskPrompt: e.target.value })} />
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, marginTop: 8 }}>
-            <input type="checkbox" checked={block.isGate}
-              onChange={e => onChange({ ...block, isGate: e.target.checked })} />
-            Gate — student must complete this tool task before continuing
-          </label>
-        </>
+      {block.type === 'guided_tool' && (
+        <GuidedToolEditor block={block} onChange={onChange} />
       )}
 
       {block.type === 'knowledge_check' && (
@@ -647,30 +653,74 @@ function BlockEditor({ block, onChange, onMove, onDel, first, last }: {
         </>
       )}
 
-      {block.type === 'branching_note' && (
-        <>
-          <input style={{ ...input, marginBottom: 8 }} placeholder='Trigger condition — e.g. "Something went wrong in VA11?"' value={block.trigger}
-            onChange={e => onChange({ ...block, trigger: e.target.value })} />
-          <ListEditor items={block.paths} addLabel="Add path"
-            onAdd={() => onChange({ ...block, paths: [...block.paths, { pathId: `p-${uid()}`, label: '', body: '' }] })}
-            renderItem={(p, i) => (
-              <div key={p.pathId} style={{ marginBottom: 8, padding: 8, background: '#f7f9fc', borderRadius: 4 }}>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                  <input style={input} placeholder='Path label — e.g. "If you see an authorization error"' value={p.label}
-                    onChange={e => onChange({ ...block, paths: block.paths.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
-                  <Move first={i === 0} last={i === block.paths.length - 1}
-                    onUp={() => onChange({ ...block, paths: move(block.paths, i, -1) })}
-                    onDown={() => onChange({ ...block, paths: move(block.paths, i, 1) })}
-                    onDel={() => onChange({ ...block, paths: block.paths.filter((_, j) => j !== i) })} />
-                </div>
-                <textarea style={{ ...input, minHeight: 40 }} placeholder="Content shown when this path applies" value={p.body}
-                  onChange={e => onChange({ ...block, paths: block.paths.map((x, j) => j === i ? { ...x, body: e.target.value } : x) })} />
-              </div>
-            )} />
-          <div style={{ fontSize: 12, color: '#888' }}>Lightweight conditional content — handles common variations without forking the module.</div>
-        </>
-      )}
     </div>
+  );
+}
+
+// ── guided tool editor ────────────────────────────────────────────────────────
+function GuidedToolEditor({ block, onChange }: {
+  block: GuidedToolBlock;
+  onChange: (b: GuidedToolBlock) => void;
+}) {
+  const setIns = (i: number, patch: Partial<GuidedInstruction>) =>
+    onChange({ ...block, instructions: block.instructions.map((x, j) => j === i ? { ...x, ...patch } : x) });
+
+  return (
+    <>
+      <input style={{ ...input, marginBottom: 8 }} placeholder="Title (required)" value={block.title}
+        onChange={e => onChange({ ...block, title: e.target.value })} />
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <input style={{ ...input, flex: 1 }} placeholder="Tool name (e.g. sap)" value={block.tool}
+          onChange={e => onChange({ ...block, tool: e.target.value })} />
+        <select style={{ ...input, width: 170 }} value={block.layout}
+          onChange={e => onChange({ ...block, layout: e.target.value as GuidedToolBlock['layout'] })}>
+          <option value="side_by_side">Instructions beside app</option>
+          <option value="stacked">Instructions above app</option>
+        </select>
+      </div>
+      <input style={{ ...input, marginBottom: 10 }} placeholder="App URL (optional — framed in place when set)" value={block.url ?? ''}
+        onChange={e => onChange({ ...block, url: e.target.value })} />
+
+      <label style={lbl}>Instructions — use {'{key}'} for parameter values</label>
+      <ListEditor items={block.instructions} addLabel="Add instruction"
+        onAdd={() => onChange({ ...block, instructions: [...block.instructions, { instructionId: `gi-${uid()}`, text: '', branches: [] }] })}
+        renderItem={(ins: GuidedInstruction, i: number) => (
+          <div key={ins.instructionId} style={{ marginBottom: 8, padding: 8, background: '#f7f9fc', borderRadius: 4 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+              <input style={input} placeholder={'e.g. Enter {orderQty} in the Quantity field'} value={ins.text}
+                onChange={e => setIns(i, { text: e.target.value })} />
+              <Move first={i === 0} last={i === block.instructions.length - 1}
+                onUp={() => onChange({ ...block, instructions: move(block.instructions, i, -1) })}
+                onDown={() => onChange({ ...block, instructions: move(block.instructions, i, 1) })}
+                onDel={() => onChange({ ...block, instructions: block.instructions.filter((_, j) => j !== i) })} />
+            </div>
+            {(ins.branches ?? []).map((br, bi) => (
+              <div key={br.branchId} style={{ display: 'flex', gap: 6, marginBottom: 4, marginLeft: 12 }}>
+                <input style={{ ...input, flex: 1, fontSize: 12 }} placeholder='If … (condition)' value={br.condition}
+                  onChange={e => setIns(i, { branches: ins.branches!.map((x, j) => j === bi ? { ...x, condition: e.target.value } : x) })} />
+                <input style={{ ...input, flex: 2, fontSize: 12 }} placeholder="then — alternative instruction" value={br.text}
+                  onChange={e => setIns(i, { branches: ins.branches!.map((x, j) => j === bi ? { ...x, text: e.target.value } : x) })} />
+                <button type="button" style={{ ...smallBtn, color: '#a33' }}
+                  onClick={() => setIns(i, { branches: ins.branches!.filter((_, j) => j !== bi) })}>✕</button>
+              </div>
+            ))}
+            <button type="button" style={{ ...smallBtn, fontSize: 11, marginLeft: 12 }}
+              onClick={() => setIns(i, { branches: [...(ins.branches ?? []), { branchId: `gb-${uid()}`, condition: '', text: '' }] })}>
+              + branch
+            </button>
+          </div>
+        )} />
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>
+        Check off instructions to drive the student's progress bar. Branches are
+        lightweight "if you hit X → do Y" variants shown on demand.
+      </div>
+
+      <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, marginTop: 8 }}>
+        <input type="checkbox" checked={block.isGate}
+          onChange={e => onChange({ ...block, isGate: e.target.checked })} />
+        Gate — student must complete this tool task before continuing
+      </label>
+    </>
   );
 }
 
