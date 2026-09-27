@@ -6,17 +6,17 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore, AdminRole } from '../../store/authStore';
 
+// The unified 'admin' account sees one nav entry per section — the dashboard
+// at / is the hub linking to individual pages. Legacy single-role dev
+// accounts keep their own section's links.
 const NAV_LINKS: Record<AdminRole, { label: string; to: string }[]> = {
-  author:     [{ label: 'Recipes',    to: '/author/recipes'    }],
-  instructor: [{ label: 'Modules',    to: '/instructor/modules' },
-               { label: 'Validation', to: '/instructor/validation' }],
-  researcher: [{ label: 'Data',       to: '/researcher/data'   },
-               { label: 'Export',     to: '/researcher/export' }],
-  admin:      [{ label: 'Modules',    to: '/admin/modules'     },
-               { label: 'SAP Pool',   to: '/admin/sap-pool'    },
-               { label: 'Audit Log',  to: '/admin/audit-log'   },
-               { label: 'Health',     to: '/admin/health'      },
-               { label: 'IRB',        to: '/admin/irb'         }],
+  author:     [{ label: 'Authoring',  to: '/author/recipes'    }],
+  instructor: [{ label: 'Instructor', to: '/instructor/modules' }],
+  researcher: [{ label: 'Research',   to: '/researcher/data'   }],
+  admin:      [{ label: 'Authoring',  to: '/author/recipes'    },
+               { label: 'Instructor', to: '/instructor/modules' },
+               { label: 'Research',   to: '/researcher/data'   },
+               { label: 'Admin',      to: '/admin/modules'     }],
 };
 
 interface Props { children: React.ReactNode; }
@@ -39,6 +39,9 @@ export function AppShell({ children }: Props) {
         display: 'flex', alignItems: 'center', gap: 24, height: 52,
       }}>
         <span style={{ fontWeight: 700, fontSize: 16, marginRight: 16 }}>CAP Admin</span>
+        <Link to="/" style={{ color: '#fff', textDecoration: 'none', fontSize: 14 }}>
+          Home
+        </Link>
         {links.map(l => (
           <Link key={l.to} to={l.to}
             style={{ color: '#fff', textDecoration: 'none', fontSize: 14 }}>

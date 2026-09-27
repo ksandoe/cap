@@ -194,6 +194,7 @@ function seedAdminUsers(): void {
   if (users.length) return;
   // Dev-only admin login — production uses Aurora admin_users + institutional SSO
   users.push(
+    { email: 'cap@cap.local',        password: 'dev-cap-password',        role: 'admin' },
     { email: 'admin@cap.local',      password: 'dev-admin-password',      role: 'admin' },
     { email: 'author@cap.local',     password: 'dev-author-password',     role: 'author' },
     { email: 'instructor@cap.local', password: 'dev-instructor-password', role: 'instructor' },

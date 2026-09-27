@@ -17,6 +17,7 @@
  */
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage }        from './pages/LoginPage';
+import { DashboardPage }    from './pages/DashboardPage';
 import { AuthorLayout }     from './pages/author/AuthorLayout';
 import { InstructorLayout } from './pages/instructor/InstructorLayout';
 import { ResearcherLayout } from './pages/researcher/ResearcherLayout';
@@ -33,7 +34,7 @@ export default function App() {
         <Route path="/instructor/*" element={<InstructorLayout />} />
         <Route path="/researcher/*" element={<ResearcherLayout />} />
         <Route path="/admin/*"      element={<AdminLayout />} />
-        <Route path="/"             element={<Navigate to="/author" replace />} />
+        <Route path="/"             element={<DashboardPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />

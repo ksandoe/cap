@@ -12,13 +12,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { API_BASE } from '../services/api';
 
-const ROLE_HOME: Record<string, string> = {
-  author:     '/author/recipes',
-  instructor: '/instructor/modules',
-  researcher: '/researcher/data',
-  admin:      '/admin/modules',
-};
-
 export function LoginPage() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
@@ -39,7 +32,7 @@ export function LoginPage() {
       if (!resp.ok) throw new Error('Invalid credentials.');
       const { token, role } = await resp.json();
       setAuth(token, role, email);
-      navigate(ROLE_HOME[role] ?? '/');
+      navigate('/');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -80,7 +73,7 @@ export function LoginPage() {
           </button>
         </form>
         <p style={{ color: '#aaa', fontSize: 12, marginTop: 16, textAlign: 'center' }}>
-          TODO: replace with institutional SSO
+          Dev account: cap@cap.local / dev-cap-password — replace with institutional SSO
         </p>
       </div>
     </div>
