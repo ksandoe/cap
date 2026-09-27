@@ -54,6 +54,9 @@ adminRouter.post('/research/query',              requireRole(['researcher','admi
 adminRouter.post('/research/export',             requireRole(['researcher','admin']), researcher.exportResearch);
 adminRouter.get( '/research/consent',            requireRole(['researcher','admin']), researcher.getConsentConfig);
 
+// Recipe image uploads — any content role can embed screenshots
+adminRouter.post('/images',                       requireRole(['author','instructor','researcher','admin']), adminSvc.uploadImage);
+
 // ── Admin-only routes ─────────────────────────────────────────────────────────
 // Module config (passing thresholds) is tunable by instructors too
 adminRouter.get( '/module-config/:id',           requireRole(['instructor','admin']), adminSvc.getModuleConfig);

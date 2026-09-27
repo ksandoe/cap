@@ -56,6 +56,18 @@ app.get('/.well-known/jwks.json', (_req, res) => {
 });
 app.get('/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
+// Recipe image assets — public read (screenshots, no student data)
+app.get('/assets/:id', async (req, res, next) => {
+  try {
+    const { assetDb } = require('./db/assetDb');
+    const a = await assetDb.get(req.params.id);
+    if (!a) { res.status(404).end(); return; }
+    res.setHeader('Content-Type', a.contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(Buffer.from(a.data, 'base64'));
+  } catch (err) { next(err); }
+});
+
 // ── Dev/demo routes (Canvas launchpad; never enable in real production) ──────
 if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_DEV_ROUTES === 'true') {
   if (USE_LOCAL_DB || !auroraConfigured()) {

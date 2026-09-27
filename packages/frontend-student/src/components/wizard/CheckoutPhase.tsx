@@ -17,14 +17,19 @@ const KICKOFF =
 const PHASE_RE      = /\[PHASE:(\d)\]/g;
 const ASSESSMENT_RE = /\[ASSESSMENT:(\{.*\})\]/s;
 
-// Friendly progress cues keyed on the agent's [PHASE:n] markers, so students
-// know the conversation is finite and how far along they are.
-const CONVO_CUES: Record<number, { label: string; frac: number }> = {
-  1: { label: 'Getting started',                    frac: 0.15 },
-  2: { label: 'Reflecting on your work',            frac: 0.50 },
-  3: { label: 'Almost done — thinking ahead',       frac: 0.80 },
-  4: { label: 'Wrapping up — nearly there',         frac: 0.95 },
-};
+// Friendly progress cues so students know the conversation is finite.
+// The agent is asked to emit [PHASE:n] markers, but small models drop
+// them — so the floor of the estimate is always the turn count, which
+// guarantees the bar visibly moves every reply.
+const EXPECTED_TURNS = 7;   // prompt budgets ~6-8 student turns
+const PHASE_CUES: Record<number, number> = { 1: 0.15, 2: 0.5, 3: 0.8, 4: 0.95 };
+
+function cueLabel(frac: number): string {
+  if (frac < 0.25) return 'Getting started';
+  if (frac < 0.55) return 'Reflecting on your work';
+  if (frac < 0.85) return 'Almost done — thinking ahead';
+  return 'Wrapping up — nearly there';
+}
 
 // Small models sometimes stack a second question despite the prompt. Keep
 // everything up to and including the first question mark — the contract is
@@ -55,6 +60,11 @@ export function CheckoutPhase() {
 
   const maxTurns = recipe?.maxTurns ?? 20;
   const userTurns = transcript.filter(t => t.role === 'user' && !t.hidden).length;
+  // Turn-count floor + marker override — either can pull the cue forward
+  const convoFrac = Math.max(
+    Math.min(0.92, userTurns / EXPECTED_TURNS),
+    PHASE_CUES[convoPhase] ?? 0.15,
+  );
 
   // Kick off the conversation with a hidden seed message (first mount only)
   useEffect(() => {
@@ -139,13 +149,10 @@ export function CheckoutPhase() {
         not a test. Answer in your own words.
       </p>
 
+      <p className="convo-cue" role="status">{cueLabel(convoFrac)}</p>
       <div className="convo-progress" aria-hidden="true">
-        <div className="convo-progress-bar"
-          style={{ width: `${Math.round((CONVO_CUES[convoPhase]?.frac ?? 0.15) * 100)}%` }} />
+        <div className="convo-progress-bar" style={{ width: `${Math.round(convoFrac * 100)}%` }} />
       </div>
-      <p className="muted convo-cue" role="status">
-        {CONVO_CUES[convoPhase]?.label ?? 'In conversation'}
-      </p>
 
       <div className="chat" ref={scrollRef} aria-live="polite">
         {visible.map((t, i) => (

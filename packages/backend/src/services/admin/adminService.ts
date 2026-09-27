@@ -5,8 +5,38 @@
  * TODO: implement each handler.
  */
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import { releaseSapAccount as poolRelease } from '../sap/sapPool';
 import { moduleConfigDb, DEFAULT_THRESHOLDS } from '../../db/moduleConfigDb';
+import { assetDb } from '../../db/assetDb';
+
+// ── Recipe image uploads ──────────────────────────────────────────────────────
+// Authors embed screenshots in rich-text/instruction fields. Stored as base64
+// in cap-assets (keeps local dev identical to prod); the admin client
+// downscales before posting. Decoded cap keeps the base64 item under
+// DynamoDB's 400KB limit.
+const MAX_IMAGE_BYTES = 280 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+
+export async function uploadImage(req: Request, res: Response): Promise<void> {
+  const { data, contentType, moduleId } = req.body ?? {};
+  if (!data || typeof data !== 'string' || !ALLOWED_IMAGE_TYPES.has(contentType)) {
+    res.status(400).json({ error: 'Provide {data: base64, contentType: image/png|jpeg|gif|webp}.' });
+    return;
+  }
+  const bytes = Buffer.from(data, 'base64');
+  if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) {
+    res.status(413).json({ error: `Image too large — keep it under ~${Math.round(MAX_IMAGE_BYTES / 1024)}KB (crop or downscale the screenshot).` });
+    return;
+  }
+  const assetId = `img-${crypto.randomUUID()}`;
+  await assetDb.put({
+    assetId, moduleId, contentType,
+    data: bytes.toString('base64'),
+    createdAt: new Date().toISOString(),
+  });
+  res.json({ url: `/assets/${assetId}`, bytes: bytes.length });
+}
 
 export async function getModuleConfig(req: Request, res: Response): Promise<void> {
   const cfg = await moduleConfigDb.getConfig(req.params.id);

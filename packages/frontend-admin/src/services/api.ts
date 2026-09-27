@@ -47,6 +47,8 @@ export const adminApi = {
     consentConfig:(moduleId: string)  => request<any>('GET',  `/admin/research/consent?moduleId=${moduleId}`),
   },
   admin: {
+    uploadImage: (img: { data: string; contentType: string; moduleId?: string }) =>
+                        request<{ url: string; bytes: number }>('POST', '/admin/images', img),
     moduleConfig: {
       get:  (moduleId: string)        => request<any>('GET',  `/admin/module-config/${moduleId}`),
       save: (config: any)             => request<any>('POST', '/admin/module-config', config),

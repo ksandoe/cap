@@ -58,13 +58,13 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* ── Checkout chat ───────────────────────────────────────────────────────── */
 .convo-progress {
-  height: 4px; border-radius: 999px; background: #eef1f6;
-  overflow: hidden; margin: 4px 0 6px;
+  height: 7px; border-radius: 999px; background: #e4e9f2;
+  overflow: hidden; margin: 2px 0 14px; border: 1px solid #d4dbe7;
 }
 .convo-progress-bar {
-  height: 100%; background: #1D4E8C; transition: width .4s ease;
+  height: 100%; background: #1D4E8C; transition: width .5s ease;
 }
-.convo-cue { margin: 0 0 10px; font-size: 13px; }
+.convo-cue { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: #1D4E8C; }
 .chat {
   background: #fff; border: 1px solid #e2e2e0; border-radius: 8px;
   min-height: 280px; max-height: 55vh; overflow-y: auto;

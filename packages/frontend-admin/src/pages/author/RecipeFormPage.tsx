@@ -17,7 +17,7 @@
  * Saving creates a new version (AUT-09). "Preview check-in questions" sends
  * the unsaved draft to the backend (AUT-08).
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -125,25 +125,87 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const c = [...arr]; [c[i], c[j]] = [c[j], c[i]]; return c;
 }
 
-const QUILL_MODULES = {
-  toolbar: [
-    [{ header: [1, 2, 3, false] }],
-    ['bold', 'italic', 'underline', 'blockquote'],
-    [{ list: 'ordered' }, { list: 'bullet' }],
-    ['link', 'image'],
-    ['clean'],
-  ],
-};
+/** Quill toolbar configs — factory so each editor gets the image-upload
+ *  handler bound to the component (uploads to cap-assets via /admin/images
+ *  rather than embedding base64 into the recipe JSON). */
+const quillModules = (imageHandler: () => void) => ({
+  toolbar: {
+    container: [
+      [{ header: [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'blockquote'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['link', 'image'],
+      ['clean'],
+    ],
+    handlers: { image: imageHandler },
+  },
+});
 
 /** Slimmer toolbar for inline fields like guided-tool instructions. */
-const QUILL_MODULES_INLINE = {
-  toolbar: [
-    ['bold', 'italic', 'underline'],
-    [{ list: 'ordered' }, { list: 'bullet' }],
-    ['link', 'image'],
-    ['clean'],
-  ],
-};
+const quillModulesInline = (imageHandler: () => void) => ({
+  toolbar: {
+    container: [
+      ['bold', 'italic', 'underline'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['link', 'image'],
+      ['clean'],
+    ],
+    handlers: { image: imageHandler },
+  },
+});
+
+// ── Image upload helpers ──────────────────────────────────────────────────────
+// Small images pass through unchanged (keeps PNG transparency). Larger
+// screenshots are downscaled on a canvas and re-encoded as JPEG so the
+// base64 payload stays under the backend's ~280KB decoded limit (which in
+// turn keeps the DynamoDB item under 400KB).
+
+const IMAGE_PASS_THROUGH = 250 * 1024;
+const IMAGE_MAX_BYTES    = 270 * 1024;
+const IMAGE_MAX_WIDTH    = 1400;
+
+function readAsDataURL(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as string);
+    r.onerror = () => rej(new Error('Could not read the image file.'));
+    r.readAsDataURL(file);
+  });
+}
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('That file is not a readable image.')); };
+    img.src = url;
+  });
+}
+
+async function prepareImage(file: File): Promise<{ dataUrl: string; contentType: string }> {
+  if (file.size <= IMAGE_PASS_THROUGH)
+    return { dataUrl: await readAsDataURL(file), contentType: file.type };
+  const img = await loadImage(file);
+  let { width, height } = img;
+  if (width > IMAGE_MAX_WIDTH) {
+    height = Math.round(height * IMAGE_MAX_WIDTH / width);
+    width = IMAGE_MAX_WIDTH;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not process the image in this browser.');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+  for (const q of [0.85, 0.7, 0.55, 0.4]) {
+    const url = canvas.toDataURL('image/jpeg', q);
+    if (Math.round(url.length * 3 / 4) <= IMAGE_MAX_BYTES)
+      return { dataUrl: url, contentType: 'image/jpeg' };
+  }
+  throw new Error('Screenshot is still too large after downscaling — crop it tighter.');
+}
 
 /** Visible text length of a rich-text body (strips HTML for validation). */
 function bodyText(html: string): string {
@@ -167,6 +229,32 @@ export function RecipeFormPage() {
   const [saved, setSaved]   = useState<{ version: number; updatedAt: string } | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [preview, setPreview] = useState<any[] | 'loading' | null>(null);
+
+  // Quill "image" toolbar handler — uploads to cap-assets via the API and
+  // inserts the returned URL instead of embedding base64 into the recipe
+  // (which would blow the DynamoDB 400KB item limit).
+  const imageUpload = useCallback(function(this: any) {
+    const quill = this.quill;
+    const picker = document.createElement('input');
+    picker.type = 'file';
+    picker.accept = 'image/png,image/jpeg,image/gif,image/webp';
+    picker.onchange = async () => {
+      const file = picker.files?.[0];
+      if (!file) return;
+      try {
+        const { dataUrl, contentType } = await prepareImage(file);
+        const { url } = await adminApi.admin.uploadImage({
+          data: dataUrl.split(',')[1], contentType, moduleId: d.moduleId,
+        });
+        const range = quill.getSelection(true);
+        quill.insertEmbed(range.index, 'image', url, 'user');
+        quill.setSelection(range.index + 1, 'user');
+      } catch (e: any) {
+        setErrors(prev => [...prev, `Image upload failed: ${e.message ?? e}`]);
+      }
+    };
+    picker.click();
+  }, [d.moduleId]);
 
   useEffect(() => {
     if (!id) return;
@@ -417,7 +505,8 @@ export function RecipeFormPage() {
                 onChange={nb => setStep(i, { blocks: s.blocks.map((x, j) => j === bi ? nb : x) })}
                 onMove={dir => setStep(i, { blocks: move(s.blocks, bi, dir) })}
                 onDel={() => setStep(i, { blocks: s.blocks.filter((_, j) => j !== bi) })}
-                first={bi === 0} last={bi === s.blocks.length - 1} />
+                first={bi === 0} last={bi === s.blocks.length - 1}
+                imageUpload={imageUpload} />
             ))}
 
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -599,12 +688,13 @@ export function RecipeFormPage() {
 }
 
 // ── block editor ──────────────────────────────────────────────────────────────
-function BlockEditor({ block, onChange, onMove, onDel, first, last }: {
+function BlockEditor({ block, onChange, onMove, onDel, first, last, imageUpload }: {
   block: ContentBlock;
   onChange: (b: ContentBlock) => void;
   onMove: (dir: -1 | 1) => void;
   onDel: () => void;
   first: boolean; last: boolean;
+  imageUpload: () => void;
 }) {
   return (
     <div style={{ border: '1px solid #ddd', borderRadius: 6, padding: 12, marginBottom: 8, background: '#fff' }}>
@@ -624,13 +714,13 @@ function BlockEditor({ block, onChange, onMove, onDel, first, last }: {
             <ReactQuill theme="snow" value={block.body}
               onChange={html => onChange({ ...block, body: html })}
               placeholder="Body — prose, instructions, callouts"
-              modules={QUILL_MODULES} />
+              modules={quillModules(imageUpload)} />
           </div>
         </>
       )}
 
       {block.type === 'guided_tool' && (
-        <GuidedToolEditor block={block} onChange={onChange} />
+        <GuidedToolEditor block={block} onChange={onChange} imageUpload={imageUpload} />
       )}
 
       {block.type === 'knowledge_check' && (
@@ -668,9 +758,10 @@ function BlockEditor({ block, onChange, onMove, onDel, first, last }: {
 }
 
 // ── guided tool editor ────────────────────────────────────────────────────────
-function GuidedToolEditor({ block, onChange }: {
+function GuidedToolEditor({ block, onChange, imageUpload }: {
   block: GuidedToolBlock;
   onChange: (b: GuidedToolBlock) => void;
+  imageUpload: () => void;
 }) {
   const setIns = (i: number, patch: Partial<GuidedInstruction>) =>
     onChange({ ...block, instructions: block.instructions.map((x, j) => j === i ? { ...x, ...patch } : x) });
@@ -701,7 +792,7 @@ function GuidedToolEditor({ block, onChange }: {
                 <ReactQuill theme="snow" value={ins.text}
                   onChange={html => setIns(i, { text: html })}
                   placeholder={'e.g. Enter {orderQty} in the Quantity field'}
-                  modules={QUILL_MODULES_INLINE} />
+                  modules={quillModulesInline(imageUpload)} />
               </div>
               <Move first={i === 0} last={i === block.instructions.length - 1}
                 onUp={() => onChange({ ...block, instructions: move(block.instructions, i, -1) })}

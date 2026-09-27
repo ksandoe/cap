@@ -28,14 +28,16 @@ const ddbRecipeDb = {
     // NOTE: no Limit here — DynamoDB applies Limit BEFORE FilterExpression,
     // so a limit of 1 can fetch only an inactive version and then filter it
     // away, yielding a false negative. Query the module's (small) version
-    // list and take the first active one.
+    // list and take the highest-version active one — if a stray second
+    // active version ever exists (e.g. a reseed), the newest save wins.
     const r = await ddb.send(new QueryCommand({
       TableName: TABLE,
       KeyConditionExpression: 'moduleId = :mid',
       FilterExpression: 'isActive = :t',
       ExpressionAttributeValues: { ':mid': moduleId, ':t': true },
     }));
-    return (r.Items?.[0] as Recipe) ?? null;
+    const actives = (r.Items ?? []).sort((a: any, b: any) => b.version - a.version);
+    return (actives[0] as Recipe) ?? null;
   },
 
   async saveRecipe(recipe: Partial<Recipe>): Promise<Recipe> {

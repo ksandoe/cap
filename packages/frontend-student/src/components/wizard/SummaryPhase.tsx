@@ -87,9 +87,6 @@ export function SummaryPhase() {
             </button>
           </>
         )}
-        <button className="secondary" onClick={() => window.print()}>
-          Print summary
-        </button>
         <button className="secondary" onClick={() => navigate('/')}>
           Return to course
         </button>

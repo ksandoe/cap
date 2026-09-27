@@ -51,6 +51,15 @@ aws dynamodb create-table --table-name cap-evaluations \
   --attribute-definitions AttributeName=attemptId,AttributeType=S \
   --key-schema AttributeName=attemptId,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST
+
+# Recipe image assets (screenshots embedded in rich text / instructions).
+# Item shape: { assetId, moduleId?, contentType, data(base64), createdAt }
+# Images are stored base64 and served via GET /assets/:id — keeps local dev
+# identical to prod; the admin client downscales to ~280KB before upload.
+aws dynamodb create-table --table-name cap-assets \
+  --attribute-definitions AttributeName=assetId,AttributeType=S \
+  --key-schema AttributeName=assetId,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST
 ```
 
 ## 2. Lambda role permissions
@@ -72,7 +81,7 @@ DYNAMODB_TABLE_PARAMS=cap-params \
   npx tsx scripts/seed-demo.ts
 
 aws lambda update-function-configuration --function-name cap-demo-api \
-  --environment "Variables={USE_LOCAL_DB=false,DYNAMODB_TABLE_SESSIONS=cap-sessions,DYNAMODB_TABLE_RECIPES=cap-recipes,DYNAMODB_TABLE_SAP_POOL=cap-sap-pool,DYNAMODB_TABLE_PARAMS=cap-params,DYNAMODB_TABLE_MODULE_CONFIG=cap-module-config,DYNAMODB_TABLE_EVALUATIONS=cap-evaluations,AWS_REGION=us-east-1,LLM_MODE=openai,OPENAI_API_KEY=<key>,OPENAI_MODEL=gpt-4o-mini,SAP_MODE=stub,CANVAS_MODE=stub,CREDLY_MODE=stub,ENABLE_DEV_ROUTES=true,FRONTEND_URL=https://gtdqd19poa.execute-api.us-east-1.amazonaws.com,SESSION_JWT_SECRET=<secret>,SESSION_TTL_HOURS=24,SAVED_TTL_DAYS=7}"
+  --environment "Variables={USE_LOCAL_DB=false,DYNAMODB_TABLE_SESSIONS=cap-sessions,DYNAMODB_TABLE_RECIPES=cap-recipes,DYNAMODB_TABLE_SAP_POOL=cap-sap-pool,DYNAMODB_TABLE_PARAMS=cap-params,DYNAMODB_TABLE_MODULE_CONFIG=cap-module-config,DYNAMODB_TABLE_EVALUATIONS=cap-evaluations,DYNAMODB_TABLE_ASSETS=cap-assets,AWS_REGION=us-east-1,LLM_MODE=openai,OPENAI_API_KEY=<key>,OPENAI_MODEL=gpt-4o-mini,SAP_MODE=stub,CANVAS_MODE=stub,CREDLY_MODE=stub,ENABLE_DEV_ROUTES=true,FRONTEND_URL=https://gtdqd19poa.execute-api.us-east-1.amazonaws.com,SESSION_JWT_SECRET=<secret>,SESSION_TTL_HOURS=24,SAVED_TTL_DAYS=7}"
 ```
 
 ## 4. Aurora Data API (durable recipes/config — optional for the demo)

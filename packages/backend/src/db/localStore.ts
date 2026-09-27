@@ -66,14 +66,20 @@ function seedParams(): void {
   if (params.length) return;
   const pool = table('cap-sap-pool');
   pool.forEach((a, i) => {
+    // Mirrors the real assignment's variation points: every student gets a
+    // distinct customer reference (the modern stand-in for the 3-digit SAP
+    // ID), slightly different quantities, discounts, and probabilities —
+    // different but known results the evaluator can sanity-check.
     params.push({
       moduleId: DEMO_MODULE_ID,
       sapUsername: a.sapUsername,
       values: {
-        customer:     `100${(i % 10) + 1}`,
-        material:     'M-001',
-        orderQty:     String(10 + (i % 10) * 5),
-        discountRate: `${i % 10}%`,
+        custRef:       String(100 + i),
+        dxtrQty:       String(4 + (i % 4)),
+        prtrQty:       String(2 + (i % 3)),
+        itemDiscount:  String(40 + (i % 4) * 10),
+        orderDiscount: String(4 + (i % 3)),
+        orderProb:     String(60 + (i % 4) * 10),
       },
     });
   });
@@ -89,8 +95,9 @@ function seedRecipe(): void {
     moduleId:          DEMO_MODULE_ID,
     moduleTitle:       'The Sales Process',
     moduleDescription:
-      'Students work through the SAP sales document flow — Inquiry, Quotation, ' +
-      'and Sales Order — and learn why each document exists and how data carries forward.',
+      'Philly Bikes, a prospective customer, wants pricing on two bicycle models. ' +
+      'Students work the SAP sales document flow — Inquiry, Quotation, and Sales ' +
+      'Order — and learn why each document exists and how data carries forward.',
     learningOutcomes: [
       'Explain the purpose of each document in the inquiry–quotation–order sequence.',
       'Describe how master data flows into and is reused by sales documents.',
@@ -102,6 +109,8 @@ function seedRecipe(): void {
       { term: 'Sales Order',  definition: 'A confirmed agreement to deliver; typically references a quotation or inquiry.' },
       { term: 'Document flow', definition: 'The linked chain of documents (inquiry → quotation → order) that carries data forward automatically.' },
       { term: 'Master data',  definition: 'Reusable records (customer, material) that populate sales documents rather than being re-entered.' },
+      { term: 'Expected order value', definition: 'Net value × order probability — an estimate of likely revenue used for pipeline reporting.' },
+      { term: 'Condition types', definition: 'Pricing building blocks (e.g. K004 item discount, RA00 net discount) that combine to calculate the final price.' },
     ],
     probingRules: [
       { trigger: 'Student describes a step without explaining its purpose',
@@ -113,10 +122,12 @@ function seedRecipe(): void {
     // table row for the student's assigned SAP account, and substituted into
     // guided-tool instruction text wherever {key} appears.
     parameters: [
-      { key: 'customer',     label: 'Customer number' },
-      { key: 'material',     label: 'Material number' },
-      { key: 'orderQty',     label: 'Order quantity' },
-      { key: 'discountRate', label: 'Discount rate' },
+      { key: 'custRef',       label: 'Customer reference (3-digit ID)' },
+      { key: 'dxtrQty',       label: 'Deluxe Touring bikes' },
+      { key: 'prtrQty',       label: 'Professional Touring bikes' },
+      { key: 'itemDiscount',  label: 'Deluxe item discount ($)' },
+      { key: 'orderDiscount', label: 'Order discount (%)' },
+      { key: 'orderProb',     label: 'Order probability (%)' },
     ],
     // Content model: module → steps → blocks. One screen per step in the
     // student wizard; guided-tool blocks carry the SAP instructions with
@@ -129,12 +140,17 @@ function seedRecipe(): void {
         understandingNote: 'Student should grasp the inquiry → quotation → order chain and why each document exists, not just the transaction codes.',
         blocks: [
           { blockId: 'cb-concept-1', type: 'rich_text',
-            title: 'Background: the SAP sales document flow',
-            body: '<p>SAP ERP tracks the sales process as a chain of linked documents: ' +
+            title: 'Scenario: Philly Bikes',
+            body: '<p><strong>Philly Bikes</strong>, a prospective customer, wants prices on ' +
+              'two models: the <em>Deluxe Touring Bike (black)</em> and the ' +
+              '<em>Professional Touring Bike (black)</em>. You will create three linked ' +
+              'documents to answer them.</p><p>SAP tracks the sales process as a chain: ' +
               '<strong>Inquiry → Quotation → Sales Order</strong>. Each document references its ' +
-              'predecessor, so master data and line items carry forward without ' +
-              're-keying.</p><p>Understanding <em>why</em> each document exists matters more ' +
-              'than memorizing transaction codes.</p>' },
+              'predecessor, so customer and material data carry forward without re-keying. ' +
+              'Understanding <em>why</em> each document exists matters more than memorizing ' +
+              'transaction codes.</p><p>Your task values (quantities, discounts, and your ' +
+              '3-digit customer reference) are highlighted in the instructions — they are ' +
+              'specific to you.</p>' },
           { blockId: 'cb-kc-1', type: 'knowledge_check',
             title: 'Quick self-check',
             questions: [
@@ -151,24 +167,32 @@ function seedRecipe(): void {
         ] },
       { stepId: 'st-inquiry', stepNumber: 2,
         title: 'Inquiry',
-        description: 'In the SAP sandbox, create an Inquiry (VA11) for your assigned customer requesting your assigned material and quantity.',
+        description: 'In the SAP sandbox, create an Inquiry for Philly Bikes — a non-binding record of what the customer asked for.',
         outcomeTagIndices: [0, 1],
-        understandingNote: 'Student should recognize that an inquiry records customer interest without committing either party, and that master data (customer, material) is reused rather than re-keyed.',
+        understandingNote: 'Student should recognize that an inquiry records customer interest without committing either party, that order probability drives the expected order value, and that master data is reused rather than re-keyed.',
         blocks: [
           { blockId: 'cb-gt-inq', type: 'guided_tool',
-            title: 'Create the inquiry (VA11)',
+            title: 'Create the inquiry',
             tool: 'sap',
             layout: 'side_by_side',
             isGate: true,
             instructions: [
-              { instructionId: 'gi-1', text: 'Log into your assigned SAP sandbox account and open transaction VA11 (Create Inquiry).' },
-              { instructionId: 'gi-2', text: 'Enter inquiry type AF, sales org 1000, distribution channel 10, division 00.',
+              { instructionId: 'gi-1', text: 'Log into your assigned SAP sandbox account and create an inquiry (Sales → Inquiry → Create, or transaction VA11).' },
+              { instructionId: 'gi-2', text: 'Enter inquiry type <strong>IN</strong>, sales organization <strong>UE00</strong>, distribution channel <strong>WH</strong>, division <strong>BI</strong>, then continue.',
                 branches: [
                   { branchId: 'gb-1', condition: 'If a field is rejected',
-                    text: 'Check the org data exactly: sales org 1000, channel 10, division 00 — typos here are the most common cause.' },
+                    text: 'Check the org data exactly: UE00 / WH / BI — typos here are the most common cause of errors.' },
                 ] },
-              { instructionId: 'gi-3', text: 'Enter sold-to party {customer} and add material {material} with quantity {orderQty}.' },
-              { instructionId: 'gi-4', text: 'Save and note the inquiry document number.' },
+              { instructionId: 'gi-3', text: 'Search the Sold-To Party using your customer reference {custRef} with country US, and select <strong>PHILLY BIKES</strong>.' },
+              { instructionId: 'gi-4', text: 'Enter {custRef} for Cust. Reference, today for the reference date and Valid From, and one month from today for Valid To.' },
+              { instructionId: 'gi-5', text: 'Find the two materials Philly Bikes asked about — search for *{custRef} — and select <strong>DXTR1-{custRef}</strong> (Deluxe Touring, black) and <strong>PRTR1-{custRef}</strong> (Professional Touring, black).' },
+              { instructionId: 'gi-6', text: 'Enter the order quantities: {dxtrQty} for the Deluxe Touring and {prtrQty} for the Professional Touring. Check the net value shown.' },
+              { instructionId: 'gi-7', text: 'Select both items, open the item conditions, and on the Sales A tab set the order probability to {orderProb}% for each item. Return to the overview and confirm the expected order value recalculated.',
+                branches: [
+                  { branchId: 'gb-2', condition: 'What is expected order value?',
+                    text: 'Net value × order probability — a 30% probability on a $21,400 inquiry shows 6,420. It estimates likely revenue, not a price the customer sees.' },
+                ] },
+              { instructionId: 'gi-8', text: 'Save and write down the inquiry document number — you will need it for the quotation.' },
             ] },
           { blockId: 'cb-cl-inq', type: 'checklist',
             title: 'Before you continue',
@@ -178,24 +202,30 @@ function seedRecipe(): void {
         ] },
       { stepId: 'st-quotation', stepNumber: 3,
         title: 'Quotation',
-        description: 'Create a Quotation (VA21) that references your inquiry, applying your assigned discount.',
+        description: 'Create a Quotation that references your inquiry — the binding offer — and apply your authorized discounts.',
         outcomeTagIndices: [0, 1],
-        understandingNote: 'Student should see that the quotation is the binding offer and that referencing the inquiry carries data forward instead of re-entering it.',
+        understandingNote: 'Student should see that the quotation is the binding offer, that referencing the inquiry carries data forward instead of re-entering it, and that pricing is built from condition types (item-level vs header-level).',
         blocks: [
           { blockId: 'cb-gt-quot', type: 'guided_tool',
-            title: 'Create the quotation (VA21)',
+            title: 'Create the quotation',
             tool: 'sap',
             layout: 'side_by_side',
             isGate: true,
             instructions: [
-              { instructionId: 'gi-1', text: 'Open transaction VA21 (Create Quotation).' },
-              { instructionId: 'gi-2', text: 'Use "Create with Reference" and select the inquiry you created — do not type the data into a blank form.',
+              { instructionId: 'gi-1', text: 'Create a quotation (Sales → Quotation → Create, or transaction VA21). Enter quotation type <strong>QT</strong>, then click <strong>Create with Reference</strong> — do not type the data into a blank form.',
                 branches: [
-                  { branchId: 'gb-1', condition: 'If you cannot find the reference option',
-                    text: 'On the VA21 initial screen, the button is "Create with Reference" — referencing is what links your documents in the flow.' },
+                  { branchId: 'gb-1', condition: 'Why "Create with Reference"?',
+                    text: 'Referencing is what links your documents in the flow — the customer, materials, and quantities copy forward from your inquiry instead of being re-keyed.' },
                 ] },
-              { instructionId: 'gi-3', text: 'Verify customer {customer}, material {material}, quantity {orderQty} carried forward, then apply a {discountRate} discount.' },
-              { instructionId: 'gi-4', text: 'Save and note the quotation document number.' },
+              { instructionId: 'gi-2', text: 'On the Inquiry tab, search by your customer reference {custRef}, select the inquiry you just created, and click <strong>Copy</strong>.' },
+              { instructionId: 'gi-3', text: 'Enter {custRef} for Cust. Reference, today for the reference date, and one month from today for Valid To and Req. Deliv. Date. Press Enter and acknowledge any warnings.' },
+              { instructionId: 'gi-4', text: 'Select the Deluxe Touring item and open its item conditions. Add condition type <strong>K004</strong> (material discount) with amount <strong>{itemDiscount}</strong>, then return to the quotation.' },
+              { instructionId: 'gi-5', text: 'For the order-level discount: Goto → Header → Conditions, add condition type <strong>RA00</strong> (net discount) with amount <strong>{orderDiscount}</strong>, press Enter, then click the activate icon to apply it.',
+                branches: [
+                  { branchId: 'gb-2', condition: 'Discount not showing in the price?',
+                    text: 'The header condition only takes effect after you click the activate icon — an easy step to miss.' },
+                ] },
+              { instructionId: 'gi-6', text: 'Save and note the quotation document number from the status message.' },
             ] },
           { blockId: 'cb-cl-quot', type: 'checklist',
             title: 'Before you continue',
@@ -205,20 +235,21 @@ function seedRecipe(): void {
         ] },
       { stepId: 'st-order', stepNumber: 4,
         title: 'Sales Order',
-        description: 'Create a Sales Order (VA01) referencing your quotation, then confirm the document flow links all three documents.',
+        description: 'Philly Bikes accepted your quotation — create the Sales Order by reference and confirm the document flow links all three documents.',
         outcomeTagIndices: [0, 1],
         understandingNote: 'Student should recognize the order as the confirmed agreement, and be able to trace the full inquiry → quotation → order document flow.',
         blocks: [
           { blockId: 'cb-gt-ord', type: 'guided_tool',
-            title: 'Create the sales order (VA01)',
+            title: 'Create the sales order',
             tool: 'sap',
             layout: 'side_by_side',
             isGate: true,
             instructions: [
-              { instructionId: 'gi-1', text: 'Open transaction VA01 (Create Sales Order) and use "Create with Reference" to reference your quotation.' },
-              { instructionId: 'gi-2', text: 'Confirm the data carried forward: customer {customer}, material {material}, quantity {orderQty}, discount {discountRate}.' },
-              { instructionId: 'gi-3', text: 'Save the sales order and note its document number.' },
-              { instructionId: 'gi-4', text: 'Open the document flow view and confirm your Inquiry, Quotation, and Sales Order are linked.' },
+              { instructionId: 'gi-1', text: 'Create a sales order (Sales → Order → Create, or transaction VA01). Enter order type <strong>OR</strong>, then click <strong>Create with Reference</strong>.' },
+              { instructionId: 'gi-2', text: 'Search by your customer reference {custRef}, select the quotation you just created, and click <strong>Copy</strong>.' },
+              { instructionId: 'gi-3', text: 'Enter {custRef} for Cust. Reference and today for the reference date. Notice the Req. Deliv. Date carried forward from the quotation.' },
+              { instructionId: 'gi-4', text: 'Save the sales order and note its document number from the confirmation message.' },
+              { instructionId: 'gi-5', text: 'Open the document flow view and confirm your Inquiry, Quotation, and Sales Order are linked.' },
             ] },
           { blockId: 'cb-cl-ord', type: 'checklist',
             title: 'Before you continue',
@@ -422,6 +453,15 @@ export const localEvalDb = {
   },
   async listForModule(moduleId: string) {
     return table('cap-evaluations').filter(r => r.moduleId === moduleId);
+  },
+};
+
+// ── assetDb ──────────────────────────────────────────────────────────────────
+
+export const localAssetDb = {
+  async put(a: Record<string, any>) { table('cap-assets').push(a); save(); },
+  async get(assetId: string) {
+    return table('cap-assets').find((a: any) => a.assetId === assetId) ?? null;
   },
 };
 
