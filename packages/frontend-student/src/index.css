@@ -69,10 +69,10 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .bubble.agent   { align-self: flex-start; background: #eef3fa; color: #222; }
 .bubble.student { align-self: flex-end;   background: #1D4E8C; color: #fff; }
 .bubble.typing  { color: #999; font-size: 20px; letter-spacing: 2px; }
-.chat-input { display: flex; gap: 8px; margin-top: 12px; }
-.chat-input input {
+.chat-input { display: flex; gap: 8px; margin-top: 12px; align-items: flex-end; }
+.chat-input textarea {
   flex: 1; padding: 10px 12px; border: 1px solid #c5c5c2;
-  border-radius: 6px; font: inherit;
+  border-radius: 6px; font: inherit; resize: vertical; min-height: 72px;
 }
 
 /* ── Summary / evaluation ────────────────────────────────────────────────── */

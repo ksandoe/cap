@@ -137,14 +137,23 @@ export function CheckoutPhase() {
           }}
           className="chat-input"
         >
-          <input
-            type="text"
+          <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Type your reply…"
+            placeholder="Type your reply… (Enter to send, Shift+Enter for a new line)"
             aria-label="Your reply"
             disabled={waiting}
             autoFocus
+            rows={3}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const content = input.trim();
+                if (!content || waiting) return;
+                setInput('');
+                sendTurn(content);
+              }
+            }}
           />
           <button type="submit" className="primary" disabled={waiting || !input.trim()}>
             Send
