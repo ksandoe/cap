@@ -9,7 +9,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
-import { Evaluation } from '@cap/shared';
 
 const KICKOFF =
   '[The student has completed the activity and is ready for the checkout conversation. Begin now.]';
@@ -40,6 +39,12 @@ function singleQuestion(text: string): string {
   const rest = text.slice(first + 1);
   return rest.includes('?') ? text.slice(0, first + 1).trim() : text;
 }
+
+// Marker-independent end detection. Small models sometimes wrap up with a
+// farewell but drop the [PHASE]/[ASSESSMENT] markers — without these checks
+// the student gets trapped in a goodbye loop.
+const AGENT_FAREWELL = /\b(good ?bye|take care|good luck|best of luck|all the best|wish you (the )?best|have a great|reach out)\b/i;
+const STUDENT_DONE   = /\b(bye|good ?bye|done|finished|that'?s all|nothing else|no more|i'?m good)\b/i;
 
 export function CheckoutPhase() {
   const sessionId      = useSessionStore(s => s.sessionId);
@@ -92,13 +97,13 @@ export function CheckoutPhase() {
       ];
       const { response } = await api.assessment.turn(messages);
 
-      // Parse hidden markers out of the agent's reply
+      // Parse hidden markers out of the agent's reply. The ASSESSMENT marker
+      // only signals the end — the authoritative evaluation always comes from
+      // /evaluate, which normalizes scores and applies module thresholds.
       let endConversation = false;
-      let inlineEval: Evaluation | null = null;
       const cleaned = response
-        .replace(ASSESSMENT_RE, (_: string, json: string) => {
+        .replace(ASSESSMENT_RE, () => {
           endConversation = true;
-          try { inlineEval = JSON.parse(json); } catch { /* fall through to /evaluate */ }
           return '';
         })
         .replace(PHASE_RE, (_: string, n: string) => {
@@ -113,21 +118,25 @@ export function CheckoutPhase() {
 
       const turns = useSessionStore.getState().transcript
         .filter(t => t.role === 'user' && !t.hidden).length;
-      if (endConversation || turns >= maxTurns) await finish(inlineEval);
+      // An agent farewell with no question means the model wrapped up
+      // without its markers — honor it instead of looping goodbyes.
+      if (!cleaned.includes('?') && AGENT_FAREWELL.test(cleaned)) endConversation = true;
+      // A student clearly signing off after a real conversation ends it too.
+      if (STUDENT_DONE.test(content) && turns >= 4) endConversation = true;
+      if (endConversation || turns >= maxTurns) await finish();
     } catch (e: any) {
       setWaiting(false);
       setError(`Something went wrong. ${e.message}`);
     }
   }
 
-  async function finish(inlineEval: Evaluation | null) {
+  async function finish() {
     if (finishing || !sessionId) return;
     setFinishing(true);
     try {
       const transcript = useSessionStore.getState().transcript
         .map(({ role, content }) => ({ role, content }));
-      const evaluation = inlineEval
-        ?? (await api.assessment.evaluate(transcript)).evaluation;
+      const { evaluation } = await api.assessment.evaluate(transcript);
       setEvaluation(evaluation);
       // /complete stores the de-identified attempt, then destroys the
       // session record — call it last.

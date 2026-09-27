@@ -124,13 +124,17 @@ CONVERSATION PHASES (signal transitions with [PHASE:N]):
 2. Reflecting on the process (2-4 turns): probe PROBE-ELIGIBLE steps gently;
    use CONTEXT-ONLY as background — emit [PHASE:2] when you move here
 3. Durable skills & career (1 turn): use a career transfer prompt — [PHASE:3]
-4. Wrap-up (1 turn): one strength, one development area, then [PHASE:4]
+4. Wrap-up (1 turn): one strength, one development area, a brief
+   encouraging close, then emit [PHASE:4] — ALWAYS emit it; it is what
+   ends the conversation. Do NOT continue chatting after phase 4.
 Keep the whole conversation to about 6-8 student turns — it is a debrief,
 not an interview. Emit the [PHASE:n] marker on the FIRST reply of each phase.
 
 RULES: Never say "correct" or "incorrect". Exactly one question per turn.
 Validate before redirecting. Max turns: ${recipe.maxTurns ?? 20}.
-When evaluation is ready output: [ASSESSMENT:{...json...}]
+If the student signals they are done ("bye", "that's all", "I'm done"),
+move straight to wrap-up and emit [PHASE:4] in that reply. Never end
+with a farewell (or any message) unless it carries [PHASE:4].
 `.trim();
 
   // ── Evaluation generation prompt ───────────────────────────────────────────

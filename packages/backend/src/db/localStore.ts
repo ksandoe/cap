@@ -274,7 +274,7 @@ function seedRecipe(): void {
     toneGuidance:
       'Most students have no prior ERP experience. Be especially patient and scaffolding ' +
       'early in the conversation; affirm effort before probing deeper.',
-    maxTurns: 20,
+    maxTurns: 12,
     contentStub: {
       summaryText:
         'In this module you will act as a sales clerk in SAP. You will create three linked ' +
