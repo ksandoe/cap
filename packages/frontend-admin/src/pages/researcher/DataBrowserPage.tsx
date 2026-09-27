@@ -9,7 +9,7 @@
 export function DataBrowserPage() {
   return (
     <div>
-      <h2 style={{ color: '#1D4E8C' }}>DataBrowserPage</h2>
+      <h2 style={{ color: '#1e6b34' }}>DataBrowserPage</h2>
       <div style={{ background: '#FDF6E3', border: '1px solid #F0D9A0',
         borderRadius: 6, padding: '12px 16px', marginBottom: 20 }}>
         <strong style={{ color: '#854F0B', fontSize: 13 }}>IRB requirement</strong>

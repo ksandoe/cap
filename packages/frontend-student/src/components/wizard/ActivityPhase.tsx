@@ -12,6 +12,7 @@
  * TODO (Phase 2): gate enforcement per step, step completion state.
  */
 import { useEffect, useRef, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { api } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
 import type {
@@ -151,10 +152,16 @@ function BlockView({ block }: { block: ContentBlock }) {
 }
 
 function RichText({ b }: { b: Extract<ContentBlock, { type: 'rich_text' }> }) {
+  // Bodies authored in the rich text editor are HTML; older plain-text /
+  // markdown drafts render as-is.
+  const isHtml = /<\/?[a-z][^>]*>/i.test(b.body);
   return (
     <div className="block rich">
       {b.title && <h3>{b.title}</h3>}
-      <p style={{ lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{b.body}</p>
+      {isHtml
+        ? <div className="rich-body"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(b.body) }} />
+        : <p style={{ lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{b.body}</p>}
     </div>
   );
 }

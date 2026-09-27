@@ -18,6 +18,8 @@
  */
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { adminApi } from '../../services/api';
 import type {
   ContentBlock, ModuleStep, EmbeddedToolBlock, KnowledgeCheckBlock,
@@ -28,7 +30,7 @@ import type {
 const input: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' };
 const lbl: React.CSSProperties   = { fontWeight: 600, fontSize: 13, color: '#333', display: 'block', marginBottom: 4 };
 const smallBtn: React.CSSProperties = { padding: '4px 10px', fontSize: 12, border: '1px solid #ccc', borderRadius: 4, background: '#fff', cursor: 'pointer' };
-const addBtn: React.CSSProperties   = { ...smallBtn, color: '#1D4E8C', borderColor: '#1D4E8C' };
+const addBtn: React.CSSProperties   = { ...smallBtn, color: '#1e6b34', borderColor: '#1e6b34' };
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
@@ -119,6 +121,21 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const c = [...arr]; [c[i], c[j]] = [c[j], c[i]]; return c;
 }
 
+const QUILL_MODULES = {
+  toolbar: [
+    [{ header: [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'blockquote'],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    ['link', 'image'],
+    ['clean'],
+  ],
+};
+
+/** Visible text length of a rich-text body (strips HTML for validation). */
+function bodyText(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+}
+
 const BLOCK_LABELS: Record<ContentBlock['type'], string> = {
   rich_text:       'Rich text',
   embedded_tool:   'Embedded tool',
@@ -165,7 +182,7 @@ export function RecipeFormPage() {
       if (!s.description.trim()) errs.push(`Step ${s.stepNumber} needs a description (what the student does).`);
       if (!s.blocks.length)      errs.push(`Step ${s.stepNumber} has no content blocks.`);
       for (const b of s.blocks) {
-        if (b.type === 'rich_text' && !b.body.trim())
+        if (b.type === 'rich_text' && !bodyText(b.body))
           errs.push(`Rich text block in step ${s.stepNumber} has no body.`);
         if (b.type === 'embedded_tool' && !b.title.trim())
           errs.push(`Embedded tool block in step ${s.stepNumber} needs a title.`);
@@ -242,12 +259,12 @@ export function RecipeFormPage() {
 
   return (
     <div style={{ maxWidth: 780 }}>
-      <h2 style={{ color: '#1D4E8C', marginBottom: 4 }}>
+      <h2 style={{ color: '#1e6b34', marginBottom: 4 }}>
         {isNew ? 'New recipe' : `Edit recipe — ${d.moduleTitle || id}`}
         {d.version ? <span style={{ fontSize: 14, color: '#888', fontWeight: 400 }}> (editing v{d.version} — save creates v{d.version + 1})</span> : null}
       </h2>
       <p style={{ color: '#888', marginBottom: 24, fontSize: 14 }}>
-        Sections marked ★ are required. <Link to="/author/recipes" style={{ color: '#1D4E8C' }}>← Back to list</Link>
+        Sections marked ★ are required. <Link to="/author/recipes" style={{ color: '#1e6b34' }}>← Back to list</Link>
       </p>
 
       {saved && (
@@ -328,7 +345,7 @@ export function RecipeFormPage() {
         {d.steps.map((s, i) => (
           <div key={s.stepId} style={{ border: '1px solid #cdd7e4', borderRadius: 6, padding: 14, marginBottom: 12, background: '#fbfcfe' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#1D4E8C' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#1e6b34' }}>
                 Step {s.stepNumber}
                 {!s.outcomeTagIndices.length && <span style={{ color: '#999', fontWeight: 400 }}> · context-only</span>}
               </span>
@@ -510,7 +527,7 @@ export function RecipeFormPage() {
       {/* ── actions ────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 12, marginTop: 24, marginBottom: 60 }}>
         <button onClick={save} disabled={saving}
-          style={{ background: '#1D4E8C', color: '#fff', border: 'none',
+          style={{ background: '#1e6b34', color: '#fff', border: 'none',
             borderRadius: 4, padding: '10px 24px', fontSize: 14, cursor: 'pointer' }}>
           {saving ? 'Saving…' : 'Save recipe'}
         </button>
@@ -566,8 +583,12 @@ function BlockEditor({ block, onChange, onMove, onDel, first, last }: {
         <>
           <input style={{ ...input, marginBottom: 8 }} placeholder="Heading (optional)" value={block.title ?? ''}
             onChange={e => onChange({ ...block, title: e.target.value })} />
-          <textarea style={{ ...input, minHeight: 90 }} placeholder="Body — prose, instructions, tables (markdown)"
-            value={block.body} onChange={e => onChange({ ...block, body: e.target.value })} />
+          <div style={{ background: '#fff', borderRadius: 4, marginBottom: 8 }}>
+            <ReactQuill theme="snow" value={block.body}
+              onChange={html => onChange({ ...block, body: html })}
+              placeholder="Body — prose, instructions, callouts"
+              modules={QUILL_MODULES} />
+          </div>
         </>
       )}
 
@@ -706,7 +727,7 @@ function QuestionList({ questions, onChange }: {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ border: '1px solid #ddd', borderRadius: 6, marginBottom: 16, overflow: 'hidden' }}>
-      <div style={{ background: '#EEF3FA', padding: '12px 16px', fontWeight: 600, fontSize: 14, color: '#1D4E8C' }}>
+      <div style={{ background: '#E9F5EC', padding: '12px 16px', fontWeight: 600, fontSize: 14, color: '#1e6b34' }}>
         {title}
       </div>
       <div style={{ padding: 16 }}>{children}</div>

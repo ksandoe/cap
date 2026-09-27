@@ -5,7 +5,7 @@
 export function ModuleListPage() {
   return (
     <div>
-      <h2 style={{ color: '#1D4E8C' }}>ModuleListPage</h2>
+      <h2 style={{ color: '#1e6b34' }}>ModuleListPage</h2>
       <p style={{ color: '#888' }}>TODO: implement</p>
     </div>
   );

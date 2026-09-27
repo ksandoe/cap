@@ -53,15 +53,15 @@ const SECTIONS: {
 export function DashboardPage() {
   return (
     <AppShell>
-      <h2 style={{ color: '#1D4E8C', marginBottom: 4 }}>CAP Admin</h2>
+      <h2 style={{ color: '#1e6b34', marginBottom: 4 }}>CAP Admin</h2>
       <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>
         One login, all areas — pick a section below.
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
         {SECTIONS.map(s => (
           <div key={s.title} style={{ border: '1px solid #ddd', borderRadius: 6, overflow: 'hidden' }}>
-            <div style={{ background: '#EEF3FA', padding: '12px 16px',
-              fontWeight: 600, fontSize: 14, color: '#1D4E8C' }}>
+            <div style={{ background: '#E9F5EC', padding: '12px 16px',
+              fontWeight: 600, fontSize: 14, color: '#1e6b34' }}>
               {s.title}
             </div>
             <div style={{ padding: 16 }}>
@@ -71,7 +71,7 @@ export function DashboardPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {s.links.map(l => (
                   <Link key={l.to} to={l.to}
-                    style={{ color: '#1D4E8C', fontSize: 14, textDecoration: 'none' }}>
+                    style={{ color: '#1e6b34', fontSize: 14, textDecoration: 'none' }}>
                     {l.label} →
                   </Link>
                 ))}

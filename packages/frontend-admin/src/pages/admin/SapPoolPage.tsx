@@ -11,12 +11,12 @@
 export function SapPoolPage() {
   return (
     <div>
-      <h2 style={{ color: '#1D4E8C', marginBottom: 24 }}>SAP account pool</h2>
+      <h2 style={{ color: '#1e6b34', marginBottom: 24 }}>SAP account pool</h2>
 
       {/* Status summary — TODO: replace with live data */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 32 }}>
         {[
-          { label: 'Total accounts', value: '—', color: '#1D4E8C' },
+          { label: 'Total accounts', value: '—', color: '#1e6b34' },
           { label: 'Available',      value: '—', color: '#085041' },
           { label: 'In use',         value: '—', color: '#854F0B' },
           { label: 'Stale locks',    value: '—', color: '#8B2500' },
@@ -30,7 +30,7 @@ export function SapPoolPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
-        <button style={{ background: '#1D4E8C', color: '#fff', border: 'none',
+        <button style={{ background: '#1e6b34', color: '#fff', border: 'none',
           borderRadius: 4, padding: '9px 20px', fontSize: 14, cursor: 'pointer' }}>
           Import accounts (CSV)
         </button>

@@ -100,11 +100,11 @@ function seedRecipe(): void {
         blocks: [
           { blockId: 'cb-concept-1', type: 'rich_text',
             title: 'Background: the SAP sales document flow',
-            body: 'SAP ERP tracks the sales process as a chain of linked documents: ' +
-              'Inquiry → Quotation → Sales Order. Each document references its ' +
+            body: '<p>SAP ERP tracks the sales process as a chain of linked documents: ' +
+              '<strong>Inquiry → Quotation → Sales Order</strong>. Each document references its ' +
               'predecessor, so master data and line items carry forward without ' +
-              're-keying. Understanding *why* each document exists matters more ' +
-              'than memorizing transaction codes.' },
+              're-keying.</p><p>Understanding <em>why</em> each document exists matters more ' +
+              'than memorizing transaction codes.</p>' },
           { blockId: 'cb-kc-1', type: 'knowledge_check',
             title: 'Quick self-check',
             questions: [
@@ -127,11 +127,13 @@ function seedRecipe(): void {
         blocks: [
           { blockId: 'cb-instr-1', type: 'rich_text',
             title: 'Instructions',
-            body: '1. Log into SAP and review the customer master record for customer 1001.\n' +
-              '2. Create an Inquiry (VA11) for customer 1001 requesting material M-001.\n' +
-              '3. Create a Quotation (VA21) that references the inquiry you created.\n' +
-              '4. Create a Sales Order (VA01) that references the quotation.\n' +
-              '5. Open the document flow view and confirm your three documents are linked.' },
+            body: '<ol>' +
+              '<li>Log into SAP and review the customer master record for customer 1001.</li>' +
+              '<li>Create an <strong>Inquiry (VA11)</strong> for customer 1001 requesting material M-001.</li>' +
+              '<li>Create a <strong>Quotation (VA21)</strong> that references the inquiry you created.</li>' +
+              '<li>Create a <strong>Sales Order (VA01)</strong> that references the quotation.</li>' +
+              '<li>Open the document flow view and confirm your three documents are linked.</li>' +
+              '</ol>' },
           { blockId: 'cb-sap-1', type: 'embedded_tool',
             title: 'SAP sandbox exercise',
             tool: 'sap',

@@ -113,6 +113,13 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 .block h3 { margin-top: 0; font-size: 16px; }
 .block.rich { border-color: transparent; background: transparent; padding-left: 0; padding-right: 0; }
+.rich-body { line-height: 1.7; }
+.rich-body h1, .rich-body h2, .rich-body h3 { color: #1D4E8C; margin: 14px 0 6px; }
+.rich-body ul, .rich-body ol { padding-left: 22px; }
+.rich-body blockquote {
+  margin: 10px 0; padding: 8px 14px; border-left: 3px solid #1D4E8C;
+  background: #f4f7fb; color: #444;
+}
 .block.tool { border-left: 4px solid #1D4E8C; }
 .block.kc   { border-left: 4px solid #0f7b6c; }
 .block.checklist { border-left: 4px solid #8a6d00; }

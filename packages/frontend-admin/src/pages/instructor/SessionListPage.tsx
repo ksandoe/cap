@@ -5,7 +5,7 @@
 export function SessionListPage() {
   return (
     <div>
-      <h2 style={{ color: '#1D4E8C' }}>SessionListPage</h2>
+      <h2 style={{ color: '#1e6b34' }}>SessionListPage</h2>
       <p style={{ color: '#888' }}>TODO: implement</p>
     </div>
   );

@@ -35,7 +35,7 @@ export function AppShell({ children }: Props) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <nav style={{
-        background: '#1D4E8C', color: '#fff', padding: '0 24px',
+        background: '#1e6b34', color: '#fff', padding: '0 24px',
         display: 'flex', alignItems: 'center', gap: 24, height: 52,
       }}>
         <span style={{ fontWeight: 700, fontSize: 16, marginRight: 16 }}>CAP Admin</span>

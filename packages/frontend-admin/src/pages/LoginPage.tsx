@@ -45,7 +45,7 @@ export function LoginPage() {
       justifyContent: 'center', background: '#f8f8f7' }}>
       <div style={{ background: '#fff', padding: 40, borderRadius: 8,
         boxShadow: '0 2px 12px rgba(0,0,0,0.08)', width: 360 }}>
-        <h1 style={{ color: '#1D4E8C', fontSize: 22, marginBottom: 8 }}>CAP Admin</h1>
+        <h1 style={{ color: '#1e6b34', fontSize: 22, marginBottom: 8 }}>CAP Admin</h1>
         <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>
           Sign in to manage modules, recipes, and results.
         </p>
@@ -66,7 +66,7 @@ export function LoginPage() {
               borderRadius: 4, fontSize: 14, marginBottom: 24 }} />
           {error && <p style={{ color: '#8B2500', fontSize: 13, marginBottom: 12 }}>{error}</p>}
           <button type="submit" disabled={loading}
-            style={{ width: '100%', padding: '10px 0', background: '#1D4E8C',
+            style={{ width: '100%', padding: '10px 0', background: '#1e6b34',
               color: '#fff', border: 'none', borderRadius: 4, fontSize: 15,
               cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
             {loading ? 'Signing in…' : 'Sign in'}

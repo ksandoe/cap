@@ -44,9 +44,9 @@ export function RecipeListPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h2 style={{ color: '#1D4E8C', margin: 0 }}>Instructional recipes</h2>
+        <h2 style={{ color: '#1e6b34', margin: 0 }}>Instructional recipes</h2>
         <Link to="/author/recipes/new"
-          style={{ background: '#1D4E8C', color: '#fff', padding: '8px 18px',
+          style={{ background: '#1e6b34', color: '#fff', padding: '8px 18px',
             borderRadius: 4, textDecoration: 'none', fontSize: 14 }}>
           + New recipe
         </Link>
@@ -72,7 +72,7 @@ export function RecipeListPage() {
             </div>
           </div>
           <Link to={`/author/recipes/${encodeURIComponent(g.moduleId)}`}
-            style={{ padding: '8px 18px', border: '1px solid #1D4E8C', color: '#1D4E8C',
+            style={{ padding: '8px 18px', border: '1px solid #1e6b34', color: '#1e6b34',
               borderRadius: 6, textDecoration: 'none', fontSize: 14 }}>
             Edit → new version
           </Link>
