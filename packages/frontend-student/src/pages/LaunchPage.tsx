@@ -46,6 +46,7 @@ export function LaunchPage() {
         moduleId:     claims.moduleId,
         currentPhase: claims.currentPhase ?? phase,
         instructorPreview: params.get('instructor') === '1',
+        persona:      persona ?? undefined,
       });
       navigate('/wizard', { replace: true });
     } catch {

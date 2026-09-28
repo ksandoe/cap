@@ -27,8 +27,9 @@ interface SessionState {
   evaluation:      Evaluation | null;
   instructorPreview: boolean;  // ?instructor=1 — rubric detail shown, clearly labeled
   instructionDone: Record<string, string[]>;  // blockId → ticked instruction/item ids
+  persona:         string | null;   // dev launchpad persona — which "Canvas" slot holds our key
 
-  setSession:      (data: { token: string; sessionId: string; moduleId: string; currentPhase: number; instructorPreview?: boolean }) => void;
+  setSession:      (data: { token: string; sessionId: string; moduleId: string; currentPhase: number; instructorPreview?: boolean; persona?: string }) => void;
   setPhase:        (phase: number) => void;
   setActivityStep: (i: number) => void;
   setRecipe:       (recipe: Recipe) => void;
@@ -57,14 +58,16 @@ const initial = {
   evaluation:       null,
   instructorPreview: false,
   instructionDone:  {} as Record<string, string[]>,
+  persona:          null,
 };
 
 export const useSessionStore = create<SessionState>((set) => ({
   ...initial,
 
-  setSession:      ({ token, sessionId, moduleId, currentPhase, instructorPreview }) =>
+  setSession:      ({ token, sessionId, moduleId, currentPhase, instructorPreview, persona }) =>
                      set(s => ({ token, sessionId, moduleId, currentPhase,
-                           instructorPreview: instructorPreview ?? s.instructorPreview })),
+                           instructorPreview: instructorPreview ?? s.instructorPreview,
+                           persona: persona ?? s.persona })),
   setPhase:        (currentPhase) => set({ currentPhase }),
   setActivityStep: (activityStep) => set({ activityStep }),
   setRecipe:       (recipe) => set({ recipe }),

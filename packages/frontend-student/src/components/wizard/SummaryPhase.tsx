@@ -7,11 +7,20 @@
  * de-identified for research and threshold tuning; they are never
  * rendered to the student.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, decodeSessionToken } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
 import type { Evaluation } from '@cap/shared';
+
+// The dev launchpad's localStorage slot stands in for the hidden Canvas
+// grade column. When a session completes its record is destroyed — the
+// key is dead, so clear the slot (in production the tool would overwrite
+// the column when posting the final grade). A retry issues a fresh key,
+// which is written back to the same slot.
+function canvasKeySlot(persona: string | null, moduleId: string | null) {
+  return persona && moduleId ? `cap-canvas-key:${persona}:${moduleId}` : null;
+}
 
 export function SummaryPhase() {
   const sessionId    = useSessionStore(s => s.sessionId);
@@ -25,6 +34,18 @@ export function SummaryPhase() {
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const moduleId = useSessionStore(s => s.moduleId);
+  const persona  = useSessionStore(s => s.persona);
+
+  // Reaching the summary means the session record was completed and
+  // destroyed — consume the resume key so the launchpad stops offering
+  // "resume" for a session that no longer exists.
+  useEffect(() => {
+    const slot = canvasKeySlot(persona, moduleId);
+    if (evaluation && slot) {
+      try { localStorage.removeItem(slot); } catch { /* non-fatal */ }
+    }
+  }, [evaluation, persona, moduleId]);
 
   if (!evaluation) {
     return <p className="muted">Your evaluation is not available.</p>;
@@ -37,8 +58,14 @@ export function SummaryPhase() {
     setRetrying(true);
     setRetryError(null);
     try {
-      const { sessionToken, redirectPhase } = await api.session.retry(sessionId, toPhase);
+      const { sessionToken, redirectPhase, sessionKey } = await api.session.retry(sessionId, toPhase);
       const claims = decodeSessionToken(sessionToken);
+      // The retry is a new session with a fresh key — update the "grade
+      // column" so the launchpad's resume link points at the live session.
+      const slot = canvasKeySlot(persona, moduleId);
+      if (slot && sessionKey) {
+        try { localStorage.setItem(slot, sessionKey); } catch { /* non-fatal */ }
+      }
       // Keep the transcript for context but start the new conversation fresh
       useSessionStore.setState({ transcript: [], evaluation: null, activityStep: 0 });
       setSession({
