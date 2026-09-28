@@ -12,11 +12,11 @@
  * On activity exit (completion, expiry, or error), the account
  * is reset via the SAP reset endpoint and returned to 'available'.
  *
- * When USE_LOCAL_DB=true, delegates to the JSON-file store in
- * db/localStore.ts so local dev works without AWS.
- *
  * TODO: implement stale-lock reclamation (account locked > N hours → force release)
  * TODO: implement SAP account reset call
+ *
+ * When USE_LOCAL_DB=true, delegates to the JSON-file store in
+ * db/localStore.ts so local dev works without AWS.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
@@ -63,13 +63,19 @@ async function ddbAcquire(sessionId: string): Promise<string> {
 
 async function ddbRelease(sapUsername: string): Promise<void> {
   // TODO: call SAP reset endpoint before releasing
-  await ddb.send(new UpdateCommand({
-    TableName:        TABLE,
-    Key:              { sapUsername },
-    UpdateExpression: 'SET #s = :available REMOVE assignedSessionId, assignedAt',
-    ExpressionAttributeNames:  { '#s': 'status' },
-    ExpressionAttributeValues: { ':available': 'available' },
-  }));
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName:        TABLE,
+      Key:              { sapUsername },
+      UpdateExpression: 'SET #s = :available REMOVE assignedSessionId, assignedAt',
+      // Don't resurrect a deleted pool row — Update on a missing key creates one
+      ConditionExpression: 'attribute_exists(sapUsername)',
+      ExpressionAttributeNames:  { '#s': 'status' },
+      ExpressionAttributeValues: { ':available': 'available' },
+    }));
+  } catch (err: any) {
+    if (err?.name !== 'ConditionalCheckFailedException') throw err;
+  }
 }
 
 export const acquireSapAccount = USE_LOCAL_DB

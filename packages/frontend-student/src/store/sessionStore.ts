@@ -1,0 +1,85 @@
+/**
+ * sessionStore.ts — Zustand in-memory session store.
+ *
+ * FERPA note: session token and all student-session data are held
+ * in memory only (Zustand). Nothing is written to localStorage,
+ * sessionStorage, or any browser-persistent storage.
+ *
+ * If the student refreshes the page, the session token is lost and
+ * they must relaunch from Canvas. (Future: encode resume token in URL hash.)
+ */
+import { create } from 'zustand';
+import { Evaluation, CheckinResponse, Recipe } from '@cap/shared';
+
+export interface ChatTurn { role: string; content: string; hidden?: boolean }
+
+interface SessionState {
+  token:           string | null;
+  sessionId:       string | null;
+  moduleId:        string | null;
+  currentPhase:    number;
+  activityStep:    number;   // index into recipe.steps during phase 2
+  attemptNumber:   number;
+  recipe:          Recipe | null;
+  parameters:      Record<string, string>;  // this student's assigned values
+  checkinResponses: CheckinResponse[];
+  transcript:      ChatTurn[];
+  evaluation:      Evaluation | null;
+  instructorPreview: boolean;  // ?instructor=1 — rubric detail shown, clearly labeled
+  instructionDone: Record<string, string[]>;  // blockId → ticked instruction/item ids
+
+  setSession:      (data: { token: string; sessionId: string; moduleId: string; currentPhase: number; instructorPreview?: boolean }) => void;
+  setPhase:        (phase: number) => void;
+  setActivityStep: (i: number) => void;
+  setRecipe:       (recipe: Recipe) => void;
+  setParameters:   (p: Record<string, string>) => void;
+  setAttemptNumber:(n: number) => void;
+  setCheckinResponses: (responses: CheckinResponse[]) => void;
+  setTranscript:   (turns: ChatTurn[]) => void;
+  setInstructionDone: (done: Record<string, string[]>) => void;
+  toggleInstructionItem: (blockId: string, itemId: string) => void;
+  appendTurn:      (role: string, content: string, hidden?: boolean) => void;
+  setEvaluation:   (evaluation: Evaluation) => void;
+  reset:           () => void;
+}
+
+const initial = {
+  token:            null,
+  sessionId:        null,
+  moduleId:         null,
+  currentPhase:     1,
+  activityStep:     0,
+  attemptNumber:    1,
+  recipe:           null,
+  parameters:       {} as Record<string, string>,
+  checkinResponses: [] as CheckinResponse[],
+  transcript:       [] as ChatTurn[],
+  evaluation:       null,
+  instructorPreview: false,
+  instructionDone:  {} as Record<string, string[]>,
+};
+
+export const useSessionStore = create<SessionState>((set) => ({
+  ...initial,
+
+  setSession:      ({ token, sessionId, moduleId, currentPhase, instructorPreview }) =>
+                     set(s => ({ token, sessionId, moduleId, currentPhase,
+                           instructorPreview: instructorPreview ?? s.instructorPreview })),
+  setPhase:        (currentPhase) => set({ currentPhase }),
+  setActivityStep: (activityStep) => set({ activityStep }),
+  setRecipe:       (recipe) => set({ recipe }),
+  setParameters:   (parameters) => set({ parameters }),
+  setAttemptNumber:(attemptNumber) => set({ attemptNumber }),
+  setCheckinResponses: (checkinResponses) => set({ checkinResponses }),
+  setTranscript:   (transcript) => set({ transcript }),
+  setInstructionDone: (instructionDone) => set({ instructionDone }),
+  toggleInstructionItem: (blockId, itemId) => set(s => {
+    const cur = new Set(s.instructionDone[blockId] ?? []);
+    cur.has(itemId) ? cur.delete(itemId) : cur.add(itemId);
+    return { instructionDone: { ...s.instructionDone, [blockId]: [...cur] } };
+  }),
+  appendTurn:      (role, content, hidden) =>
+    set(s => ({ transcript: [...s.transcript, { role, content, hidden }] })),
+  setEvaluation:   (evaluation) => set({ evaluation }),
+  reset:           () => set(initial),
+}));

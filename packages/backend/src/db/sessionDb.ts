@@ -14,9 +14,9 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient, GetCommand, PutCommand,
-  UpdateCommand, DeleteCommand, QueryCommand,
+  UpdateCommand, DeleteCommand, QueryCommand, ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { USE_LOCAL_DB }  from '../config/env';
+import { USE_LOCAL_DB }   from '../config/env';
 import { localSessionDb } from './localStore';
 
 const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
@@ -50,19 +50,46 @@ const ddbSessionDb = {
   },
 
   async findActiveSession(canvasUuid: string, moduleId: string) {
+    // TODO: requires GSI on canvasUuid + moduleId
+    // Placeholder: scan is acceptable for PoC scale
     const r = await ddb.send(new QueryCommand({
       TableName: TABLE,
       IndexName: 'canvasUuid-moduleId-index',
       KeyConditionExpression: 'canvasUuid = :cu AND moduleId = :mid',
-      FilterExpression: '#s <> :completed AND #s <> :expired',
+      FilterExpression: '#s <> :completed AND #s <> :expired AND #s <> :interrupted',
       ExpressionAttributeNames:  { '#s': 'state' },
       ExpressionAttributeValues: {
         ':cu': canvasUuid, ':mid': moduleId,
-        ':completed': 'COMPLETED', ':expired': 'EXPIRED',
+        ':completed': 'COMPLETED', ':expired': 'EXPIRED', ':interrupted': 'INTERRUPTED',
       },
       Limit: 1,
     }));
     return r.Items?.[0] ?? null;
+  },
+
+  // Opaque session key — the value CAP conceptually writes back to the
+  // Canvas grade column (not student-visible). On relaunch the platform
+  // presents it and we resume by key instead of by student identity, so
+  // the link carries no PII. Scan is fine at PoC/demo scale.
+  async findBySessionKey(sessionKey: string) {
+    const r = await ddb.send(new ScanCommand({
+      TableName: TABLE,
+      FilterExpression: 'sessionKey = :k AND #s <> :completed AND #s <> :expired AND #s <> :interrupted',
+      ExpressionAttributeNames:  { '#s': 'state' },
+      ExpressionAttributeValues: {
+        ':k': sessionKey,
+        ':completed': 'COMPLETED', ':expired': 'EXPIRED', ':interrupted': 'INTERRUPTED',
+      },
+      // No Limit — DynamoDB applies it BEFORE FilterExpression, which would
+      // drop the match (same footgun as getActiveRecipe).
+    }));
+    return r.Items?.[0] ?? null;
+  },
+
+  async listSessions() {
+    // Scan is fine at PoC/demo scale — sessions are few and short-lived.
+    const r = await ddb.send(new ScanCommand({ TableName: TABLE }));
+    return r.Items ?? [];
   },
 };
 

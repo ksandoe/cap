@@ -1,31 +1,66 @@
 /**
- * dev.ts — Local development routes. Mounted only when NODE_ENV !== 'production'.
+ * dev.ts — Development / demo routes ("Canvas launchpad").
  *
- * GET /dev/launch?moduleId=<id> — Simulates an LTI launch without Canvas:
- * creates (or resumes) a session for a synthetic dev identity and redirects
- * to the SPA with a session token, exactly as the real LTI launch does.
+ * Mounted when NODE_ENV !== 'production' OR ENABLE_DEV_ROUTES=true.
+ * The latter exists so a deployed demo build can expose the launchpad
+ * while campus LTI registration is pending. NEVER enable in production —
+ * these routes create sessions without LTI JWT validation.
+ *
+ * GET /dev/modules                    — list launchable modules (active recipes)
+ * GET /dev/launch?moduleId&persona    — simulate a Canvas LTI launch: create or
+ *                                       resume a session for a synthetic
+ *                                       identity and redirect to the SPA with
+ *                                       a session token, exactly as the real
+ *                                       LTI launch does.
+ *
+ * Personas map to stable canvasUuids so resume/retry behavior is demoable:
+ * relaunching the same module as the same persona resumes their session.
  */
 import { Router, Request, Response } from 'express';
+import { asyncRouter } from '../middleware/asyncRouter';
 import { createSession }        from '../services/orchestrator/orchestratorService';
 import { LOCAL_DEMO_MODULE_ID } from '../db/localStore';
+import { recipeDb }             from '../db/recipeDb';
 import { logger }               from '../services/eventLogger';
 import { EVENTS }               from '@cap/shared';
 
-export const devRouter = Router();
+export const devRouter = asyncRouter();
+
+// Demo personas — stable identities so each "student" keeps their own session
+const PERSONAS: Record<string, string> = {
+  alex:  'dev-alex',
+  blair: 'dev-blair',
+  casey: 'dev-casey',
+};
+
+devRouter.get('/modules', async (_req: Request, res: Response) => {
+  const modules = await recipeDb.listActiveModules();
+  res.json({ modules });
+});
 
 devRouter.get('/launch', async (req: Request, res: Response) => {
   const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
   try {
     const moduleId = (req.query.moduleId as string) || LOCAL_DEMO_MODULE_ID;
-    const { sessionToken, redirectPhase } = await createSession({
-      canvasUuid:         'dev-student',   // stable identity → resume works across relaunches
-      ltiContextId:       'dev-context',
+    const persona  = (req.query.persona as string) || 'alex';
+    const canvasUuid = PERSONAS[persona] ?? `dev-${persona}`;
+
+    // ?key= simulates the opaque session key the platform stores in the
+    // grade column and sends back on relaunch — resume without identity.
+    const key = (req.query.key as string) || undefined;
+
+    const { sessionToken, redirectPhase, sessionKey } = await createSession({
+      canvasUuid,                          // stable identity → resume works across relaunches
+      ltiContextId:       `dev-context-${moduleId}`,
       ltiResourceLinkId:  'dev-resource-link',
       agsEndpoint:        'local-dev',
       lisResultSourcedId: 'local-dev',
       moduleId,
-    });
-    res.redirect(`${frontendUrl}/launch?token=${sessionToken}&phase=${redirectPhase}`);
+    }, { sessionKey: key });
+    // &key=+&persona= ride along so the student SPA can "return" the key to
+    // the launchpad's localStorage — standing in for the Canvas grade column.
+    const instructor = req.query.instructor === '1' ? '&instructor=1' : '';
+    res.redirect(`${frontendUrl}/launch?token=${sessionToken}&phase=${redirectPhase}&key=${sessionKey}&persona=${persona}${instructor}`);
   } catch (err) {
     logger.error(EVENTS.LTI_LAUNCH_FAILED, { error: String(err), source: 'dev-launch' });
     const code = err instanceof Error ? err.message : 'UNKNOWN';

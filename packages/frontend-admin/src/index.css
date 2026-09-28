@@ -1,0 +1,2 @@
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #f8f8f7; color: #333; }
