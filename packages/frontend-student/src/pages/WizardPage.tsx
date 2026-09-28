@@ -30,6 +30,8 @@ export function WizardPage() {
   const setAttempt   = useSessionStore(s => s.setAttemptNumber);
   const setTranscript = useSessionStore(s => s.setTranscript);
   const setCheckinResponses = useSessionStore(s => s.setCheckinResponses);
+  const setActivityStep  = useSessionStore(s => s.setActivityStep);
+  const setInstructionDone = useSessionStore(s => s.setInstructionDone);
   const navigate     = useNavigate();
 
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,9 @@ export function WizardPage() {
           setTranscript(session.transcript);
         if (Array.isArray(session.checkinResponses) && session.checkinResponses.length)
           setCheckinResponses(session.checkinResponses);
+        // Exact position within the activity — step screen + ticked items.
+        if (typeof session.activityStep === 'number') setActivityStep(session.activityStep);
+        if (session.instructionDone) setInstructionDone(session.instructionDone);
         if (moduleId) {
           const recipe = await api.recipe.get(moduleId);
           setRecipe(recipe);

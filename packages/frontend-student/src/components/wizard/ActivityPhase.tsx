@@ -36,11 +36,16 @@ export function ActivityPhase() {
   const [error,      setError]      = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
-
   const steps = recipe?.steps ?? [];
   const step  = steps[activityStep];
   const isLast = activityStep === steps.length - 1;
+
+  function goTo(i: number) {
+    setStep(i);
+    postProgress(i);
+  }
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   async function startVerification() {
     if (!sessionId || verifying) return;
@@ -113,11 +118,11 @@ export function ActivityPhase() {
 
       <div className="step-nav">
         <button className="secondary" disabled={activityStep === 0}
-          onClick={() => setStep(activityStep - 1)}>
+          onClick={() => goTo(activityStep - 1)}>
           ← Back
         </button>
         {!isLast && (
-          <button className="primary" onClick={() => setStep(activityStep + 1)}>
+          <button className="primary" onClick={() => goTo(activityStep + 1)}>
             Next: {steps[activityStep + 1].title} →
           </button>
         )}
@@ -163,6 +168,18 @@ function RichText({ b }: { b: Extract<ContentBlock, { type: 'rich_text' }> }) {
 // Instructions with inline {param} substitution, per-instruction branches,
 // a self-reported progress bar, and the framed (or linked) application.
 
+/** Persist activity position to the session record — fire-and-forget.
+ *  Posted on step changes and instruction/checklist toggles, so resume
+ *  (saved or interrupted) restores exact position, not just the phase. */
+function postProgress(step?: number) {
+  const { sessionId, activityStep, instructionDone } = useSessionStore.getState();
+  if (!sessionId) return;
+  api.session.progress(sessionId, {
+    activityStep: step ?? activityStep,
+    instructionDone,
+  }).catch(() => { /* position checkpoint — non-fatal */ });
+}
+
 /** Render instruction text with {key} placeholders swapped for the
  *  student's assigned values, highlighted inline. Unknown keys render
  *  literally so authors see their mistake rather than a blank. */
@@ -201,10 +218,12 @@ function InstructionText({ text }: { text: string }) {
 }
 
 function GuidedTool({ b }: { b: GuidedToolBlock }) {
-  const [done, setDone] = useState<Set<string>>(new Set());
-  const toggle = (id: string) => setDone(prev => {
-    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
-  });
+  // Ticks live in the session store (per blockId) so they persist to the
+  // session record and restore on resume.
+  const doneIds  = useSessionStore(s => s.instructionDone[b.blockId] ?? []);
+  const toggleItem = useSessionStore(s => s.toggleInstructionItem);
+  const done = new Set(doneIds);
+  const toggle = (id: string) => { toggleItem(b.blockId, id); postProgress(); };
   const total = b.instructions.length;
   const pct   = total ? Math.round((done.size / total) * 100) : 0;
 
@@ -354,10 +373,10 @@ function Question({ q }: { q: KnowledgeCheckQuestion }) {
 }
 
 function Checklist({ b }: { b: ChecklistBlock }) {
-  const [done, setDone] = useState<Set<string>>(new Set());
-  const toggle = (id: string) => setDone(prev => {
-    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
-  });
+  const doneIds  = useSessionStore(s => s.instructionDone[b.blockId] ?? []);
+  const toggleItem = useSessionStore(s => s.toggleInstructionItem);
+  const done = new Set(doneIds);
+  const toggle = (id: string) => { toggleItem(b.blockId, id); postProgress(); };
   return (
     <div className="block checklist">
       <h3>{b.title ?? 'Confirm before continuing'}

@@ -57,6 +57,8 @@ export const api = {
     verifyStatus:     (id: string)           => request<any>('GET',  `/session/${id}/verify-status`),
     complete:         (id: string, evaluation: any, transcript?: any[]) =>
                         request<any>('POST', `/session/${id}/complete`, { evaluation, transcript }),
+    progress:         (id: string, p: { activityStep?: number; instructionDone?: Record<string, string[]> }) =>
+                        request<any>('POST', `/session/${id}/progress`, p),
     save:             (id: string)           => request<{ ok: boolean; resumeWithinDays: number }>('POST', `/session/${id}/save`),
     retry:            (id: string, toPhase?: number) => request<any>('POST', `/session/${id}/retry`, toPhase ? { toPhase } : {}),
   },

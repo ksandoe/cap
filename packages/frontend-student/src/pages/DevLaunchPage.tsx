@@ -125,10 +125,12 @@ export function DevLaunchPage() {
               <div style={{ fontSize: 13, color: '#777' }}>
                 Assignment · launches external tool
                 {storedKey(m.moduleId) && (
-                  <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 10,
-                                 background: '#eef3ea', color: '#4a6b2f', fontSize: 11,
-                                 border: '1px solid #c8dcc0' }}>
-                    resume key on file
+                  <span
+                    title="Canvas is holding an opaque resume key for this persona's in-progress session (the hidden grade-column field in production). Launching will resume where they left off."
+                    style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 10,
+                             background: '#eef3ea', color: '#4a6b2f', fontSize: 11,
+                             border: '1px solid #c8dcc0', cursor: 'help' }}>
+                    session in progress — relaunch resumes
                   </span>
                 )}
               </div>

@@ -256,6 +256,22 @@ export async function getSapVerificationStatus(req: Request, res: Response): Pro
   res.json({ status: session.state, sapVerificationError: (session as any).sapVerificationError });
 }
 
+// Lightweight progress checkpoint — the student app posts here on each
+// step advance / instruction toggle, so an interrupted OR explicitly
+// saved session restores exact position (step + ticked items), not just
+// the coarse phase.
+export async function saveProgress(req: Request, res: Response): Promise<void> {
+  const session = await sessionDb.getSession(req.params.id);
+  if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
+  const { activityStep, instructionDone } = req.body ?? {};
+  await sessionDb.updateSession(req.params.id, {
+    ...(typeof activityStep === 'number' ? { activityStep } : {}),
+    ...(instructionDone ? { instructionDone } : {}),
+    lastActivityAt: now(),
+  });
+  res.json({ ok: true });
+}
+
 export async function saveSession(req: Request, res: Response): Promise<void> {
   const session = await sessionDb.getSession(req.params.id);
   if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
@@ -377,6 +393,8 @@ export async function createRetry(req: Request, res: Response): Promise<void> {
     savedAt:           undefined,
     completedAt:       undefined,
     transcript:        undefined,
+    activityStep:      undefined,
+    instructionDone:   undefined,
     evaluation:        undefined,
     sapVerificationError: undefined,
     ttl:               ttlIn(SESSION_TTL_HOURS * 3600),

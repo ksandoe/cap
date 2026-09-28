@@ -26,6 +26,7 @@ interface SessionState {
   transcript:      ChatTurn[];
   evaluation:      Evaluation | null;
   instructorPreview: boolean;  // ?instructor=1 — rubric detail shown, clearly labeled
+  instructionDone: Record<string, string[]>;  // blockId → ticked instruction/item ids
 
   setSession:      (data: { token: string; sessionId: string; moduleId: string; currentPhase: number; instructorPreview?: boolean }) => void;
   setPhase:        (phase: number) => void;
@@ -35,6 +36,8 @@ interface SessionState {
   setAttemptNumber:(n: number) => void;
   setCheckinResponses: (responses: CheckinResponse[]) => void;
   setTranscript:   (turns: ChatTurn[]) => void;
+  setInstructionDone: (done: Record<string, string[]>) => void;
+  toggleInstructionItem: (blockId: string, itemId: string) => void;
   appendTurn:      (role: string, content: string, hidden?: boolean) => void;
   setEvaluation:   (evaluation: Evaluation) => void;
   reset:           () => void;
@@ -53,6 +56,7 @@ const initial = {
   transcript:       [] as ChatTurn[],
   evaluation:       null,
   instructorPreview: false,
+  instructionDone:  {} as Record<string, string[]>,
 };
 
 export const useSessionStore = create<SessionState>((set) => ({
@@ -68,6 +72,12 @@ export const useSessionStore = create<SessionState>((set) => ({
   setAttemptNumber:(attemptNumber) => set({ attemptNumber }),
   setCheckinResponses: (checkinResponses) => set({ checkinResponses }),
   setTranscript:   (transcript) => set({ transcript }),
+  setInstructionDone: (instructionDone) => set({ instructionDone }),
+  toggleInstructionItem: (blockId, itemId) => set(s => {
+    const cur = new Set(s.instructionDone[blockId] ?? []);
+    cur.has(itemId) ? cur.delete(itemId) : cur.add(itemId);
+    return { instructionDone: { ...s.instructionDone, [blockId]: [...cur] } };
+  }),
   appendTurn:      (role, content, hidden) =>
     set(s => ({ transcript: [...s.transcript, { role, content, hidden }] })),
   setEvaluation:   (evaluation) => set({ evaluation }),
