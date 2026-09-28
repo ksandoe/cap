@@ -15,7 +15,7 @@
  * localStore.ts so local dev works without AWS.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { USE_LOCAL_DB } from '../config/env';
 import { localEvalDb } from './localStore';
 
@@ -35,6 +35,10 @@ const TABLE = process.env.DYNAMODB_TABLE_EVALUATIONS!;
 const ddbEvalDb = {
   async saveAttempt(rec: EvalRecord): Promise<void> {
     await ddb.send(new PutCommand({ TableName: TABLE, Item: rec }));
+  },
+  async getAttempt(attemptId: string): Promise<EvalRecord | null> {
+    const r = await ddb.send(new GetCommand({ TableName: TABLE, Key: { attemptId } }));
+    return (r.Item as EvalRecord) ?? null;
   },
   async listForModule(moduleId: string): Promise<EvalRecord[]> {
     // Scan is fine at PoC scale — the eval table is small.

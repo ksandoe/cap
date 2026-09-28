@@ -25,14 +25,16 @@ interface SessionState {
   checkinResponses: CheckinResponse[];
   transcript:      ChatTurn[];
   evaluation:      Evaluation | null;
+  instructorPreview: boolean;  // ?instructor=1 — rubric detail shown, clearly labeled
 
-  setSession:      (data: { token: string; sessionId: string; moduleId: string; currentPhase: number }) => void;
+  setSession:      (data: { token: string; sessionId: string; moduleId: string; currentPhase: number; instructorPreview?: boolean }) => void;
   setPhase:        (phase: number) => void;
   setActivityStep: (i: number) => void;
   setRecipe:       (recipe: Recipe) => void;
   setParameters:   (p: Record<string, string>) => void;
   setAttemptNumber:(n: number) => void;
   setCheckinResponses: (responses: CheckinResponse[]) => void;
+  setTranscript:   (turns: ChatTurn[]) => void;
   appendTurn:      (role: string, content: string, hidden?: boolean) => void;
   setEvaluation:   (evaluation: Evaluation) => void;
   reset:           () => void;
@@ -50,19 +52,22 @@ const initial = {
   checkinResponses: [] as CheckinResponse[],
   transcript:       [] as ChatTurn[],
   evaluation:       null,
+  instructorPreview: false,
 };
 
 export const useSessionStore = create<SessionState>((set) => ({
   ...initial,
 
-  setSession:      ({ token, sessionId, moduleId, currentPhase }) =>
-                     set({ token, sessionId, moduleId, currentPhase }),
+  setSession:      ({ token, sessionId, moduleId, currentPhase, instructorPreview }) =>
+                     set(s => ({ token, sessionId, moduleId, currentPhase,
+                           instructorPreview: instructorPreview ?? s.instructorPreview })),
   setPhase:        (currentPhase) => set({ currentPhase }),
   setActivityStep: (activityStep) => set({ activityStep }),
   setRecipe:       (recipe) => set({ recipe }),
   setParameters:   (parameters) => set({ parameters }),
   setAttemptNumber:(attemptNumber) => set({ attemptNumber }),
   setCheckinResponses: (checkinResponses) => set({ checkinResponses }),
+  setTranscript:   (transcript) => set({ transcript }),
   appendTurn:      (role, content, hidden) =>
     set(s => ({ transcript: [...s.transcript, { role, content, hidden }] })),
   setEvaluation:   (evaluation) => set({ evaluation }),

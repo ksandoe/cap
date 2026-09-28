@@ -13,6 +13,7 @@ import { SessionListPage }    from './SessionListPage';
 import { TranscriptPage }     from './TranscriptPage';
 import { ValidationLogPage }  from './ValidationLogPage';
 import { ThresholdsPage }     from './ThresholdsPage';
+import { EvaluationsPage, EvaluationDetailPage } from './EvaluationsPage';
 
 export function InstructorLayout() {
   return (
@@ -23,6 +24,8 @@ export function InstructorLayout() {
         <Route path="sessions/:sessionId"        element={<TranscriptPage />} />
         <Route path="validation"                 element={<ValidationLogPage />} />
         <Route path="thresholds"                 element={<ThresholdsPage />} />
+        <Route path="evaluations"                element={<EvaluationsPage />} />
+        <Route path="evaluations/:attemptId"     element={<EvaluationDetailPage />} />
         <Route path="*"                          element={<ModuleListPage />} />
       </Routes>
     </AppShell>

@@ -45,15 +45,22 @@ devRouter.get('/launch', async (req: Request, res: Response) => {
     const persona  = (req.query.persona as string) || 'alex';
     const canvasUuid = PERSONAS[persona] ?? `dev-${persona}`;
 
-    const { sessionToken, redirectPhase } = await createSession({
+    // ?key= simulates the opaque session key the platform stores in the
+    // grade column and sends back on relaunch — resume without identity.
+    const key = (req.query.key as string) || undefined;
+
+    const { sessionToken, redirectPhase, sessionKey } = await createSession({
       canvasUuid,                          // stable identity → resume works across relaunches
       ltiContextId:       `dev-context-${moduleId}`,
       ltiResourceLinkId:  'dev-resource-link',
       agsEndpoint:        'local-dev',
       lisResultSourcedId: 'local-dev',
       moduleId,
-    });
-    res.redirect(`${frontendUrl}/launch?token=${sessionToken}&phase=${redirectPhase}`);
+    }, { sessionKey: key });
+    // &key=+&persona= ride along so the student SPA can "return" the key to
+    // the launchpad's localStorage — standing in for the Canvas grade column.
+    const instructor = req.query.instructor === '1' ? '&instructor=1' : '';
+    res.redirect(`${frontendUrl}/launch?token=${sessionToken}&phase=${redirectPhase}&key=${sessionKey}&persona=${persona}${instructor}`);
   } catch (err) {
     logger.error(EVENTS.LTI_LAUNCH_FAILED, { error: String(err), source: 'dev-launch' });
     const code = err instanceof Error ? err.message : 'UNKNOWN';

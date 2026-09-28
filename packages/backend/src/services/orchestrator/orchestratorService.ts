@@ -59,13 +59,32 @@ function stateForPhase(phase: number): string {
 export async function createSession(ltiContext: {
   canvasUuid: string; ltiContextId: string; ltiResourceLinkId: string;
   agsEndpoint: string; lisResultSourcedId: string; moduleId: string;
-}): Promise<{ sessionToken: string; redirectPhase: number }> {
+}, opts: { sessionKey?: string } = {}): Promise<{ sessionToken: string; redirectPhase: number; sessionKey: string }> {
 
-  // Check for an existing resumable session (includes SAVED — a paused
+  // Resume path 1 — opaque session key. In production this is the value
+  // CAP writes to the Canvas grade column (invisible to the student) via
+  // AGS; on relaunch the platform sends it back and it reconnects the
+  // launch to this session record without exposing student identity.
+  // In dev, the launchpad plays Canvas's role and passes ?key=.
+  let existing: any = null;
+  if (opts.sessionKey) {
+    existing = await sessionDb.findBySessionKey(opts.sessionKey);
+    // A key is only authoritative for its own module — a stale/foreign key
+    // must not hijack a different module's session.
+    if (existing && existing.moduleId !== ltiContext.moduleId) existing = null;
+    if (existing) logger.info(EVENTS.SESSION_RESUMED, { sessionId: existing.sessionId, via: 'sessionKey' });
+  }
+
+  // Resume path 2 — fallback identity lookup (includes SAVED — a paused
   // session is resumable while its account is still held)
-  const existing = await sessionDb.findActiveSession(ltiContext.canvasUuid, ltiContext.moduleId);
+  if (!existing)
+    existing = await sessionDb.findActiveSession(ltiContext.canvasUuid, ltiContext.moduleId);
+
   if (existing) {
     const updates: Record<string, unknown> = { lastActivityAt: now() };
+    // Backfill — sessions created before sessionKey existed get one on
+    // first resume so every live session has a resume link.
+    if (!existing.sessionKey) updates.sessionKey = `sk-${uuidv4()}`;
     // Refresh the parameter binding from the account's current param row —
     // values belong to the pooled account, so a recipe/params update since
     // the session was created should be picked up rather than leaving
@@ -87,7 +106,8 @@ export async function createSession(ltiContext: {
       moduleId: existing.moduleId,   currentPhase: existing.phaseReached,
       canvasUuid: existing.canvasUuid,
     });
-    return { sessionToken: token, redirectPhase: existing.phaseReached };
+    return { sessionToken: token, redirectPhase: existing.phaseReached,
+             sessionKey: (updates.sessionKey ?? existing.sessionKey) as string };
   }
 
   // Reclaim accounts held by dead sessions before taking a fresh one
@@ -107,6 +127,10 @@ export async function createSession(ltiContext: {
 
   const session = {
     sessionId, tempUserId, moduleId: ltiContext.moduleId,
+    // Opaque resume key — returned to the platform (Canvas grade column in
+    // production, launchpad localStorage in dev) so an interrupted/saved
+    // session reconnects without carrying any student identifier.
+    sessionKey:    `sk-${uuidv4()}`,
     recipeId:      recipe?.recipeId ?? null,
     recipeVersion: recipe?.version  ?? 1,
     state:      'LAUNCHED' as const,
@@ -134,7 +158,7 @@ export async function createSession(ltiContext: {
     currentPhase: PHASES.CHECKIN, canvasUuid: ltiContext.canvasUuid,
   });
 
-  return { sessionToken: token, redirectPhase: PHASES.CHECKIN };
+  return { sessionToken: token, redirectPhase: PHASES.CHECKIN, sessionKey: session.sessionKey };
 }
 
 // ── Stale-session sweep ───────────────────────────────────────────────────────
@@ -243,7 +267,9 @@ export async function saveSession(req: Request, res: Response): Promise<void> {
   });
   logger.info(EVENTS.SESSION_SAVED, { sessionId: req.params.id });
   // The SAP account stays assigned — resume via relaunch within SAVED_TTL_DAYS.
-  res.json({ ok: true, resumeWithinDays: SAVED_TTL_DAYS });
+  // sessionKey is returned so the platform-side record (Canvas grade column;
+  // launchpad localStorage in dev) holds the resume link.
+  res.json({ ok: true, resumeWithinDays: SAVED_TTL_DAYS, sessionKey: (session as any).sessionKey });
 }
 
 export async function completeSession(req: Request, res: Response): Promise<void> {
@@ -335,6 +361,7 @@ export async function createRetry(req: Request, res: Response): Promise<void> {
   const retrySession = {
     ...(parent ?? {}),
     sessionId:         newSessionId,
+    sessionKey:        `sk-${uuidv4()}`,   // fresh key — the parent's key stays with the dead session
     tempUserId:        parent?.tempUserId ?? claims.tempUserId,
     moduleId,
     canvasUuid:        parent?.canvasUuid ?? claims.canvasUuid,
@@ -364,5 +391,5 @@ export async function createRetry(req: Request, res: Response): Promise<void> {
     canvasUuid: retrySession.canvasUuid,
   });
 
-  res.json({ sessionToken: token, redirectPhase: toPhase });
+  res.json({ sessionToken: token, redirectPhase: toPhase, sessionKey: retrySession.sessionKey });
 }

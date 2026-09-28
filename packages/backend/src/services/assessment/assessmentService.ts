@@ -69,6 +69,15 @@ export async function processConversationTurn(req: Request, res: Response): Prom
     : await callModel(checkoutSystemPrompt, messages);
   logger.info(EVENTS.CHECKOUT_TURN, { sessionId, turn: messages.length });
 
+  // Persist the transcript on the session record so a saved/interrupted
+  // session resumes mid-conversation. Assistant markers ([PHASE:n],
+  // [ASSESSMENT:...]) are stripped — they are wire protocol, not content.
+  const cleaned = String(raw).replace(/\[PHASE:\d\]|\[ASSESSMENT:[^\]]*\]/g, '').trim();
+  sessionDb.updateSession(sessionId, {
+    transcript: [...messages, { role: 'assistant', content: cleaned }]
+      .map(({ role, content }: any) => ({ role, content })),
+  }).catch(() => { /* non-fatal — transcript loss only affects resume fidelity */ });
+
   res.json({ response: raw });
 }
 

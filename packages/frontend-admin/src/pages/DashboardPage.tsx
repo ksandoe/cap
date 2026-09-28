@@ -27,6 +27,7 @@ const SECTIONS: {
       { label: 'Modules',           to: '/instructor/modules' },
       { label: 'Validation log',    to: '/instructor/validation' },
       { label: 'Passing thresholds',to: '/instructor/thresholds' },
+      { label: 'Evaluation records',to: '/instructor/evaluations' },
     ],
   },
   {

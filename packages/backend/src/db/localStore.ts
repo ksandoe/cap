@@ -178,19 +178,19 @@ function seedRecipe(): void {
             isGate: true,
             instructions: [
               { instructionId: 'gi-1', text: 'Log into your assigned SAP sandbox account and create an inquiry (Sales → Inquiry → Create, or transaction VA11).' },
-              { instructionId: 'gi-2', text: 'Enter inquiry type <strong>IN</strong>, sales organization <strong>UE00</strong>, distribution channel <strong>WH</strong>, division <strong>BI</strong>, then continue.',
+              { instructionId: 'gi-2', text: 'Enter inquiry type <strong>IN</strong>, sales organization <strong>UE00</strong>, distribution channel <strong>WH</strong>, division <strong>BI</strong>, then continue.<p><img src="/img/seed-inq-orgdata" alt="Create Inquiry initial screen"></p>',
                 branches: [
                   { branchId: 'gb-1', condition: 'If a field is rejected',
                     text: 'Check the org data exactly: UE00 / WH / BI — typos here are the most common cause of errors.' },
                 ] },
-              { instructionId: 'gi-3', text: 'Search the Sold-To Party using your customer reference {custRef} with country US, and select <strong>PHILLY BIKES</strong>.' },
+              { instructionId: 'gi-3', text: 'Search the Sold-To Party using your customer reference {custRef} with country US, and select <strong>PHILLY BIKES</strong>.<p><img src="/img/seed-inq-soldto" alt="Customer search dialog"></p><p><img src="/img/seed-inq-custlist" alt="Customer list"></p>' },
               { instructionId: 'gi-4', text: 'Enter {custRef} for Cust. Reference, today for the reference date and Valid From, and one month from today for Valid To.' },
-              { instructionId: 'gi-5', text: 'Find the two materials Philly Bikes asked about — search for *{custRef} — and select <strong>DXTR1-{custRef}</strong> (Deluxe Touring, black) and <strong>PRTR1-{custRef}</strong> (Professional Touring, black).' },
-              { instructionId: 'gi-6', text: 'Enter the order quantities: {dxtrQty} for the Deluxe Touring and {prtrQty} for the Professional Touring. Check the net value shown.' },
-              { instructionId: 'gi-7', text: 'Select both items, open the item conditions, and on the Sales A tab set the order probability to {orderProb}% for each item. Return to the overview and confirm the expected order value recalculated.',
+              { instructionId: 'gi-5', text: 'Find the two materials Philly Bikes asked about — search for *{custRef} — and select <strong>DXTR1-{custRef}</strong> (Deluxe Touring, black) and <strong>PRTR1-{custRef}</strong> (Professional Touring, black).<p><img src="/img/seed-inq-matlist" alt="Material search results"></p>' },
+              { instructionId: 'gi-6', text: 'Enter the order quantities: {dxtrQty} for the Deluxe Touring and {prtrQty} for the Professional Touring. Check the net value shown.<p><img src="/img/seed-inq-qty" alt="Inquiry overview with quantities"></p>' },
+              { instructionId: 'gi-7', text: 'Select both items, open the item conditions, and on the Sales A tab set the order probability to {orderProb}% for each item. Return to the overview and confirm the expected order value recalculated.<p><img src="/img/seed-inq-itemcond" alt="Item conditions navigation"></p><p><img src="/img/seed-inq-salesa" alt="Sales A tab — order probability"></p>',
                 branches: [
                   { branchId: 'gb-2', condition: 'What is expected order value?',
-                    text: 'Net value × order probability — a 30% probability on a $21,400 inquiry shows 6,420. It estimates likely revenue, not a price the customer sees.' },
+                    text: 'Net value × order probability — a 30% probability on a $21,400 inquiry shows 6,420. It estimates likely revenue, not a price the customer sees.<p><img src="/img/seed-inq-result" alt="Expected order value result"></p>' },
                 ] },
               { instructionId: 'gi-8', text: 'Save and write down the inquiry document number — you will need it for the quotation.' },
             ] },
@@ -212,15 +212,15 @@ function seedRecipe(): void {
             layout: 'side_by_side',
             isGate: true,
             instructions: [
-              { instructionId: 'gi-1', text: 'Create a quotation (Sales → Quotation → Create, or transaction VA21). Enter quotation type <strong>QT</strong>, then click <strong>Create with Reference</strong> — do not type the data into a blank form.',
+              { instructionId: 'gi-1', text: 'Create a quotation (Sales → Quotation → Create, or transaction VA21). Enter quotation type <strong>QT</strong>, then click <strong>Create with Reference</strong> — do not type the data into a blank form.<p><img src="/img/seed-qt-create" alt="Create Quotation initial screen"></p><p><img src="/img/seed-qt-refdialog" alt="Create with Reference dialog"></p>',
                 branches: [
                   { branchId: 'gb-1', condition: 'Why "Create with Reference"?',
                     text: 'Referencing is what links your documents in the flow — the customer, materials, and quantities copy forward from your inquiry instead of being re-keyed.' },
                 ] },
-              { instructionId: 'gi-2', text: 'On the Inquiry tab, search by your customer reference {custRef}, select the inquiry you just created, and click <strong>Copy</strong>.' },
-              { instructionId: 'gi-3', text: 'Enter {custRef} for Cust. Reference, today for the reference date, and one month from today for Valid To and Req. Deliv. Date. Press Enter and acknowledge any warnings.' },
-              { instructionId: 'gi-4', text: 'Select the Deluxe Touring item and open its item conditions. Add condition type <strong>K004</strong> (material discount) with amount <strong>{itemDiscount}</strong>, then return to the quotation.' },
-              { instructionId: 'gi-5', text: 'For the order-level discount: Goto → Header → Conditions, add condition type <strong>RA00</strong> (net discount) with amount <strong>{orderDiscount}</strong>, press Enter, then click the activate icon to apply it.',
+              { instructionId: 'gi-2', text: 'On the Inquiry tab, search by your customer reference {custRef}, select the inquiry you just created, and click <strong>Copy</strong>.<p><img src="/img/seed-qt-search" alt="Inquiry search dialog"></p><p><img src="/img/seed-qt-list" alt="Inquiry list — select and copy"></p>' },
+              { instructionId: 'gi-3', text: 'Enter {custRef} for Cust. Reference, today for the reference date, and one month from today for Valid To and Req. Deliv. Date. Press Enter and acknowledge any warnings.<p><img src="/img/seed-qt-overview" alt="Quotation overview"></p>' },
+              { instructionId: 'gi-4', text: 'Select the Deluxe Touring item and open its item conditions. Add condition type <strong>K004</strong> (material discount) with amount <strong>{itemDiscount}</strong>, then return to the quotation.<p><img src="/img/seed-qt-itemcond" alt="Item pricing conditions — K004"></p>' },
+              { instructionId: 'gi-5', text: 'For the order-level discount: Goto → Header → Conditions, add condition type <strong>RA00</strong> (net discount) with amount <strong>{orderDiscount}</strong>, press Enter, then click the activate icon to apply it.<p><img src="/img/seed-qt-activate" alt="Header conditions — activate RA00"></p>',
                 branches: [
                   { branchId: 'gb-2', condition: 'Discount not showing in the price?',
                     text: 'The header condition only takes effect after you click the activate icon — an easy step to miss.' },
@@ -245,9 +245,9 @@ function seedRecipe(): void {
             layout: 'side_by_side',
             isGate: true,
             instructions: [
-              { instructionId: 'gi-1', text: 'Create a sales order (Sales → Order → Create, or transaction VA01). Enter order type <strong>OR</strong>, then click <strong>Create with Reference</strong>.' },
-              { instructionId: 'gi-2', text: 'Search by your customer reference {custRef}, select the quotation you just created, and click <strong>Copy</strong>.' },
-              { instructionId: 'gi-3', text: 'Enter {custRef} for Cust. Reference and today for the reference date. Notice the Req. Deliv. Date carried forward from the quotation.' },
+              { instructionId: 'gi-1', text: 'Create a sales order (Sales → Order → Create, or transaction VA01). Enter order type <strong>OR</strong>, then click <strong>Create with Reference</strong>.<p><img src="/img/seed-ord-create" alt="Create Sales Order initial screen"></p><p><img src="/img/seed-ord-refdialog" alt="Reference dialog"></p>' },
+              { instructionId: 'gi-2', text: 'Search by your customer reference {custRef}, select the quotation you just created, and click <strong>Copy</strong>.<p><img src="/img/seed-ord-list" alt="Quotation list — select and copy"></p>' },
+              { instructionId: 'gi-3', text: 'Enter {custRef} for Cust. Reference and today for the reference date. Notice the Req. Deliv. Date carried forward from the quotation.<p><img src="/img/seed-ord-overview" alt="Sales order overview"></p>' },
               { instructionId: 'gi-4', text: 'Save the sales order and note its document number from the confirmation message.' },
               { instructionId: 'gi-5', text: 'Open the document flow view and confirm your Inquiry, Quotation, and Sales Order are linked.' },
             ] },
@@ -356,6 +356,12 @@ export const localSessionDb = {
       s.state !== 'COMPLETED' && s.state !== 'EXPIRED' && s.state !== 'INTERRUPTED'
     ) ?? null;
   },
+  async findBySessionKey(sessionKey: string) {
+    return table('cap-sessions').find(s =>
+      s.sessionKey === sessionKey &&
+      s.state !== 'COMPLETED' && s.state !== 'EXPIRED' && s.state !== 'INTERRUPTED'
+    ) ?? null;
+  },
   async listSessions() {
     return [...table('cap-sessions')];
   },
@@ -450,6 +456,9 @@ export const localEvalDb = {
     const i = t.findIndex(r => r.attemptId === rec.attemptId);
     if (i >= 0) t[i] = rec; else t.push(rec);
     save();
+  },
+  async getAttempt(attemptId: string) {
+    return table('cap-evaluations').find(r => r.attemptId === attemptId) ?? null;
   },
   async listForModule(moduleId: string) {
     return table('cap-evaluations').filter(r => r.moduleId === moduleId);

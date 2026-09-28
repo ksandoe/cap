@@ -32,6 +32,15 @@ export function DevLaunchPage() {
   const [persona,  setPersona]  = useState(PERSONAS[0].key);
   const [modules,  setModules]  = useState<Module[] | null>(null);
   const [loadErr,  setLoadErr]  = useState(false);
+  const [instructorPreview, setInstructorPreview] = useState(false);
+
+  // Simulated "Canvas grade column": keys CAP returned on prior launches,
+  // stored per persona+module in localStorage by LaunchPage. Passing the
+  // key back on relaunch exercises the identity-free resume path.
+  const storedKey = (moduleId: string) => {
+    try { return localStorage.getItem(`cap-canvas-key:${persona}:${moduleId}`); }
+    catch { return null; }
+  };
 
   useEffect(() => {
     fetch(`${API_BASE}/dev/modules`)
@@ -82,6 +91,12 @@ export function DevLaunchPage() {
           Each persona has its own session — relaunching a module resumes
           where that persona left off.
         </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555', marginTop: 10, cursor: 'pointer' }}>
+          <input type="checkbox" checked={instructorPreview}
+                 onChange={e => setInstructorPreview(e.target.checked)} />
+          Instructor preview — show rubric scores on the summary page
+          <span style={{ color: '#999' }}>(testing only — students never see this)</span>
+        </label>
       </section>
 
       <section>
@@ -109,10 +124,19 @@ export function DevLaunchPage() {
               <div style={{ fontWeight: 600 }}>{m.moduleTitle}</div>
               <div style={{ fontSize: 13, color: '#777' }}>
                 Assignment · launches external tool
+                {storedKey(m.moduleId) && (
+                  <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 10,
+                                 background: '#eef3ea', color: '#4a6b2f', fontSize: 11,
+                                 border: '1px solid #c8dcc0' }}>
+                    resume key on file
+                  </span>
+                )}
               </div>
             </div>
             <a
-              href={`${API_BASE}/dev/launch?moduleId=${encodeURIComponent(m.moduleId)}&persona=${persona}`}
+              href={`${API_BASE}/dev/launch?moduleId=${encodeURIComponent(m.moduleId)}&persona=${persona}` +
+                    (storedKey(m.moduleId) ? `&key=${storedKey(m.moduleId)}` : '') +
+                    (instructorPreview ? '&instructor=1' : '')}
               style={{
                 padding: '9px 18px', background: '#1D4E8C', color: '#fff',
                 borderRadius: 6, textDecoration: 'none', fontWeight: 600,

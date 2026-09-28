@@ -12,6 +12,40 @@
  * TODO: implement each handler.
  */
 import { Request, Response } from 'express';
+import { evalDb } from '../../db/evalDb';
+
+/**
+ * Evaluation browser — reads the de-identified cap-evaluations store.
+ * Records carry no student identifiers by construction; this is the same
+ * dataset researchers would see post-IRB.
+ */
+export async function listEvaluations(req: Request, res: Response): Promise<void> {
+  const moduleId = (req.query.moduleId as string) ?? '';
+  const records  = await evalDb.listForModule(moduleId);
+  // List view omits transcripts — detail view fetches them separately.
+  res.json({ evaluations: records
+    .map(r => {
+      const ev = r.evaluation as any;
+      return {
+        attemptId:     r.attemptId,
+        moduleId:      r.moduleId,
+        recipeVersion: r.recipeVersion,
+        attemptNumber: r.attemptNumber,
+        completedAt:   r.completedAt,
+        overallScore:  ev?.overallScore ?? null,
+        badgeAwarded:  !!ev?.badgeAwarded,
+        dimensions:    (ev?.dimensionRatings ?? []).map((d: any) => d.dimensionName ?? d.dimension ?? d.name ?? '?'),
+      };
+    })
+    .sort((a, b) => b.completedAt.localeCompare(a.completedAt)),
+  });
+}
+
+export async function getEvaluation(req: Request, res: Response): Promise<void> {
+  const rec = await evalDb.getAttempt(req.params.id);
+  if (!rec) { res.status(404).json({ error: 'EVALUATION_NOT_FOUND' }); return; }
+  res.json(rec);
+}
 
 export async function listSessions(req: Request, res: Response): Promise<void> {
   // TODO: query DynamoDB for sessions by moduleId

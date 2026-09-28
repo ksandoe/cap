@@ -41,6 +41,10 @@ export const adminApi = {
     grantRetry:  (id: string, reason: string) => request<any>('POST', `/admin/sessions/${id}/grant-retry`, { reason }),
     reviewEval:  (id: string, ratings: any)   => request<any>('POST', `/admin/sessions/${id}/review`, { ratings }),
   },
+  evaluations: {
+    list: (moduleId: string) => request<any>('GET',  `/admin/evaluations?moduleId=${moduleId}`),
+    get:  (id: string)       => request<any>('GET',  `/admin/evaluations/${id}`),
+  },
   research: {
     query:       (params: any)        => request<any>('POST', '/admin/research/query', params),
     export:      (params: any)        => request<any>('POST', '/admin/research/export', params),

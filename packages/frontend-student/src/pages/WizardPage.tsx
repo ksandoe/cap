@@ -28,6 +28,8 @@ export function WizardPage() {
   const setRecipe    = useSessionStore(s => s.setRecipe);
   const setParams    = useSessionStore(s => s.setParameters);
   const setAttempt   = useSessionStore(s => s.setAttemptNumber);
+  const setTranscript = useSessionStore(s => s.setTranscript);
+  const setCheckinResponses = useSessionStore(s => s.setCheckinResponses);
   const navigate     = useNavigate();
 
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +44,12 @@ export function WizardPage() {
         if (session.phaseReached) setPhase(session.phaseReached);
         if (session.attemptNumber) setAttempt(session.attemptNumber);
         if (session.parameters) setParams(session.parameters);
+        // Resume hydration — a saved/interrupted session restores its
+        // conversation and check-in answers from the session record.
+        if (Array.isArray(session.transcript) && session.transcript.length)
+          setTranscript(session.transcript);
+        if (Array.isArray(session.checkinResponses) && session.checkinResponses.length)
+          setCheckinResponses(session.checkinResponses);
         if (moduleId) {
           const recipe = await api.recipe.get(moduleId);
           setRecipe(recipe);

@@ -49,6 +49,12 @@ adminRouter.get( '/sessions/:id/transcript',     requireRole(['instructor','admi
 adminRouter.post('/sessions/:id/grant-retry',    requireRole(['instructor','admin']), instructor.grantRetry);
 adminRouter.post('/sessions/:id/review',         requireRole(['instructor','admin']), instructor.reviewEvaluation);
 
+// De-identified evaluation records (rubric scores + transcripts) — the
+// same dataset researchers see post-IRB. No student identifiers exist
+// in this store.
+adminRouter.get( '/evaluations',                 requireRole(['instructor','researcher','admin']), instructor.listEvaluations);
+adminRouter.get( '/evaluations/:id',             requireRole(['instructor','researcher','admin']), instructor.getEvaluation);
+
 // ── Researcher routes ─────────────────────────────────────────────────────────
 adminRouter.post('/research/query',              requireRole(['researcher','admin']), researcher.queryResearch);
 adminRouter.post('/research/export',             requireRole(['researcher','admin']), researcher.exportResearch);

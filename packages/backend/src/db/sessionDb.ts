@@ -67,6 +67,25 @@ const ddbSessionDb = {
     return r.Items?.[0] ?? null;
   },
 
+  // Opaque session key — the value CAP conceptually writes back to the
+  // Canvas grade column (not student-visible). On relaunch the platform
+  // presents it and we resume by key instead of by student identity, so
+  // the link carries no PII. Scan is fine at PoC/demo scale.
+  async findBySessionKey(sessionKey: string) {
+    const r = await ddb.send(new ScanCommand({
+      TableName: TABLE,
+      FilterExpression: 'sessionKey = :k AND #s <> :completed AND #s <> :expired AND #s <> :interrupted',
+      ExpressionAttributeNames:  { '#s': 'state' },
+      ExpressionAttributeValues: {
+        ':k': sessionKey,
+        ':completed': 'COMPLETED', ':expired': 'EXPIRED', ':interrupted': 'INTERRUPTED',
+      },
+      // No Limit — DynamoDB applies it BEFORE FilterExpression, which would
+      // drop the match (same footgun as getActiveRecipe).
+    }));
+    return r.Items?.[0] ?? null;
+  },
+
   async listSessions() {
     // Scan is fine at PoC/demo scale — sessions are few and short-lived.
     const r = await ddb.send(new ScanCommand({ TableName: TABLE }));
