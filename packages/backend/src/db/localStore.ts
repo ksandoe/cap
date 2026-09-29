@@ -114,11 +114,25 @@ function seedRecipe(): void {
       { term: 'Expected order value', definition: 'Net value × order probability — an estimate of likely revenue used for pipeline reporting.' },
       { term: 'Condition types', definition: 'Pricing building blocks (e.g. K004 item discount, RA00 net discount) that combine to calculate the final price.' },
     ],
+    // IF/THEN pairs — when the trigger pattern appears, the agent should
+    // follow up along these lines. Authoring guidance: name the *pattern*
+    // in the trigger (not a literal phrase), and aim the follow-up at the
+    // understanding gap, not the missing fact.
     probingRules: [
       { trigger: 'Student describes a step without explaining its purpose',
-        followUp: 'Ask why that document/step exists in the process.' },
-      { trigger: 'Student names transaction codes without describing the business outcome',
-        followUp: 'Ask what the business achieves with that document.' },
+        followUp: 'Ask why that document exists in the process — what would be lost without it.' },
+      { trigger: 'Student names codes (IN/QT/OR, K004/RA00, VA11) without saying what they mean',
+        followUp: 'Ask what the business gets from that document or discount — meaning over memorization.' },
+      { trigger: 'Student says they "just followed the instructions" or clicked through',
+        followUp: 'Ask what would have been different if they had re-typed everything by hand — i.e., what "Create with Reference" actually did for them.' },
+      { trigger: 'Student glosses over order probability or expected order value',
+        followUp: 'Ask them to explain the calculation in their own words using their assigned probability and quantities.' },
+      { trigger: 'Student mentions an SAP message, warning, or something unexpected',
+        followUp: 'Ask what the message was telling them and how they decided what to do next.' },
+      { trigger: 'Student says data "just appeared" or carried over without reflection',
+        followUp: 'Ask which fields they entered themselves versus which arrived from the earlier document.' },
+      { trigger: 'Student mentions both discounts but not the difference between them',
+        followUp: 'Ask which discount applied to a single bike versus the whole order, and why a company would use each.' },
     ],
     // Per-student parameters — values are bound at launch from the cap-params
     // table row for the student's assigned SAP account, and substituted into
@@ -139,7 +153,10 @@ function seedRecipe(): void {
         title: 'Introduction',
         description: 'Read the background on the SAP sales document flow and check your understanding.',
         outcomeTagIndices: [0, 3],
-        understandingNote: 'Student should grasp the inquiry → quotation → order chain and why each document exists, not just the transaction codes.',
+        understandingNote:
+          'Listen for: the three documents named in sequence and framed as one connected ' +
+          'flow rather than three isolated forms — ideally with a sense of who commits whom ' +
+          'at each hop (customer interest → seller\u2019s offer → confirmed agreement).',
         blocks: [
           { blockId: 'cb-concept-1', type: 'rich_text',
             title: 'Scenario: Philly Bikes',
@@ -171,7 +188,12 @@ function seedRecipe(): void {
         title: 'Inquiry',
         description: 'In the SAP sandbox, create an Inquiry for Philly Bikes — a non-binding record of what the customer asked for.',
         outcomeTagIndices: [1, 2],
-        understandingNote: 'Student should recognize that an inquiry records customer interest without committing either party, that order probability drives the expected order value, and that master data is reused rather than re-keyed.',
+        understandingNote:
+          'Listen for: the inquiry as a record of customer interest that binds nobody; ' +
+          'order probability driving expected order value (can the student explain net value ' +
+          '× their assigned probability, ideally with their own numbers?); customer and ' +
+          'material master data being found and reused rather than re-keyed; and why the ' +
+          'unique customer reference made their documents findable later.',
         blocks: [
           { blockId: 'cb-gt-inq', type: 'guided_tool',
             title: 'Create the inquiry',
@@ -206,7 +228,11 @@ function seedRecipe(): void {
         title: 'Quotation',
         description: 'Create a Quotation that references your inquiry — the binding offer — and apply your authorized discounts.',
         outcomeTagIndices: [1, 2],
-        understandingNote: 'Student should see that the quotation is the binding offer, that referencing the inquiry carries data forward instead of re-entering it, and that pricing is built from condition types (item-level vs header-level).',
+        understandingNote:
+          'Listen for: the quotation as the seller\u2019s binding offer; "Create with Reference" ' +
+          'carrying sold-to, materials, and quantities forward instead of re-keying; the ' +
+          'difference between an item-level condition (K004 — one bike) and an order-level ' +
+          'condition (RA00 — the whole order); and why a business would want both knobs.',
         blocks: [
           { blockId: 'cb-gt-quot', type: 'guided_tool',
             title: 'Create the quotation',
@@ -239,7 +265,11 @@ function seedRecipe(): void {
         title: 'Sales Order',
         description: 'Philly Bikes accepted your quotation — create the Sales Order by reference and confirm the document flow links all three documents.',
         outcomeTagIndices: [1, 3],
-        understandingNote: 'Student should recognize the order as the confirmed agreement, and be able to trace the full inquiry → quotation → order document flow.',
+        understandingNote:
+          'Listen for: the order as the confirmed agreement that completes the chain; ' +
+          'ability to trace the document flow backward (order ← quotation ← inquiry) and ' +
+          'name what traveled in each hop; awareness of what they still had to enter ' +
+          'versus what arrived automatically.',
         blocks: [
           { blockId: 'cb-gt-ord', type: 'guided_tool',
             title: 'Create the sales order',
@@ -265,9 +295,15 @@ function seedRecipe(): void {
       { name: 'Conceptual vocabulary',   description: 'Uses domain terms (document flow, master data, binding vs non-binding) accurately.' },
       { name: 'Transfer and reflection', description: 'Connects the process to durable skills and career contexts.' },
     ],
+    // Patterns that signal a thin answer worth a follow-up. Authoring
+    // guidance: describe the *shape* of a vague answer, not a keyword.
     vagueAnswerTriggers: [
       'Student describes a step without explaining its purpose.',
       'Student uses vocabulary without demonstrating what it means.',
+      'Student repeats instruction text ("I entered the values") instead of describing their own experience.',
+      '"It worked" or "it just did it" without saying what actually happened.',
+      'Student says data "copied over" without identifying which document supplied it.',
+      'Student cites a document number or code as if it demonstrates understanding.',
     ],
     careerTransferPrompts: [
       'How might understanding this document flow help you in a procurement or operations role?',
