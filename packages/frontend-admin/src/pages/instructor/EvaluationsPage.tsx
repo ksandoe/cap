@@ -142,7 +142,7 @@ export function EvaluationDetailPage() {
       {(ev.outcomeSummary?.length ?? 0) > 0 && (
         <ul style={{ fontSize: 13, color: '#555' }}>
           {ev.outcomeSummary.map((o: any, i: number) => (
-            <li key={i}>{typeof o === 'string' ? o : `${o.outcome ?? o.name ?? ''}: ${o.status ?? o.rating ?? ''}`}</li>
+            <li key={i}>{typeof o === 'string' ? o : `${o.outcomeText ?? o.outcome ?? o.name ?? ''}: ${o.status ?? o.rating ?? ''}`}</li>
           ))}
         </ul>
       )}

@@ -99,15 +99,11 @@ function seedRecipe(): void {
       'Students work the SAP sales document flow — Inquiry, Quotation, and Sales ' +
       'Order — and learn why each document exists and how data carries forward.',
     learningOutcomes: [
-      'Explain the role and sequence of an inquiry, quotation, and sales order in the SAP sales process.',
-      'Create a customer inquiry in SAP using appropriate customer, material, quantity, date, and organizational information.',
-      'Interpret order probability and expected order value and explain how changes in probability affect the expected value of an inquiry.',
-      'Create a customer quotation by referencing an existing inquiry and carrying forward relevant transaction data.',
-      'Apply and distinguish item-level and order-level pricing conditions in a quotation.',
-      'Create a sales order by referencing an accepted quotation and verify that the transaction has been successfully recorded.',
-      'Trace how customer, product, pricing, and transaction data move across related SAP sales documents.',
-      'Explain how document integration in SAP supports a connected business process rather than a collection of isolated transactions.',
-      'Respond appropriately to common SAP messages, warnings, and variations encountered while completing the sales process.',
+      'Describe how inquiries, quotations, and sales orders are connected within the SAP sales process.',
+      'Complete the inquiry-to-sales-order process in SAP using appropriate customer, product, pricing, and transaction information.',
+      'Interpret selected sales information, including order probability, expected order value, and pricing conditions.',
+      'Explain how SAP carries information across related documents to support an integrated business process.',
+      'Reflect on their experience using SAP and identify ways their understanding, confidence, or approach to enterprise systems developed during the activity.',
     ],
     keyConcepts: [
       { term: 'Inquiry',      definition: 'A non-binding request from a customer for pricing/availability. Not a commitment to purchase.' },
@@ -142,7 +138,7 @@ function seedRecipe(): void {
       { stepId: 'st-intro', stepNumber: 1,
         title: 'Introduction',
         description: 'Read the background on the SAP sales document flow and check your understanding.',
-        outcomeTagIndices: [0, 7],
+        outcomeTagIndices: [0, 3],
         understandingNote: 'Student should grasp the inquiry → quotation → order chain and why each document exists, not just the transaction codes.',
         blocks: [
           { blockId: 'cb-concept-1', type: 'rich_text',
@@ -174,7 +170,7 @@ function seedRecipe(): void {
       { stepId: 'st-inquiry', stepNumber: 2,
         title: 'Inquiry',
         description: 'In the SAP sandbox, create an Inquiry for Philly Bikes — a non-binding record of what the customer asked for.',
-        outcomeTagIndices: [1, 2, 8],
+        outcomeTagIndices: [1, 2],
         understandingNote: 'Student should recognize that an inquiry records customer interest without committing either party, that order probability drives the expected order value, and that master data is reused rather than re-keyed.',
         blocks: [
           { blockId: 'cb-gt-inq', type: 'guided_tool',
@@ -209,7 +205,7 @@ function seedRecipe(): void {
       { stepId: 'st-quotation', stepNumber: 3,
         title: 'Quotation',
         description: 'Create a Quotation that references your inquiry — the binding offer — and apply your authorized discounts.',
-        outcomeTagIndices: [3, 4],
+        outcomeTagIndices: [1, 2],
         understandingNote: 'Student should see that the quotation is the binding offer, that referencing the inquiry carries data forward instead of re-entering it, and that pricing is built from condition types (item-level vs header-level).',
         blocks: [
           { blockId: 'cb-gt-quot', type: 'guided_tool',
@@ -242,7 +238,7 @@ function seedRecipe(): void {
       { stepId: 'st-order', stepNumber: 4,
         title: 'Sales Order',
         description: 'Philly Bikes accepted your quotation — create the Sales Order by reference and confirm the document flow links all three documents.',
-        outcomeTagIndices: [5, 6],
+        outcomeTagIndices: [1, 3],
         understandingNote: 'Student should recognize the order as the confirmed agreement, and be able to trace the full inquiry → quotation → order document flow.',
         blocks: [
           { blockId: 'cb-gt-ord', type: 'guided_tool',
