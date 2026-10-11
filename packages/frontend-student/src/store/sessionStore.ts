@@ -11,7 +11,7 @@
 import { create } from 'zustand';
 import { Evaluation, CheckinResponse, Recipe } from '@cap/shared';
 
-export interface ChatTurn { role: string; content: string; hidden?: boolean }
+export interface ChatTurn { role: string; content: string; hidden?: boolean; grace?: boolean }
 
 interface SessionState {
   token:           string | null;
@@ -40,6 +40,7 @@ interface SessionState {
   setInstructionDone: (done: Record<string, string[]>) => void;
   toggleInstructionItem: (blockId: string, itemId: string) => void;
   appendTurn:      (role: string, content: string, hidden?: boolean) => void;
+  markLastUserGrace: () => void;   // agent flagged the last user turn as a clarification — doesn't burn budget
   setEvaluation:   (evaluation: Evaluation) => void;
   reset:           () => void;
 }
@@ -83,6 +84,14 @@ export const useSessionStore = create<SessionState>((set) => ({
   }),
   appendTurn:      (role, content, hidden) =>
     set(s => ({ transcript: [...s.transcript, { role, content, hidden }] })),
+  markLastUserGrace: () =>
+    set(s => {
+      const t = [...s.transcript];
+      for (let i = t.length - 1; i >= 0; i--) {
+        if (t[i].role === 'user' && !t[i].hidden) { t[i] = { ...t[i], grace: true }; break; }
+      }
+      return { transcript: t };
+    }),
   setEvaluation:   (evaluation) => set({ evaluation }),
   reset:           () => set(initial),
 }));

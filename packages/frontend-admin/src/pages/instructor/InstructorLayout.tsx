@@ -26,7 +26,7 @@ export function InstructorLayout() {
         <Route path="thresholds"                 element={<ThresholdsPage />} />
         <Route path="evaluations"                element={<EvaluationsPage />} />
         <Route path="evaluations/:attemptId"     element={<EvaluationDetailPage />} />
-        <Route path="*"                          element={<ModuleListPage />} />
+        <Route path="*"                          element={<EvaluationsPage />} />
       </Routes>
     </AppShell>
   );

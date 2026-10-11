@@ -313,13 +313,9 @@ WITH inserted_recipe AS (
             ),
 
             -- ── Instructional recipe ──────────────────────────────────────────
-            'rubricDimensions', jsonb_build_array(
-                jsonb_build_object('name', 'Process understanding',  'description', 'Can the student explain the purpose of each document and how they connect in the sales cycle, beyond describing what buttons they clicked?'),
-                jsonb_build_object('name', 'Conceptual grasp',       'description', 'Does the student understand the business logic behind the process — who commits to what, when, and why?'),
-                jsonb_build_object('name', 'System proficiency',     'description', 'Can the student articulate what they did in SAP and why each system step mattered, including the significance of creating documents with reference?'),
-                jsonb_build_object('name', 'Durable skills transfer','description', 'Can the student connect this activity to transferable skills (attention to detail, process thinking, professional communication) and their future career?')
-            ),
-
+            -- v3: evaluation uses the platform-wide MASTER_RUBRIC — per-recipe
+            -- rubricDimensions, careerTransferPrompts, maxTurns, and contentStub
+            -- were removed from authoring.
             'probingRules', jsonb_build_array(
                 jsonb_build_object(
                     'trigger',   'Student describes creating a document without explaining its purpose',
@@ -350,24 +346,7 @@ WITH inserted_recipe AS (
                 'Student says "I don''t know" or "I''m not sure" without attempting an answer'
             ),
 
-            'careerTransferPrompts', jsonb_build_array(
-                'If you were working in a sales role, procurement, or operations at a company that uses SAP or a similar ERP system, how might understanding this process help you do your job better?',
-                'What skills did you practice during this activity that you think will be useful regardless of which software tools you use in your career?',
-                'If a colleague who had never used SAP asked you to explain what you did today in plain language, what would you say?'
-            ),
-
-            'toneGuidance', 'Many students completing this module have little to no prior business or ERP experience. Be patient and encouraging. Acknowledge that the SAP interface can feel unfamiliar and that understanding the business logic takes time. Celebrate specific moments of understanding — when a student makes a connection between the documents and real business situations, affirm it explicitly before pushing deeper.',
-
-            'maxTurns', 24,
-
-            -- ── Content stub ─────────────────────────────────────────────────
-            'contentStub', jsonb_build_object(
-                'summaryText', 'In this module you will learn how businesses use SAP to manage the early stages of a sale — from a customer''s first inquiry through to a confirmed sales order. You will practice creating three core documents in SAP''s Sales & Distribution module: an Inquiry, a Quotation, and a Sales Order. By the end of the activity you should be able to explain not just what each document is, but why it exists and how the three documents connect as a sequence.',
-                'resourceLinks', jsonb_build_array(
-                    jsonb_build_object('url', 'https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/sd', 'label', 'SAP SD documentation', 'type', 'reading'),
-                    jsonb_build_object('url', 'https://www.sap.com/products/erp/what-is-erp.html',   'label', 'What is ERP? (SAP overview)', 'type', 'reading')
-                )
-            )
+            'toneGuidance', 'Many students completing this module have little to no prior business or ERP experience. Be patient and encouraging. Acknowledge that the SAP interface can feel unfamiliar and that understanding the business logic takes time. Celebrate specific moments of understanding — when a student makes a connection between the documents and real business situations, affirm it explicitly before pushing deeper.'
         )
     )
     RETURNING recipe_id, module_id

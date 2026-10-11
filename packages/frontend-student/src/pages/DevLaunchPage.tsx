@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { API_BASE } from '../services/api';
+import { APP_VERSION } from '@cap/shared';
 
 interface Module { moduleId: string; moduleTitle: string }
 
@@ -159,6 +160,7 @@ export function DevLaunchPage() {
         Demo launchpad — replaces Canvas while LTI registration is pending.
         The launch itself exercises the real session pipeline.
       </p>
+      <p style={{ fontSize: 11, color: '#bbb' }}>CAP v{APP_VERSION}</p>
     </div>
   );
 }

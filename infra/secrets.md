@@ -12,3 +12,4 @@ All secrets stored under prefix: cap/<env>/
 | cap/prod/session-jwt-secret   | HS256 secret for student session token signing     |
 | cap/prod/admin-jwt-secret     | HS256 secret for admin JWT signing                 |
 | cap/prod/aurora-password      | Aurora PostgreSQL password                         |
+| cap/prod/admin-passkey        | Shared team passkey for Admin App sign-in (v3 interim; replaced by OTP) |

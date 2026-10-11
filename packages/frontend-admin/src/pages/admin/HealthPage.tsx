@@ -6,12 +6,15 @@
  *
  * TODO: fetch from GET /admin/health
  */
+import { PlannedBanner } from '../../components/PlannedPage';
+
 const INTEGRATIONS = ['Canvas LMS', 'SAP Sandbox', 'Credly', 'Anthropic API'];
 
 export function HealthPage() {
   return (
     <div>
       <h2 style={{ color: '#1e6b34', marginBottom: 24 }}>Integration health</h2>
+      <PlannedBanner />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {INTEGRATIONS.map(name => (
           <div key={name} style={{ background: '#fff', border: '1px solid #ddd',
@@ -24,7 +27,7 @@ export function HealthPage() {
               </span>
             </div>
             <p style={{ color: '#aaa', fontSize: 12, marginTop: 8 }}>
-              TODO: last successful call — never · last error — never
+              Last successful call — · last error —
             </p>
           </div>
         ))}

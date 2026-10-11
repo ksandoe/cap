@@ -14,19 +14,44 @@ const BASE = API_BASE;
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = useAuthStore.getState().token;
-  const resp  = await fetch(`${BASE}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  if (!resp.ok) throw new Error(`API ${resp.status}: ${await resp.text()}`);
+  let resp: Response;
+  try {
+    resp = await fetch(`${BASE}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch {
+    throw new Error('Backend unreachable — is the API server running on :3001?');
+  }
+  if (!resp.ok) {
+    const text = await resp.text();
+    // The Vite dev proxy returns an HTML 500 when the backend is down —
+    // surface that case plainly instead of dumping markup into the UI.
+    if (text.trimStart().startsWith('<')) {
+      throw new Error(`API ${resp.status} — backend may be down or restarting on :3001`);
+    }
+    throw new Error(`API ${resp.status}: ${text}`);
+  }
   return resp.json();
 }
 
 export const adminApi = {
+  // v3 guided authoring — drafts + AI generation dialog
+  authoring: {
+    listDrafts:  ()                 => request<{ drafts: any[] }>('GET',  '/admin/authoring/drafts'),
+    createDraft: (body: any)        => request<{ draft: any }>('POST',    '/admin/authoring/drafts', body),
+    getDraft:    (id: string)       => request<{ draft: any }>('GET',     `/admin/authoring/drafts/${encodeURIComponent(id)}`),
+    updateDraft: (id: string, body: any) => request<{ draft: any }>('PUT',`/admin/authoring/drafts/${encodeURIComponent(id)}`, body),
+    deleteDraft: (id: string)       => request<{ ok: boolean }>('DELETE', `/admin/authoring/drafts/${encodeURIComponent(id)}`),
+    publish:     (id: string)       => request<{ recipe: any }>('POST',   `/admin/authoring/drafts/${encodeURIComponent(id)}/publish`),
+    extractText: (file: { filename: string; data: string }) =>
+                                    request<{ filename: string; text: string; chars: number }>('POST', '/admin/authoring/extract-text', file),
+    generate:    (body: any)        => request<{ generated: any; draft?: any }>('POST', '/admin/authoring/generate', body),
+  },
   recipe: {
     list:          ()                 => request<{ recipes: any[] }>('GET', '/recipe'),
     get:           (moduleId: string) => request<any>('GET',  `/recipe/${moduleId}`),
@@ -66,6 +91,13 @@ export const adminApi = {
       query: (params: any)            => request<any>('POST', '/admin/audit-log/query', params),
     },
     health:    ()                     => request<any>('GET',  '/admin/health'),
+    platform: {
+      get:          ()                => request<any>('GET',    '/admin/platform'),
+      saveRubric:   (rubric: any[])   => request<any>('PUT',    '/admin/platform/rubric', { rubric }),
+      resetRubric:  ()                => request<any>('DELETE', '/admin/platform/rubric'),
+      savePasskey:  (passkey: string) => request<any>('PUT',    '/admin/platform/passkey', { passkey }),
+      resetPasskey: ()                => request<any>('DELETE', '/admin/platform/passkey'),
+    },
     irbConfig: {
       get:  (moduleId: string)        => request<any>('GET',  `/admin/irb-config/${moduleId}`),
       save: (config: any)             => request<any>('POST', '/admin/irb-config', config),

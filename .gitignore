@@ -10,3 +10,4 @@ cap_scaffold*.zip
 .amplify/
 cdk.out/
 .serverless/
+cap-deploy.zip

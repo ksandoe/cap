@@ -2,11 +2,11 @@
  * SessionListPage.tsx — TODO: implement
  * Refer to user stories INS-01 through INS-06 and Master PRD Section 4.2.
  */
+import { PlannedPage } from '../../components/PlannedPage';
+
 export function SessionListPage() {
   return (
-    <div>
-      <h2 style={{ color: '#1e6b34' }}>SessionListPage</h2>
-      <p style={{ color: '#888' }}>TODO: implement</p>
-    </div>
+    <PlannedPage title="Sessions"
+      blurb="Per-module session list with status, retry management, and transcript links." />
   );
 }

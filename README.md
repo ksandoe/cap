@@ -21,12 +21,28 @@ npm run dev               # starts all three on their respective ports
 
 Then open http://localhost:3000 and click **Launch demo** — the dev landing
 page simulates the Canvas LTI launch. The Admin App runs at
-http://localhost:3002 — dev logins are seeded (`admin@cap.local` /
-`dev-admin-password`; also `author@`, `instructor@`, `researcher@` variants).
+http://localhost:3002 and signs in with a shared team passkey
+(`ADMIN_PASSKEY` in `.env`, dev default `cap-team-2026`, plus an optional
+display name used for draft attribution). This is an interim measure — the planned
+model is OTP sign-on against institutional emails with per-user roles
+managed by a superadmin; the role-gate plumbing already supports it.
+
+The authoring wizard separates two jobs: **Student activity** (steps +
+parameters — the instructions students follow, always author-built) and
+**Assessment recipe** (outcomes, concepts, conversation guidance — the
+principles the reflective agent works from; the AI generation dialog
+drafts these fields from uploaded source materials).
+
+Under **Admin → Platform settings** the team can rotate the shared
+passkey (a stored override that takes precedence over `ADMIN_PASSKEY`)
+and edit the platform-wide master rubric that all evaluations run
+against (the `MASTER_RUBRIC` code constant remains the fallback; rubric
+edits apply to new conversations/evaluations).
 
 Local dev runs against a JSON-file store (`USE_LOCAL_DB=true`, data in
 `packages/backend/.dev-data/`) seeded with a demo recipe and SAP account
-pool — no AWS required. SAP verification, Canvas grade return, and Credly
+pool — no AWS required. Authoring drafts persist under the same store, so
+work in progress survives dev-server restarts. SAP verification, Canvas grade return, and Credly
 badge issuance are simulated. With no `OPENAI_API_KEY` set, the AI calls
 return canned mock responses (`LLM_MODE=mock`); add a key to `.env` for the
 real OpenAI-compatible API (Azure OpenAI supported — see `.env.example`).
@@ -76,8 +92,10 @@ API Gateway → Lambda (Express backend — packages/backend)
     ┌─────────────┴──────────────────────────────────────┘
     │
     ├── DynamoDB
-    │     ├── cap-sessions    (ephemeral, TTL — student sessions)
-    │     └── cap-sap-pool    (SAP account pool)
+    │     ├── cap-sessions        (ephemeral, TTL — student sessions)
+    │     ├── cap-sap-pool        (SAP account pool)
+    │     ├── cap-recipes         (published recipe versions)
+    │     └── cap-recipe-drafts   (v3 authoring drafts — resumable)
     │
     ├── Aurora PostgreSQL (Serverless v2)
     │     ├── public schema   (recipes, module_config, audit_log, …)

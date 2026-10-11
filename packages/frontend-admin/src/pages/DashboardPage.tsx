@@ -2,55 +2,15 @@
  * DashboardPage.tsx — Unified admin landing page.
  *
  * One login, one page: four sections (authoring, instructor, researcher,
- * administration) with links into each area's pages. Role-based menu
- * restrictions can be layered on later by graying out sections.
+ * administration) with links into each area's pages. Section definitions
+ * live in config/sections.ts — the top-nav dropdowns read the same list,
+ * so tiles and menus always match. `soon` links render a "not yet built"
+ * tag so the menu doesn't over-promise.
  */
 import { Link } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
-
-const SECTIONS: {
-  title: string; blurb: string;
-  links: { label: string; to: string }[];
-}[] = [
-  {
-    title: 'Authoring',
-    blurb: 'Create and revise instructional recipes — outcomes, steps, content blocks, rubric, and probing behavior.',
-    links: [
-      { label: 'Recipes',       to: '/author/recipes' },
-      { label: 'New recipe',    to: '/author/recipes/new' },
-    ],
-  },
-  {
-    title: 'Instructor',
-    blurb: 'Monitor module activity, review session transcripts and evaluations, manage retries.',
-    links: [
-      { label: 'Modules',           to: '/instructor/modules' },
-      { label: 'Validation log',    to: '/instructor/validation' },
-      { label: 'Passing thresholds',to: '/instructor/thresholds' },
-      { label: 'Evaluation records',to: '/instructor/evaluations' },
-    ],
-  },
-  {
-    title: 'Researcher',
-    blurb: 'De-identified session data for approved research. Consent and IRB-gated exports.',
-    links: [
-      { label: 'Data browser', to: '/researcher/data' },
-      { label: 'Export',       to: '/researcher/export' },
-      { label: 'Consent',      to: '/researcher/consent' },
-    ],
-  },
-  {
-    title: 'Administration',
-    blurb: 'Module configuration, SAP account pool, integration health, audit log, and IRB controls.',
-    links: [
-      { label: 'Module config', to: '/admin/modules' },
-      { label: 'SAP pool',      to: '/admin/sap-pool' },
-      { label: 'Audit log',     to: '/admin/audit-log' },
-      { label: 'Health',        to: '/admin/health' },
-      { label: 'IRB',           to: '/admin/irb' },
-    ],
-  },
-];
+import { SECTIONS } from '../config/sections';
+import { SoonTag } from '../components/PlannedPage';
 
 export function DashboardPage() {
   return (
@@ -73,8 +33,9 @@ export function DashboardPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {s.links.map(l => (
                   <Link key={l.to} to={l.to}
-                    style={{ color: '#1e6b34', fontSize: 14, textDecoration: 'none' }}>
+                    style={{ color: l.soon ? '#999' : '#1e6b34', fontSize: 14, textDecoration: 'none' }}>
                     {l.label} →
+                    {l.soon && <SoonTag />}
                   </Link>
                 ))}
               </div>

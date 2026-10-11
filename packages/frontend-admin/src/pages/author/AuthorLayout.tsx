@@ -1,23 +1,27 @@
 /**
- * AuthorLayout.tsx — Domain expert module wrapper.
+ * AuthorLayout.tsx — Domain expert module wrapper (v3).
  * Routes:
- *   /author/recipes           → recipe list
- *   /author/recipes/new       → new recipe form
- *   /author/recipes/:id       → edit existing recipe
+ *   /author/recipes              → modules workspace (drafts + published)
+ *   /author/generate             → AI-assisted generation dialog
+ *   /author/drafts/:draftId      → authoring wizard (draft resume)
+ *   /author/modules/:moduleId    → authoring wizard (maintenance, seeded
+ *                                  from the module's active version)
  */
 import { Routes, Route } from 'react-router-dom';
 import { AppShell }       from '../../components/layout/AppShell';
 import { RecipeListPage } from './RecipeListPage';
-import { RecipeFormPage } from './RecipeFormPage';
+import { GeneratePage }   from './GeneratePage';
+import { AuthoringWizard } from './AuthoringWizard';
 
 export function AuthorLayout() {
   return (
     <AppShell>
       <Routes>
-        <Route path="recipes"         element={<RecipeListPage />} />
-        <Route path="recipes/new"     element={<RecipeFormPage />} />
-        <Route path="recipes/:id"     element={<RecipeFormPage />} />
-        <Route path="*"               element={<RecipeListPage />} />
+        <Route path="recipes"             element={<RecipeListPage />} />
+        <Route path="generate"            element={<GeneratePage />} />
+        <Route path="drafts/:draftId"     element={<AuthoringWizard />} />
+        <Route path="modules/:moduleId"   element={<AuthoringWizard />} />
+        <Route path="*"                   element={<RecipeListPage />} />
       </Routes>
     </AppShell>
   );

@@ -31,3 +31,17 @@
   - Get active recipe by moduleId
   - List all versions by moduleId
   - Put new recipe version
+
+## cap-recipe-drafts (v3)
+- **Purpose:** Server-side authoring drafts — works in progress for the
+  wizard, including extracted source-material text, clarifying answers,
+  AI-generated fields, and per-section completion state. Permanent (no
+  TTL); deleted on publish or explicit discard.
+- **PK:** `draftId` (String)
+- **Access patterns:**
+  - List all drafts (workspace "drafts in progress" zone)
+  - Get/update draft by draftId (autosave + resume across sessions)
+  - Create draft (blank, AI-generated, or seeded from a published recipe)
+  - Delete draft on publish or discard
+- **Note:** `sourceMaterials` holds extracted plain text only — the
+  uploaded file bytes are never persisted.

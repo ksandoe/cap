@@ -8,10 +8,13 @@
  *
  * TODO: implement — fetch from GET /admin/sap-pool/status
  */
+import { PlannedBanner } from '../../components/PlannedPage';
+
 export function SapPoolPage() {
   return (
     <div>
       <h2 style={{ color: '#1e6b34', marginBottom: 24 }}>SAP account pool</h2>
+      <PlannedBanner extra="The /admin/sap-pool API exists — this page just isn't wired to it yet." />
 
       {/* Status summary — TODO: replace with live data */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 32 }}>
@@ -41,7 +44,7 @@ export function SapPoolPage() {
       </div>
 
       <p style={{ color: '#aaa', fontSize: 13 }}>
-        TODO: load account table from DynamoDB via /admin/sap-pool/status.
+        Planned: load account table from DynamoDB via /admin/sap-pool/status.
         Flag accounts where assignedAt &gt; session TTL as stale.
       </p>
     </div>

@@ -14,7 +14,7 @@ import { ModuleConfigPage }    from './ModuleConfigPage';
 import { SapPoolPage }         from './SapPoolPage';
 import { AuditLogPage }        from './AuditLogPage';
 import { HealthPage }          from './HealthPage';
-import { IrbConfigPage }       from './IrbConfigPage';
+import { PlatformPage }        from './PlatformPage';
 
 export function AdminLayout() {
   return (
@@ -22,11 +22,11 @@ export function AdminLayout() {
       <Routes>
         <Route path="modules"      element={<ModuleConfigPage />} />
         <Route path="modules/:id"  element={<ModuleConfigPage />} />
+        <Route path="platform"     element={<PlatformPage />} />
         <Route path="sap-pool"     element={<SapPoolPage />} />
         <Route path="audit-log"    element={<AuditLogPage />} />
         <Route path="health"       element={<HealthPage />} />
-        <Route path="irb"          element={<IrbConfigPage />} />
-        <Route path="*"            element={<ModuleConfigPage />} />
+        <Route path="*"            element={<PlatformPage />} />
       </Routes>
     </AppShell>
   );

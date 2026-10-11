@@ -1,12 +1,13 @@
 /**
  * ModuleConfigPage.tsx — TODO: implement
  * Refer to Master PRD Section 4.4 and relevant ADM user stories.
+ * Backend routes GET/POST /admin/module-config already exist.
  */
+import { PlannedPage } from '../../components/PlannedPage';
+
 export function ModuleConfigPage() {
   return (
-    <div>
-      <h2 style={{ color: '#1e6b34' }}>ModuleConfigPage</h2>
-      <p style={{ color: '#888' }}>TODO: implement</p>
-    </div>
+    <PlannedPage title="Module config"
+      blurb="Per-module operational settings (SAP pool assignment, timing, feature flags)." />
   );
 }

@@ -9,11 +9,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
+import { ReviewActivityModal } from './ReviewActivityModal';
+import { DEFAULT_MAX_TURNS } from '@cap/shared';
 
 const KICKOFF =
   '[The student has completed the activity and is ready for the checkout conversation. Begin now.]';
 
 const PHASE_RE      = /\[PHASE:(\d)\]/g;
+const GRACE_RE      = /\[GRACE\]/g;
 const ASSESSMENT_RE = /\[ASSESSMENT:(\{.*\})\]/s;
 
 // Friendly progress cues so students know the conversation is finite.
@@ -45,6 +48,9 @@ function singleQuestion(text: string): string {
 // the student gets trapped in a goodbye loop.
 const AGENT_FAREWELL = /\b(good ?bye|take care|good luck|best of luck|all the best|wish you (the )?best|have a great|reach out)\b/i;
 const STUDENT_DONE   = /\b(bye|good ?bye|done|finished|that'?s all|nothing else|no more|i'?m good)\b/i;
+// Grace exchanges are free, but the whole conversation still has a hard
+// ceiling so clarifications can't stall it forever.
+const GRACE_CEILING = 6;
 
 export function CheckoutPhase() {
   const sessionId      = useSessionStore(s => s.sessionId);
@@ -59,12 +65,15 @@ export function CheckoutPhase() {
   const [finishing, setFinishing] = useState(false);
   const [error,     setError]     = useState<string | null>(null);
   const [convoPhase, setConvoPhase] = useState(1);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
   const started   = useRef(false);
 
-  const maxTurns = recipe?.maxTurns ?? 20;
-  const userTurns = transcript.filter(t => t.role === 'user' && !t.hidden).length;
+  const maxTurns = recipe?.maxTurns ?? DEFAULT_MAX_TURNS;
+  // Clarification exchanges ([GRACE]-flagged) don't burn the turn budget —
+  // asking for help shouldn't shorten the debrief.
+  const userTurns = transcript.filter(t => t.role === 'user' && !t.hidden && !t.grace).length;
   // Turn-count floor + marker override — either can pull the cue forward
   const convoFrac = Math.max(
     Math.min(0.92, userTurns / EXPECTED_TURNS),
@@ -101,6 +110,7 @@ export function CheckoutPhase() {
       // only signals the end — the authoritative evaluation always comes from
       // /evaluate, which normalizes scores and applies module thresholds.
       let endConversation = false;
+      let wasGrace = false;
       const cleaned = response
         .replace(ASSESSMENT_RE, () => {
           endConversation = true;
@@ -111,19 +121,33 @@ export function CheckoutPhase() {
           if (n === '4') endConversation = true;
           return '';
         })
+        .replace(GRACE_RE, () => {
+          wasGrace = true;
+          return '';
+        })
         .trim();
 
+      if (wasGrace) useSessionStore.getState().markLastUserGrace();
       if (cleaned) appendTurn('assistant', singleQuestion(cleaned));
       setWaiting(false);
 
-      const turns = useSessionStore.getState().transcript
-        .filter(t => t.role === 'user' && !t.hidden).length;
+      const now = useSessionStore.getState().transcript;
+      const turns = now.filter(t => t.role === 'user' && !t.hidden && !t.grace).length;
+      const allTurns = now.filter(t => t.role === 'user' && !t.hidden).length;
+      // Grace turn: at the turn budget, if the agent's latest reply ended
+      // with a question the student gets one more reply — the conversation
+      // never ends on an unanswered agent question.
+      const lastAgent = [...now].reverse().find(t => t.role === 'assistant' && !t.hidden);
+      const awaitingAnswer = !!lastAgent?.content.trim().endsWith('?');
       // An agent farewell with no question means the model wrapped up
       // without its markers — honor it instead of looping goodbyes.
       if (!cleaned.includes('?') && AGENT_FAREWELL.test(cleaned)) endConversation = true;
       // A student clearly signing off after a real conversation ends it too.
       if (STUDENT_DONE.test(content) && turns >= 4) endConversation = true;
-      if (endConversation || turns >= maxTurns) await finish();
+      // Absolute ceiling counts grace turns too, so a student can't stall
+      // indefinitely on clarifications.
+      if (endConversation || allTurns >= maxTurns + GRACE_CEILING
+        || (turns >= maxTurns && !awaitingAnswer)) await finish();
     } catch (e: any) {
       setWaiting(false);
       setError(`Something went wrong. ${e.message}`);
@@ -158,7 +182,13 @@ export function CheckoutPhase() {
         not a test. Answer in your own words.
       </p>
 
-      <p className="convo-cue" role="status">{cueLabel(convoFrac)}</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+        <p className="convo-cue" role="status" style={{ marginTop: 0 }}>{cueLabel(convoFrac)}</p>
+        <button type="button" className="secondary" style={{ fontSize: 13, padding: '4px 12px' }}
+          onClick={() => setReviewOpen(true)}>
+          Review what you did
+        </button>
+      </div>
       <div className="convo-progress" aria-hidden="true">
         <div className="convo-progress-bar" style={{ width: `${Math.round(convoFrac * 100)}%` }} />
       </div>
@@ -166,6 +196,7 @@ export function CheckoutPhase() {
       <div className="chat" ref={scrollRef} aria-live="polite">
         {visible.map((t, i) => (
           <div key={i} className={`bubble ${t.role === 'assistant' ? 'agent' : 'student'}`}>
+            {t.grace && <div className="grace-tag">clarifying question</div>}
             {t.content}
           </div>
         ))}
@@ -210,6 +241,8 @@ export function CheckoutPhase() {
           </button>
         </form>
       )}
+
+      {reviewOpen && <ReviewActivityModal onClose={() => setReviewOpen(false)} />}
     </div>
   );
 }

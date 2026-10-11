@@ -15,6 +15,7 @@ import { AppShell }        from '../../components/layout/AppShell';
 import { DataBrowserPage } from './DataBrowserPage';
 import { ExportPage }      from './ExportPage';
 import { ConsentPage }     from './ConsentPage';
+import { IrbConfigPage }   from './IrbConfigPage';
 
 export function ResearcherLayout() {
   return (
@@ -23,6 +24,7 @@ export function ResearcherLayout() {
         <Route path="data"    element={<DataBrowserPage />} />
         <Route path="export"  element={<ExportPage />} />
         <Route path="consent" element={<ConsentPage />} />
+        <Route path="irb"     element={<IrbConfigPage />} />
         <Route path="*"       element={<DataBrowserPage />} />
       </Routes>
     </AppShell>

@@ -1,22 +1,24 @@
 /**
  * LoginPage.tsx
  *
- * Admin App login. In production this will redirect to institutional
- * SSO (SAML/OIDC). For the PoC it accepts email + password and calls
- * the backend /admin/auth/login endpoint which returns a JWT and role.
+ * Admin App login — v3 interim: a single shared team passkey grants full
+ * access to every section. The optional name is stored for attribution
+ * on drafts and validation notes.
  *
- * TODO: replace with SSO redirect when institutional IdP is configured.
+ * Long-term (planned): OTP sign-on — institutional email → one-time code —
+ * with per-user accounts and role-based access managed by a superadmin.
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { API_BASE } from '../services/api';
+import { APP_VERSION } from '@cap/shared';
 
 export function LoginPage() {
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');
-  const [loading, setLoading]   = useState(false);
+  const [passkey, setPasskey] = useState('');
+  const [name, setName]       = useState('');
+  const [error, setError]     = useState('');
+  const [loading, setLoading] = useState(false);
   const setAuth  = useAuthStore(s => s.setAuth);
   const navigate = useNavigate();
 
@@ -27,11 +29,11 @@ export function LoginPage() {
       const resp = await fetch(`${API_BASE}/admin/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ passkey, name: name.trim() || undefined }),
       });
-      if (!resp.ok) throw new Error('Invalid credentials.');
-      const { token, role } = await resp.json();
-      setAuth(token, role, email);
+      if (!resp.ok) throw new Error('Incorrect passkey.');
+      const { token, role, name: who } = await resp.json();
+      setAuth(token, role, who);
       navigate('/');
     } catch (err: any) {
       setError(err.message);
@@ -45,23 +47,25 @@ export function LoginPage() {
       justifyContent: 'center', background: '#f8f8f7' }}>
       <div style={{ background: '#fff', padding: 40, borderRadius: 8,
         boxShadow: '0 2px 12px rgba(0,0,0,0.08)', width: 360 }}>
-        <h1 style={{ color: '#1e6b34', fontSize: 22, marginBottom: 8 }}>CAP Admin</h1>
+        <h1 style={{ color: '#1e6b34', fontSize: 22, marginBottom: 8 }}>
+          CAP Admin <span style={{ fontSize: 12, fontWeight: 400, color: '#999' }}>v{APP_VERSION}</span>
+        </h1>
         <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>
-          Sign in to manage modules, recipes, and results.
+          Enter the team passkey to manage modules, recipes, and results.
         </p>
         <form onSubmit={handleSubmit}>
           <label style={{ display: 'block', fontSize: 13, color: '#444', marginBottom: 4 }}>
-            Email
+            Your name or initials <span style={{ color: '#999' }}>(optional — used to credit your edits)</span>
           </label>
-          <input value={email} onChange={e => setEmail(e.target.value)}
-            type="email" required
+          <input value={name} onChange={e => setName(e.target.value)}
+            type="text" placeholder="e.g. Parand"
             style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd',
               borderRadius: 4, fontSize: 14, marginBottom: 16 }} />
           <label style={{ display: 'block', fontSize: 13, color: '#444', marginBottom: 4 }}>
-            Password
+            Team passkey
           </label>
-          <input value={password} onChange={e => setPassword(e.target.value)}
-            type="password" required
+          <input value={passkey} onChange={e => setPasskey(e.target.value)}
+            type="password" required autoFocus
             style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd',
               borderRadius: 4, fontSize: 14, marginBottom: 24 }} />
           {error && <p style={{ color: '#8B2500', fontSize: 13, marginBottom: 12 }}>{error}</p>}
@@ -72,9 +76,6 @@ export function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        <p style={{ color: '#aaa', fontSize: 12, marginTop: 16, textAlign: 'center' }}>
-          Dev account: cap@cap.local / dev-cap-password — replace with institutional SSO
-        </p>
       </div>
     </div>
   );

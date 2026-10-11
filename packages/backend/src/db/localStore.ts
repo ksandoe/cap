@@ -11,7 +11,7 @@ import fs   from 'fs';
 import os   from 'os';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { Recipe, CheckinResponse } from '@cap/shared';
+import { Recipe, CheckinResponse, RecipeDraft } from '@cap/shared';
 
 // In Lambda the deployment dir is read-only — use /tmp (per-container,
 // still ephemeral; acceptable for demo use per USE_LOCAL_DB semantics).
@@ -290,11 +290,8 @@ function seedRecipe(): void {
             ] },
         ] },
     ],
-    rubricDimensions: [
-      { name: 'Process understanding',   description: 'Explains the inquiry–quotation–order sequence and why each document exists.' },
-      { name: 'Conceptual vocabulary',   description: 'Uses domain terms (document flow, master data, binding vs non-binding) accurately.' },
-      { name: 'Transfer and reflection', description: 'Connects the process to durable skills and career contexts.' },
-    ],
+    // v3: evaluation uses the platform MASTER_RUBRIC — no per-recipe
+    // rubricDimensions, careerTransferPrompts, maxTurns, or contentStub.
     // Patterns that signal a thin answer worth a follow-up. Authoring
     // guidance: describe the *shape* of a vague answer, not a keyword.
     vagueAnswerTriggers: [
@@ -305,23 +302,9 @@ function seedRecipe(): void {
       'Student says data "copied over" without identifying which document supplied it.',
       'Student cites a document number or code as if it demonstrates understanding.',
     ],
-    careerTransferPrompts: [
-      'How might understanding this document flow help you in a procurement or operations role?',
-      'What transferable skills do you feel you practiced during this activity?',
-    ],
     toneGuidance:
       'Most students have no prior ERP experience. Be especially patient and scaffolding ' +
       'early in the conversation; affirm effort before probing deeper.',
-    maxTurns: 12,
-    contentStub: {
-      summaryText:
-        'In this module you will act as a sales clerk in SAP. You will create three linked ' +
-        'documents — an Inquiry, a Quotation, and a Sales Order — for Philly Bikes and its ' +
-        'touring bikes, then confirm the document flow connects them.',
-      resourceLinks: [
-        { url: 'https://help.sap.com', label: 'SAP Help Portal', type: 'reading' },
-      ],
-    },
     isActive:  true,
     createdAt: now,
     updatedAt: now,
@@ -500,6 +483,30 @@ export const localEvalDb = {
   },
   async listForModule(moduleId: string) {
     return table('cap-evaluations').filter(r => r.moduleId === moduleId);
+  },
+};
+
+// ── draftDb ──────────────────────────────────────────────────────────────────
+// In-progress recipe drafts (v3 guided authoring). Team-visible under the
+// shared passkey; persists until published or discarded.
+
+export const localDraftDb = {
+  async list(): Promise<RecipeDraft[]> {
+    return [...table('cap-recipe-drafts')] as RecipeDraft[];
+  },
+  async get(draftId: string): Promise<RecipeDraft | null> {
+    return (table('cap-recipe-drafts').find(d => d.draftId === draftId) as RecipeDraft) ?? null;
+  },
+  async put(draft: RecipeDraft) {
+    const t = table('cap-recipe-drafts');
+    const i = t.findIndex(d => d.draftId === draft.draftId);
+    if (i >= 0) t[i] = draft; else t.push(draft);
+    save();
+  },
+  async remove(draftId: string) {
+    const t = table('cap-recipe-drafts');
+    const i = t.findIndex(d => d.draftId === draftId);
+    if (i >= 0) { t.splice(i, 1); save(); }
   },
 };
 

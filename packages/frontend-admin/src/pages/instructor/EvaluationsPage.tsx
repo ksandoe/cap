@@ -46,10 +46,14 @@ export function EvaluationsPage() {
         students see only pass/fail.
       </p>
 
-      <select value={selected} onChange={e => setSelected(e.target.value)}
-        style={{ padding: '8px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, marginBottom: 16, width: '100%', maxWidth: 480 }}>
-        {modules.map(m => <option key={m.moduleId} value={m.moduleId}>{m.moduleTitle} ({m.moduleId})</option>)}
-      </select>
+      {modules.length > 0 ? (
+        <select value={selected} onChange={e => setSelected(e.target.value)}
+          style={{ padding: '8px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, marginBottom: 16, width: '100%', maxWidth: 480 }}>
+          {modules.map(m => <option key={m.moduleId} value={m.moduleId}>{m.moduleTitle} ({m.moduleId})</option>)}
+        </select>
+      ) : !error && (
+        <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>No published modules yet.</p>
+      )}
 
       {error && <p style={{ color: '#a33' }}>{error}</p>}
       {!error && rows.length === 0 && <p style={{ color: '#888' }}>No completed attempts recorded yet.</p>}

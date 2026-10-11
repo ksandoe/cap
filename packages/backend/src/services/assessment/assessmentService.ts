@@ -15,11 +15,13 @@
 import { Request, Response } from 'express';
 import { sessionDb }     from '../../db/sessionDb';
 import { recipeDb }      from '../../db/recipeDb';
+import { evalDb }        from '../../db/evalDb';
 import { moduleConfigDb, DEFAULT_THRESHOLDS } from '../../db/moduleConfigDb';
 import { compileContext } from './contextCompiler';
+import { platformConfigDb } from '../../db/platformConfigDb';
 import { callModel, extractJson } from './llmProvider';
 import { logger }        from '../eventLogger';
-import { EVENTS }        from '@cap/shared';
+import { EVENTS, Evaluation } from '@cap/shared';
 import { LLM_MODE }      from '../../config/env';
 import { mockCheckinQuestions, mockConversationTurn, mockEvaluation } from './mockAi';
 
@@ -54,6 +56,21 @@ export async function generateCheckinQuestions(req: Request, res: Response): Pro
   }
 }
 
+// Lines where the model appears to leak an "ideal answer" (the prompt-
+// injection exploit demonstrated in prototype testing). The security rules
+// in the system prompt are the primary defense; this filter is a cheap
+// output-side backstop for smaller models that ignore them.
+const ANSWER_LEAK = /\b(expected|ideal|model|correct|sample)\s+(response|answer|solution)\b/i;
+
+/** Fetch the prior attempt's evaluation for retry sessions (priorSessionId
+ *  is the completed session's id — the eval record's key — so no student
+ *  identifier is needed). */
+async function priorEvaluation(session: any): Promise<Evaluation | null> {
+  if (!session?.priorSessionId) return null;
+  const rec = await evalDb.getAttempt(session.priorSessionId).catch(() => null);
+  return (rec?.evaluation as Evaluation) ?? null;
+}
+
 export async function processConversationTurn(req: Request, res: Response): Promise<void> {
   const { sessionId } = req.session!;
   const { messages }  = req.body; // full conversation history from client
@@ -62,17 +79,27 @@ export async function processConversationTurn(req: Request, res: Response): Prom
   if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
   touch(sessionId);
   const recipe  = await recipeDb.getActiveRecipe(session.moduleId);
-  const { checkoutSystemPrompt } = compileContext(recipe!, session);
+  const prior   = await priorEvaluation(session);
+  const rubric  = await platformConfigDb.rubric();
+  const { checkoutSystemPrompt } = compileContext(recipe!, session, prior, rubric);
 
-  const raw = MOCK_AI
-    ? mockConversationTurn(messages.filter((m: any) => m.role === 'user').length)
+  let raw = MOCK_AI
+    ? mockConversationTurn(messages.filter((m: any) => m.role === 'user').length, !!prior)
     : await callModel(checkoutSystemPrompt, messages);
   logger.info(EVENTS.CHECKOUT_TURN, { sessionId, turn: messages.length });
 
+  // Output-side guardrail: strip lines that leak expected/ideal answers.
+  if (ANSWER_LEAK.test(raw)) {
+    logger.warn(EVENTS.PROMPT_GUARD, { sessionId, snippet: raw.slice(0, 160) });
+    raw = raw.split('\n').filter(l => !ANSWER_LEAK.test(l)).join('\n').trim()
+      || "I can't share expected answers — but I'm happy to keep talking through what you did.";
+  }
+
   // Persist the transcript on the session record so a saved/interrupted
   // session resumes mid-conversation. Assistant markers ([PHASE:n],
-  // [ASSESSMENT:...]) are stripped — they are wire protocol, not content.
-  const cleaned = String(raw).replace(/\[PHASE:\d\]|\[ASSESSMENT:[^\]]*\]/g, '').trim();
+  // [GRACE], [ASSESSMENT:...]) are stripped — they are wire protocol,
+  // not content.
+  const cleaned = String(raw).replace(/\[PHASE:\d\]|\[GRACE\]|\[ASSESSMENT:[^\]]*\]/g, '').trim();
   sessionDb.updateSession(sessionId, {
     transcript: [...messages, { role: 'assistant', content: cleaned }]
       .map(({ role, content }: any) => ({ role, content })),
@@ -89,7 +116,8 @@ export async function generateEvaluation(req: Request, res: Response): Promise<v
   if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
   touch(sessionId);
   const recipe  = await recipeDb.getActiveRecipe(session.moduleId);
-  const { evaluationSystemPrompt } = compileContext(recipe!, session);
+  const rubric  = await platformConfigDb.rubric();
+  const { evaluationSystemPrompt } = compileContext(recipe!, session, undefined, rubric);
 
   const raw = MOCK_AI
     ? mockEvaluation(recipe!)

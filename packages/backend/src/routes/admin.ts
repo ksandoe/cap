@@ -24,6 +24,9 @@
  * GET  /admin/irb-config/:id       → IRB config (admin)
  * POST /admin/irb-config           → save IRB config (admin)
  * POST /admin/auth/login           → admin login (public)
+ *
+ * /admin/authoring/*               → v3 guided authoring (author|admin):
+ *   drafts CRUD, :id/publish, extract-text (file→text), generate (AI draft)
  */
 import { Router } from 'express';
 import { asyncRouter } from '../middleware/asyncRouter';
@@ -32,6 +35,8 @@ import { authMiddleware } from '../middleware/auth';
 import * as instructor from '../services/admin/instructorService';
 import * as researcher  from '../services/admin/researcherService';
 import * as adminSvc    from '../services/admin/adminService';
+import * as authoring   from '../services/admin/authoringService';
+import * as platform    from '../services/admin/platformService';
 import { handleAdminLogin } from '../services/admin/authService';
 
 export const adminRouter = asyncRouter();
@@ -63,10 +68,28 @@ adminRouter.get( '/research/consent',            requireRole(['researcher','admi
 // Recipe image uploads — any content role can embed screenshots
 adminRouter.post('/images',                       requireRole(['author','instructor','researcher','admin']), adminSvc.uploadImage);
 
+// ── Guided authoring (v3): drafts + AI generation ─────────────────────────────
+adminRouter.get(   '/authoring/drafts',            requireRole(['author','admin']), authoring.listDrafts);
+adminRouter.post(  '/authoring/drafts',            requireRole(['author','admin']), authoring.createDraft);
+adminRouter.get(   '/authoring/drafts/:id',        requireRole(['author','admin']), authoring.getDraft);
+adminRouter.put(   '/authoring/drafts/:id',        requireRole(['author','admin']), authoring.updateDraft);
+adminRouter.delete('/authoring/drafts/:id',        requireRole(['author','admin']), authoring.deleteDraft);
+adminRouter.post(  '/authoring/drafts/:id/publish',requireRole(['author','admin']), authoring.publishDraft);
+adminRouter.post(  '/authoring/extract-text',      requireRole(['author','admin']), authoring.extractText);
+adminRouter.post(  '/authoring/generate',          requireRole(['author','admin']), authoring.generate);
+
 // ── Admin-only routes ─────────────────────────────────────────────────────────
 // Module config (passing thresholds) is tunable by instructors too
 adminRouter.get( '/module-config/:id',           requireRole(['instructor','admin']), adminSvc.getModuleConfig);
 adminRouter.post('/module-config',               requireRole(['instructor','admin']), adminSvc.saveModuleConfig);
+// Platform settings — master rubric override + shared passkey (v3.1).
+// The passkey value is never returned, only whether an override is set.
+adminRouter.get(   '/platform',                  requireRole(['admin']), platform.getPlatform);
+adminRouter.put(   '/platform/rubric',           requireRole(['admin']), platform.saveRubric);
+adminRouter.delete('/platform/rubric',           requireRole(['admin']), platform.resetRubric);
+adminRouter.put(   '/platform/passkey',          requireRole(['admin']), platform.savePasskey);
+adminRouter.delete('/platform/passkey',          requireRole(['admin']), platform.resetPasskey);
+
 adminRouter.get( '/sap-pool/status',             requireRole(['admin']), adminSvc.getSapPoolStatus);
 adminRouter.post('/sap-pool/import',             requireRole(['admin']), adminSvc.importSapAccounts);
 adminRouter.post('/sap-pool/:username/release',  requireRole(['admin']), adminSvc.releaseSapAccount);

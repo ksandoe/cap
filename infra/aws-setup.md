@@ -60,6 +60,14 @@ aws dynamodb create-table --table-name cap-assets \
   --attribute-definitions AttributeName=assetId,AttributeType=S \
   --key-schema AttributeName=assetId,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST
+
+# v3: server-side authoring drafts (wizard workspace). Item shape:
+# { draftId, title, moduleId?, owner?, sections, data, sourceMaterials,
+#   aiFields, createdAt, updatedAt, published? }
+aws dynamodb create-table --table-name cap-recipe-drafts \
+  --attribute-definitions AttributeName=draftId,AttributeType=S \
+  --key-schema AttributeName=draftId,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST
 ```
 
 ## 2. Lambda role permissions
@@ -81,8 +89,28 @@ DYNAMODB_TABLE_PARAMS=cap-params \
   npx tsx scripts/seed-demo.ts
 
 aws lambda update-function-configuration --function-name cap-demo-api \
-  --environment "Variables={USE_LOCAL_DB=false,DYNAMODB_TABLE_SESSIONS=cap-sessions,DYNAMODB_TABLE_RECIPES=cap-recipes,DYNAMODB_TABLE_SAP_POOL=cap-sap-pool,DYNAMODB_TABLE_PARAMS=cap-params,DYNAMODB_TABLE_MODULE_CONFIG=cap-module-config,DYNAMODB_TABLE_EVALUATIONS=cap-evaluations,DYNAMODB_TABLE_ASSETS=cap-assets,AWS_REGION=us-east-1,LLM_MODE=openai,OPENAI_API_KEY=<key>,OPENAI_MODEL=gpt-4o-mini,SAP_MODE=stub,CANVAS_MODE=stub,CREDLY_MODE=stub,ENABLE_DEV_ROUTES=true,FRONTEND_URL=https://gtdqd19poa.execute-api.us-east-1.amazonaws.com,SESSION_JWT_SECRET=<secret>,SESSION_TTL_HOURS=24,SAVED_TTL_DAYS=7}"
+  --environment "Variables={USE_LOCAL_DB=false,DYNAMODB_TABLE_SESSIONS=cap-sessions,DYNAMODB_TABLE_RECIPES=cap-recipes,DYNAMODB_TABLE_SAP_POOL=cap-sap-pool,DYNAMODB_TABLE_PARAMS=cap-params,DYNAMODB_TABLE_MODULE_CONFIG=cap-module-config,DYNAMODB_TABLE_EVALUATIONS=cap-evaluations,DYNAMODB_TABLE_ASSETS=cap-assets,DYNAMODB_TABLE_RECIPE_DRAFTS=cap-recipe-drafts,AWS_REGION=us-east-1,LLM_MODE=openai,OPENAI_API_KEY=<key>,OPENAI_MODEL=gpt-4o-mini,SAP_MODE=stub,CANVAS_MODE=stub,CREDLY_MODE=stub,ENABLE_DEV_ROUTES=true,FRONTEND_URL=https://gtdqd19poa.execute-api.us-east-1.amazonaws.com,SESSION_JWT_SECRET=<secret>,SESSION_TTL_HOURS=24,SAVED_TTL_DAYS=7,ADMIN_PASSKEY=<team-passkey>}"
 ```
+
+## 3b. Deploy a new code bundle
+
+The Lambda serves both apps from one zip — `dist/bundle.js` (handler
+`dist/bundle.handler`) plus the built SPAs under `dist/public/`:
+
+```bash
+npm run build                    # builds shared+backend+student+admin dists
+cd packages/backend
+mkdir -p dist/public/student dist/public/admin
+cp -r ../frontend-student/dist/* dist/public/student/
+cp -r ../frontend-admin/dist/*   dist/public/admin/
+cd dist && zip -r ../../cap-deploy.zip . && cd ..
+aws lambda update-function-code --function-name cap-demo-api \
+  --zip-file fileb://cap-deploy.zip --publish
+```
+
+Note: PDF source-material extraction uses `unpdf` precisely because it
+bundles with no external worker file — do not swap back to `pdf-parse`
+v2, which tries to load `pdf.worker.mjs` from disk and fails in Lambda.
 
 ## 4. Aurora Data API (durable recipes/config — optional for the demo)
 

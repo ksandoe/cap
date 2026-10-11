@@ -15,6 +15,7 @@ import { ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSessionStore } from '../../store/sessionStore';
 import { api } from '../../services/api';
+import { APP_VERSION } from '@cap/shared';
 
 export function WizardShell({ currentPhase, children }: { currentPhase: number; children: ReactNode }) {
   const moduleTitle  = useSessionStore(s => s.recipe?.moduleTitle);
@@ -54,7 +55,9 @@ export function WizardShell({ currentPhase, children }: { currentPhase: number; 
       <header style={{ background: '#1D4E8C', color: '#fff', padding: '16px 32px' }}>
         <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 13, opacity: 0.85 }}>Conversational Assessment Platform</div>
+            <div style={{ fontSize: 13, opacity: 0.85 }}>
+              Conversational Assessment Platform <span style={{ opacity: 0.7, fontSize: 11 }}>v{APP_VERSION}</span>
+            </div>
             <h1 style={{ margin: '2px 0 0', fontSize: 20 }}>
               {moduleTitle ?? 'Learning module'}
             </h1>

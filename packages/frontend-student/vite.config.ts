@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
@@ -10,6 +11,8 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: { '@cap/shared': '../shared/src' },
+    // Absolute path — relative aliases resolve against the importing file,
+    // which breaks dev-server resolution from nested routes.
+    alias: { '@cap/shared': path.resolve(__dirname, '../shared/src/index.ts') },
   },
 });

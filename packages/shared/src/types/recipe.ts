@@ -139,14 +139,23 @@ export interface Recipe {
   steps:                ModuleStep[];
 
   // Instructional recipe — the AI agent's behavior
-  rubricDimensions:     RubricDimension[];
+  /** @deprecated v3: evaluation uses the platform MASTER_RUBRIC
+   *  (constants/assessment.ts). Retained so stored pre-v3 recipes still
+   *  deserialize; ignored at runtime and no longer authored. */
+  rubricDimensions?:    RubricDimension[];
   probingRules:         ProbingRule[];
   vagueAnswerTriggers:  string[];
-  careerTransferPrompts:string[];
+  /** @deprecated v3: the transfer question is a fixed conversation phase;
+   *  retained for legacy recipes, no longer authored. */
+  careerTransferPrompts?:string[];
   toneGuidance?:        string;
-  maxTurns:             number;
+  /** @deprecated v3: platform DEFAULT_MAX_TURNS applies; honored when
+   *  present on legacy recipes, no longer authored. */
+  maxTurns?:            number;
 
   // Supporting content
+  /** @deprecated v3: pre-activity summary content folds into step 1
+   *  rich text; retained for legacy recipes, no longer authored. */
   contentStub?:         ContentStub;
   backgroundDocs?:      BackgroundDoc[];
 

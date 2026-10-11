@@ -2,11 +2,11 @@
  * TranscriptPage.tsx — TODO: implement
  * Refer to user stories INS-01 through INS-06 and Master PRD Section 4.2.
  */
+import { PlannedPage } from '../../components/PlannedPage';
+
 export function TranscriptPage() {
   return (
-    <div>
-      <h2 style={{ color: '#1e6b34' }}>TranscriptPage</h2>
-      <p style={{ color: '#888' }}>TODO: implement</p>
-    </div>
+    <PlannedPage title="Session transcript"
+      blurb="Full checkout transcript with the evaluation result and instructor rating review." />
   );
 }

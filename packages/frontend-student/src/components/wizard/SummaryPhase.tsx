@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, decodeSessionToken } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
+import { ReviewActivityModal } from './ReviewActivityModal';
 import type { Evaluation } from '@cap/shared';
 
 // The dev launchpad's localStorage slot stands in for the hidden Canvas
@@ -33,6 +34,7 @@ export function SummaryPhase() {
 
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const navigate = useNavigate();
   const moduleId = useSessionStore(s => s.moduleId);
   const persona  = useSessionStore(s => s.persona);
@@ -66,8 +68,12 @@ export function SummaryPhase() {
       if (slot && sessionKey) {
         try { localStorage.setItem(slot, sessionKey); } catch { /* non-fatal */ }
       }
-      // Keep the transcript for context but start the new conversation fresh
-      useSessionStore.setState({ transcript: [], evaluation: null, activityStep: 0 });
+      // Keep the transcript for context but start the new conversation
+      // fresh — a redo also clears the self-reported activity ticks.
+      useSessionStore.setState({
+        transcript: [], evaluation: null, activityStep: 0,
+        instructionDone: toPhase === 2 ? {} : useSessionStore.getState().instructionDone,
+      });
       setSession({
         token:        sessionToken,
         sessionId:    claims.sessionId,
@@ -106,13 +112,16 @@ export function SummaryPhase() {
       <p style={{ lineHeight: 1.7 }}>{evaluation.overallSummary}</p>
 
       <div className="actions">
+        <button className="secondary" onClick={() => setReviewOpen(true)}>
+          Review what you did
+        </button>
         {!passed && (
           <>
             <button className="primary" onClick={() => retry(3)} disabled={retrying}>
               {retrying ? 'Starting…' : `Try the reflection again (attempt ${attemptNumber + 1})`}
             </button>
             <button className="secondary" onClick={() => retry(2)} disabled={retrying}>
-              Revisit the activity
+              Redo the activity
             </button>
           </>
         )}
@@ -125,11 +134,15 @@ export function SummaryPhase() {
 
       {!passed && (
         <p className="muted" style={{ marginTop: 12 }}>
-          “Try the reflection again” starts a new conversation — you won’t
-          repeat the check-in or the activity. “Revisit the activity” takes
-          you back through the module steps with a fresh exercise.
+          “Try the reflection again” starts a new conversation that picks up
+          where the last one left off — it acknowledges what you already
+          showed well and focuses on what still needs evidence. “Review what
+          you did” shows your completed work read-only; “Redo the activity”
+          takes you back through the module steps with a fresh exercise.
         </p>
       )}
+
+      {reviewOpen && <ReviewActivityModal onClose={() => setReviewOpen(false)} />}
 
       {instructorPreview && <InstructorPreview evaluation={evaluation} />}
     </div>

@@ -12,9 +12,9 @@
     "dev": "concurrently \"npm run dev -w packages/frontend-student\" \"npm run dev -w packages/frontend-admin\" \"npm run dev -w packages/backend\"",
     "dev:student": "concurrently \"npm run dev -w packages/frontend-student\" \"npm run dev -w packages/backend\"",
     "dev:admin":   "concurrently \"npm run dev -w packages/frontend-admin\"  \"npm run dev -w packages/backend\"",
-    "build":       "npm run build -w packages/shared && npm run build -w packages/backend && npm run build -w packages/frontend-student && npm run build -w packages/frontend-admin",
-    "build:student":"npm run build -w packages/shared && npm run build -w packages/frontend-student",
-    "build:admin":  "npm run build -w packages/shared && npm run build -w packages/frontend-admin",
+    "build":       "npm run build -w packages/shared --if-present && npm run build -w packages/backend && npm run build -w packages/frontend-student && npm run build -w packages/frontend-admin",
+    "build:student":"npm run build -w packages/shared --if-present && npm run build -w packages/frontend-student",
+    "build:admin":  "npm run build -w packages/shared --if-present && npm run build -w packages/frontend-admin",
     "test":  "npm run test --workspaces --if-present",
     "lint":  "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
