@@ -25,6 +25,12 @@ Students complete a hands-on SAP exercise, then have a reflective AI conversatio
 
 These need the team, UCC, IT or the IRB. Surface them; don't pick an answer silently.
 
+- **Simulated SAP (under discussion, Oct 2026):** a web simulation of the small slice of SAP the exercises use, possibly replacing live SAP for Sales (and Navigation) in the Spring 2027 pilot.
+  - Kent is taking it to Parand first, then the team.
+  - Discussion brief: https://claude.ai/artifact/1BimxxuEqjMHJWoMypyCL3
+  - Until it's decided, don't invest further in the SAP account pool or live OData verification.
+  - Keep the SAP verification interface swappable (`SAP_MODE` stub | live, plus a future `sim`).
+  - If adopted, it largely settles the next two items.
 - **SAP account model:** random pooled accounts (current code and PRD) vs. a stable account per student. UCC may not allow pooled reuse, and students need to return to their own work.
 - **SAP verification:** must check the sales order's owner and **net value**, not just that it exists. Whether the OData API exposes this is unconfirmed.
 - **Research identity:** the LIFT research plan needs a stable pseudonymous ID per student. The PRD stores only cohort-level IDs. LTI `iss`+`sub` (hashed server-side) makes this feasible, but it is tied to IRB and consent design. The existing IRB 2024-164 does **not** cover CAP.
