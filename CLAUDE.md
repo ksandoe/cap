@@ -27,9 +27,21 @@ These need the team, UCC, IT or the IRB. Surface them; don't pick an answer sile
 
 - **SAP account model:** random pooled accounts (current code and PRD) vs. a stable account per student. UCC may not allow pooled reuse, and students need to return to their own work.
 - **SAP verification:** must check the sales order's owner and **net value**, not just that it exists. Whether the OData API exposes this is unconfirmed.
-- **Research identity:** the LIFT research plan needs a stable pseudonymous ID per student. The PRD stores only cohort-level IDs. Tied to IRB and consent design. The existing IRB 2024-164 does **not** cover CAP.
+- **Research identity:** the LIFT research plan needs a stable pseudonymous ID per student. The PRD stores only cohort-level IDs. LTI `iss`+`sub` (hashed server-side) makes this feasible, but it is tied to IRB and consent design. The existing IRB 2024-164 does **not** cover CAP.
 - **Rubric dimensions:** code (3), proposal (4) and Joni (split transfer/reflection) disagree. Editable under Admin → Platform settings.
-- **Completion and grade policy:** the threshold for "Completed", and whether the instructor confirms grades in Canvas.
+- **Completion threshold:** what counts as a pass. Completion itself is decided to be all-or-nothing points.
+- **Canvas write-back:** AGS vs. a scoped Canvas API. This is a Phase 2 decision with ATEC.
+
+## Decided
+
+Record decisions in `docs/decisions/`. Each record says what was decided, who decided it, and what it means for the code.
+
+- **Canvas LTI path with ATEC** ([docs/decisions/2026-10-canvas-lti-atec.md](docs/decisions/2026-10-canvas-lti-atec.md)):
+  - The team owns the app, hosting and maintenance; ATEC owns Canvas registration.
+  - Phase 1 is launch only. Identity is `iss`+`sub` and the activity comes from a custom parameter. No name, email or roster data.
+  - Completion is graded all-or-nothing.
+  - **Credly goes through Canvas.** CAP never stores emails.
+  - Canvas Dev now; formal review before real students use it.
 
 ## Claude license terms (CSU pilot, approved Oct 2026)
 

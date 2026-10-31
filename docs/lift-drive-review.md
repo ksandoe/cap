@@ -33,7 +33,7 @@ None of these appear in the Oct 10 tracker. The interviews are Parand ×2, Joni 
 |---|---|---|---|
 | 1 | **SAP "Check My Work" must validate real work.** That means: the sales order exists, it belongs to the student's SAP user, and it has the expected **net value**. Existence alone is not enough. | Parand | `sapConnector.ts` is a stub that reports success. The design (master PRD, `VerificationResult`) only checks that documents exist. |
 | 2 | **SAP account model.** The UCC/SAP group may no longer allow random pooled accounts that are reused. Students also need to come back to the *same* account (crashes, unfinished work, reviewing earlier documents). | Parand | Random pool assignment, released on exit (`localStore.ts`, `sapPool.ts`). The superseded IIO PRD had a 1:1 Canvas→SAP map, which may need to come back. |
-| 3 | **Canvas LTI + grade return** is still stubbed. Campus guidelines make it a **"Category B" integration**, which needs an IT and data-owner design review before deployment. | David, campus DoIT | Stubbed |
+| 3 | **Canvas LTI + grade return** is still stubbed. Campus guidelines make it a **"Category B" integration**, which needs an IT and data-owner design review before deployment. **Update:** the path was agreed with ATEC in late October 2026: Canvas Dev now, launch first, write-back second, Credly through Canvas. See [decisions/2026-10-canvas-lti-atec.md](decisions/2026-10-canvas-lti-atec.md). | David, campus DoIT, ATEC | Stubbed |
 
 ### Research and privacy (conflicts the team needs to resolve)
 
