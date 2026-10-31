@@ -31,6 +31,29 @@ These need the team, UCC, IT or the IRB. Surface them; don't pick an answer sile
 - **Rubric dimensions:** code (3), proposal (4) and Joni (split transfer/reflection) disagree. Editable under Admin → Platform settings.
 - **Completion and grade policy:** the threshold for "Completed", and whether the instructor confirms grades in Canvas.
 
+## Claude license terms (CSU pilot, approved Oct 2026)
+
+Kent's Claude access comes from an approved CSU Claude pilot license (individual, faculty only). It is granted in waves:
+
+- **Wave 1 ends 2027-01-15.**
+- Wave 2 runs 2027-01-19 → 2027-09-01 and needs a **new request**. Renewal isn't guaranteed.
+
+Keep decisions and context in the repo and Drive, not only in Claude conversations, so work isn't stranded if access lapses. University work must happen in the **CSU workspace** (account tied to calstate.ai), never a personal Claude account.
+
+The application commits to the following, and they bind how Claude works in this repo:
+
+- **Only public materials, synthetic data, and fully de-identified content.** No Level 1/2 data, FERPA records, credentials, API keys or internal endpoints go to Claude. In practice:
+  - Never read `.env` files, secrets, deploy bundles (`cap-deploy.zip`) or the Drive "demo site links and credentials" doc.
+  - Test conversations use **synthetic** student responses only.
+- **The prototype stays disconnected** from SAP, Canvas, PeopleSoft and M365. Any real integration or student-facing deployment needs a separate IT and data-owner request; the Spring 2027 pilot depends on that request.
+- **Approved uses:**
+  - Recipe and rubric design
+  - Testing adaptive questioning against synthetic students, which includes evaluating Claude as the assessment engine vs. ChatGPT Edu
+  - Literature synthesis
+  - Research-analysis planning on synthetic or de-identified data
+  - Technical design and prototype code
+- **Students can't use the license.** That includes Aliyah. Her work reaches Claude only through Kent.
+
 ## Constraints
 
 - **FERPA-first.** No student PII persisted. Don't add absolute timestamps or other re-identifying fields to research or eval records without flagging it. Student text goes to the LLM, so keep identifiers out of prompts. Campus policy forbids FERPA data and PII in AI prompts.
