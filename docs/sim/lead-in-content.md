@@ -58,11 +58,22 @@ pipeline, not a sale. Two things make that concrete in the system:
   thousand open inquiries can't plan production or cash flow on "maybe," but it can plan around a
   dollar-weighted expectation. You're generating one data point in that forecast.
 
+**Whose number is on this, anyway?**
+
+Before you touch the screen: you'll be given a **Customer PO Number** for your assigned customer —
+something like `PO-10238`. It's tempting to assume SAP generated that, but it didn't. A PO
+(purchase order) number is assigned by the *customer's* own purchasing system, following whatever
+numbering scheme they use internally — on its own, it means nothing to your company or to SAP.
+You'll type it into the **Customer Reference** field specifically so you and the customer share a
+handle to refer back to this request later, which is exactly why "Customer Reference" exists as a
+field separate from SAP's own document number. Every real customer has their own PO convention;
+keeping your system's documents matched to the customer's paperwork is what this field is for.
+
 **What to watch for**
 
-- You'll search for the customer and for each material instead of typing codes from memory — real
-  sales reps don't memorize every customer or SKU either; the search is the normal workflow, not a
-  workaround.
+- Your assignment brief names your customer and the exact two products — color included — you're
+  quoting. That's not filler text, it's what you'll type into the search dialogs: search by name,
+  the way a real rep would, not by a code you've memorized.
 - Required fields are marked with an asterisk (`*`). SAP won't let you save past a missing
   required field, but it also won't stop you from *trying* — you'll see exactly what students
   before you have missed.
@@ -137,6 +148,9 @@ exactly how much each discount is worth in dollars.
   **activate** it. SAP separates "I've proposed this condition" from "this condition is live,"
   which matters in real pricing scenarios where several possible discounts might be evaluated
   before one is chosen.
+- You'll type in the same Customer PO Number you used on the inquiry. SAP doesn't carry Customer
+  Reference forward automatically between document types the way it carries the customer and
+  materials forward — re-entering it here (and again on the sales order) is expected, not a mistake.
 - Same status-bar quirk as the inquiry: your new quotation number appears at the bottom of the
   screen when you save, not in a dialog box.
 
@@ -167,9 +181,9 @@ numbers than the quotation the customer agreed to, something would have gone wro
 
 **What to watch for**
 
-- Same **Create with Reference** pattern as before — search by your reference number, copy the
-  quotation forward. By now this should feel familiar: three different document types, one
-  consistent way of carrying data between them.
+- Same **Create with Reference** pattern as before — search by the Customer PO Number you've been
+  using all along, copy the quotation forward. By now this should feel familiar: three different
+  document types, one consistent way of carrying data between them.
 - Almost everything is pre-filled, including the pricing you worked out in the quotation step and
   the requested delivery date. You're mainly confirming, not re-entering.
 - Watch the save confirmation at the bottom-left for your new order number. You'll need it — not
