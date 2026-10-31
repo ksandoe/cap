@@ -1,0 +1,166 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: '72', 'Segoe UI', Arial, sans-serif;
+  background: #f5f6f7;
+  color: #1d2d3e;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding-bottom: 40px; /* leave room for the fixed status bar */
+}
+
+.progress-bar {
+  display: flex;
+  overflow-x: auto;
+  gap: 4px;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #d9d9d9;
+}
+
+.progress-step {
+  flex: 1 1 0;
+  min-width: 90px;
+  text-align: center;
+  padding: 6px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: default;
+  color: #89919a;
+  background: #f0f1f2;
+  border: 1px solid transparent;
+}
+
+.progress-step.reachable {
+  cursor: pointer;
+  color: #1d2d3e;
+}
+
+.progress-step.current {
+  background: #0a6ed1;
+  color: #fff;
+  font-weight: 600;
+}
+
+.progress-step.complete {
+  background: #e4f3e8;
+  color: #1d6b32;
+  border-color: #1d6b32;
+}
+
+.block-content {
+  flex: 1;
+  padding: 24px;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.status-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #32363a;
+  color: #fff;
+  font-size: 13px;
+  padding: 8px 16px;
+  min-height: 24px;
+}
+
+.lead-in h2 {
+  margin-top: 0;
+}
+
+.lead-in ul {
+  padding-left: 20px;
+}
+
+.activity-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.activity-layout.stacked {
+  flex-direction: column;
+}
+
+.activity-pane {
+  flex: 1;
+  min-width: 0;
+}
+
+.instructions-pane {
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.screen-pane {
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.layout-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.field-row {
+  margin-bottom: 14px;
+}
+
+.field-row label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #556;
+}
+
+.field-row .required::after {
+  content: ' *';
+  color: #bb0000;
+}
+
+.item-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.item-table th,
+.item-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid #ececec;
+  font-size: 13px;
+}
+
+.step-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.search-result-row {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.search-result-row:hover {
+  background: #f0f7ff;
+}

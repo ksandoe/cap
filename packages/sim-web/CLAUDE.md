@@ -50,5 +50,5 @@ Requirements from Parand's interviews:
 
 ## Status
 
-- **2026-10-31:** repo created; nothing built yet. Next step: agree on the architecture and data model, then build a thin end-to-end slice (inquiry → quotation → sales order → document flow) with pricing and the main quirks, for Parand to try.
+- **2026-10-31:** repo created; architecture and data model agreed (`docs/architecture-proposal.md`, `docs/lead-in-content.md`); thin end-to-end slice built and working locally — inquiry → quotation → sales order → document flow, with per-student randomized pricing, the main quirks, and the CAP `/api/verify` contract. See `README.md` for what's built vs. simplified. Next step: have Parand try it and react.
 - Record design decisions in `docs/decisions/`, one short note per decision: what was decided, why, and alternatives rejected.
