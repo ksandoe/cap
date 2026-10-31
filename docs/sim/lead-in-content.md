@@ -27,6 +27,12 @@ Inquiry  →  Quotation  →  Sales Order  →  (Delivery)  →  (Billing)
 The parenthesized steps are outside this PoC's scope but are worth showing grayed-out, so students
 see the sales process doesn't stop at the sales order — it hands off to logistics and finance next.
 
+**Illustrative images (Kent is sourcing these)**: each lead-in has a natural spot for one generic/
+historical image — a paper purchase order, a typed quotation letter, a carbon-copy sales order
+form — shown next to "and here's the same document, digitally, in SAP." The content model should
+carry an optional `imageRef` per lead-in so one can be dropped in later without touching the
+layout; nothing here depends on having one.
+
 ---
 
 ## Before: Create Inquiry (VA11)

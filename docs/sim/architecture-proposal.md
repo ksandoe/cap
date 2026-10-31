@@ -51,12 +51,15 @@ Things in the PDF that are **not relevant** to the simulation and should be drop
   links to the three transactions is enough for the learning goal.
 - Points/rubric/submission-box mechanics — that's Canvas/CAP's job, not the sim's.
 
-Two numbers worth flagging for Parand, since the exercise brief says *"discount, quantity and
-order probability are fixed per assignment"*: the PDF's $21,400 is the **pre-discount inquiry net
+Two numbers worth flagging for Parand: the PDF's $21,400 is the **pre-discount inquiry net
 value**; the quotation/order net value after the $50 item discount and 5% header discount is a
-*different*, smaller number. Whichever value CAP checks for an assignment needs to be computed
-from this engine, not hand-typed, or the two will drift the moment someone changes a condition
-amount.
+*different*, smaller number. The original interview notes said quantity/discount/probability are
+"fixed per assignment," meaning every student's correct answer is identical — Kent has since asked
+to loosen that (see §3a): each student gets their own combination of these values, and therefore
+their own correct net value, while the underlying computation (discount stacking, probability
+math) stays identical for everyone. Whichever value CAP checks needs to come from the engine's own
+calculation for that student's specific parameters, never hand-typed, or the two will drift the
+moment a range or table changes.
 
 ---
 
@@ -128,25 +131,81 @@ Assignment {
   id: string
   title: string
   customerId: string
-  materialNaming: 'shared' | 'per-student-suffix'   // supports "material numbers may vary per student"
-  scenario: {
-    items: { materialId: string; quantity: number }[]
-    inquiryOrderProbability: number        // e.g. 70
-    itemConditions: { materialId: string; conditionCode: string; amount: number }[]   // K004 $50 on DXTR1
-    headerConditions: { conditionCode: string; amount: number }[]                     // RA00 5%
-  }
-  expectedNetValue: {
-    inquiry: number       // computed by the engine from scenario, stored for fast verification
-    quotation: number
-    order: number
-  }
-  quirks: QuirkConfig      // see §5
+  materialIds: string[]        // shared catalog; no per-student numbering needed, see §4
+  variantStrategy: VariantStrategy   // replaces a single fixed scenario — see §3a
+  quirks: QuirkConfig           // see §5
 }
 ```
 
-`expectedNetValue` is **derived**, not authored — a seed script runs the same pricing engine the
-student's UI uses and stores the result, so the "verification key" can never drift from the
-engine's own math.
+`Assignment` no longer carries a single `scenario` or `expectedNetValue` — both are now
+per-student, resolved once and persisted on an `AssignmentInstance` (§3a), not authored or
+computed at the assignment level.
+
+### 3a. Parameterization: per-student variants
+
+The original interview notes fixed quantity, discount, and order probability per assignment, so
+every student's correct net value was identical. Kent has asked to loosen that: each student
+should get their own combination of these values — and therefore their own correct net value —
+while still being checkable by the same engine. Two generation modes, chosen per assignment:
+
+```ts
+type VariantStrategy =
+  | { mode: 'fixed'; scenario: ScenarioParams }     // today's single-shared-answer behavior, kept for a quick demo
+  | { mode: 'table'; variants: ScenarioParams[] }    // instructor-authored pool, roughly a dozen to a few dozen rows
+  | { mode: 'random'; ranges: ScenarioRanges }       // generated within bounds, whole numbers
+
+interface ScenarioParams {
+  items: { materialId: string; quantity: number }[]
+  itemConditions: { materialId: string; conditionCode: string; amount: number }[]
+  headerConditions: { conditionCode: string; amount: number }[]
+  orderProbability: number
+}
+
+interface ScenarioRanges {
+  items: { materialId: string; quantityMin: number; quantityMax: number }[]
+  itemConditions: { materialId: string; conditionCode: string; amountMin: number; amountMax: number; step: number }[]
+  headerConditions: { conditionCode: string; amountMin: number; amountMax: number; step: number }[]
+  orderProbabilityMin: number
+  orderProbabilityMax: number
+}
+```
+
+`step` keeps a random range producing numbers that look like real business decisions — e.g. a K004
+discount with `amountMin: 25, amountMax: 75, step: 5` only ever lands on $25/$30/.../$75, never
+$47. Defaults to 1 (any whole number) when omitted. Everything resolved is a whole number, per
+Kent's guidance — no fractional quantities or discount cents.
+
+**Resolving a variant once, per student, and persisting it:**
+
+```ts
+interface AssignmentInstance {
+  id: string
+  assignmentId: string
+  studentKey: string
+  source: 'fixed' | 'table' | 'random'
+  variantIndex: number | null    // which table row, if source === 'table'
+  seed: string | null            // studentKey + assignmentId, if source === 'random' — reproducible and auditable
+  resolvedParams: ScenarioParams
+  expectedNetValue: { inquiry: number; quotation: number; order: number }   // computed once, from resolvedParams
+  createdAt: string
+}
+```
+
+The first time a student touches an assignment (opens VA11), the server resolves their variant —
+picks a table row (e.g. `hash(studentKey) % variants.length`, deterministic, no need to track
+which rows are "already used") or rolls the ranges with a PRNG seeded from
+`studentKey + assignmentId` — runs it once through the pricing engine to get `expectedNetValue`,
+and **persists the result**. Every later screen, including a resumed document days later, reads
+the already-resolved `AssignmentInstance` rather than re-rolling. That's not just tidiness: a
+student who leaves and comes back must see the same quantities and discounts they started with, or
+the exercise breaks the exact requirement `CLAUDE.md` already calls out — pause and resume.
+
+Table-sourced variants are the safer default for the first build: an instructor can eyeball all
+~24 rows and confirm every one produces a sensible, non-zero, non-identical net value, which is
+harder to guarantee for an open-ended random range without also authoring guard rules (e.g., "the
+two conditions together can't push net value to zero or negative"). `random` is easy to add later
+once someone has picked real ranges and step sizes — it's the same `AssignmentInstance` shape
+either way.
 
 ### Student-generated data
 
@@ -224,9 +283,16 @@ standalone for Parand's review. It plays the same three roles the 3-digit ID pla
 - Is the ownership key CAP's verification question needs ("does this order belong to *this*
   student").
 
-This also directly answers "Some identifiers and material numbers may vary per student": if
-`Assignment.materialNaming === 'per-student-suffix'`, material IDs get the studentKey appended at
-seed/display time; the pricing and quirks logic never needs to know which mode is active.
+On a real SAP instance, customers and materials were numbered per-student for an operational
+reason, not a pedagogical one: with hundreds of students sharing one live client, giving everyone
+the same customer or material number would mean they were literally editing the same
+inventory/master record. Kent confirmed that constraint doesn't apply to a simulation — each
+student's documents already live in their own rows, scoped by `studentKey`, so there's nothing to
+collide. Per that guidance: **no per-student customer or material numbering.** One shared customer
+(Philly Bikes) and one shared material catalog for the whole class; `Assignment.materialIds` just
+lists which of that shared catalog an assignment uses. Per-student *variation* — different
+quantities, different discount amounts, possibly a different subset of materials — is handled
+entirely by §3a's variant strategy, not by minting unique master-data numbers per student.
 
 ---
 
@@ -325,6 +391,10 @@ interface SimVerificationResult {
 }
 ```
 
+`expectedNetValue` here is read from that student's own `AssignmentInstance` (§3a) — looked up by
+`studentKey` + `assignmentId` — not a single constant on `Assignment`, now that net value is
+expected to differ student to student by design.
+
 Exposed as `GET /api/verify?studentKey=...&assignmentId=...` on the `server` package. A CAP-side
 `SAP_MODE=sim` implementation of `sapConnector.ts` calls this endpoint instead of SAP's OData API
 and maps the response down to whatever shape CAP's verification caller currently expects,
@@ -339,12 +409,20 @@ expanding it over time as CAP's own verification logic grows to use `ownedByStud
    "Status" section's stated next step), or get one transaction (Inquiry) fully polished —
    quirks, lead-in, event log — before extending to Quotation/Order? Proposal: all three, but
    shallow on polish, so Parand can react to the *whole* flow rather than one excellent screen.
-2. **Per-student material numbers**: does the PoC need `per-student-suffix` materials for the
-   first demo, or is a shared material catalog (same DXTR1/PRTR1 for everyone, only quantities/
-   discounts fixed per assignment) enough to show the concept? Shared is less seed-data work.
-3. **Net value target for Parand's demo assignment**: should the PoC replicate the PDF's exact
-   numbers (5 Deluxe + 2 Professional, $50 K004, 5% RA00) so Parand can compare directly against
-   the real SAP exercise's expected net value?
+2. ~~Per-student material numbers~~ — resolved: not needed in a simulation (§4). One shared
+   customer and material catalog for the whole class; per-student variation happens in §3a's
+   scenario parameters instead.
+3. **Default variant strategy for the first build** (§3a): `table` with a hand-authored set of
+   roughly two dozen rows, or `random` within ranges? Proposal: `table` first — every row can be
+   eyeballed for a sane, non-zero net value; `random` is a small follow-on once ranges and step
+   sizes (below) are set.
+4. **Ranges/step sizes, if `random` is used**: placeholders to replace with real numbers from
+   Parand/Kent — e.g. quantity 3–8 per material, K004 discount $25–$75 in $5 steps, RA00 discount
+   3–10% in whole points, order probability 50–90% in 10-point steps.
+5. **Net value target for Parand's demo assignment**: should at least one table row (or the
+   `fixed` mode) replicate the PDF's exact numbers (5 Deluxe + 2 Professional, $50 K004, 5% RA00),
+   so Parand can compare that one variant directly against the real SAP exercise's expected net
+   value, even while other students land on different numbers?
 
 ---
 
