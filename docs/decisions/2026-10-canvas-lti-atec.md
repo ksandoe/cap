@@ -42,10 +42,13 @@
 
 ## Consequences for the code
 
-These changes are not made yet. Each one is a planned follow-up.
-
-- `ltiService.ts` keys identity on `claims.sub` alone (`canvasUuid`). Change it to the `iss` + `sub` pair. Read the activity from the agreed custom parameter; the code currently reads `custom.module_id`.
-- `orchestratorService.ts` maps scores to **1.0 / 0.5 / 0.0**, and `gradeService.ts` documents the same mapping. Completion is now all-or-nothing, so the mapping becomes **pass = 1.0, otherwise no pass**. The threshold that defines "pass" is still a team decision.
+- **Done 2026-10-30:** learner identity.
+  - `ltiService.ts` derives an opaque learner key, an HMAC of `iss`+`sub` (`identity/learnerKey.ts`, secret `LEARNER_KEY_SECRET`).
+  - The raw `sub` is kept only in the server-side session record for grade write-back. It is stripped from the browser session response and no longer appears in the session JWT.
+  - The activity comes from `custom.activity_id`; `module_id` is still accepted as a fallback.
+- **Done 2026-10-30:** grading.
+  - The score is now **1.0 if passed, else 0.0**. The threshold that defines "pass" is still a team decision.
+  - `gradeService.ts` now sends `sub` as the AGS `userId`; it previously sent `lis_result_sourcedid`, which was a bug.
 - `badgeService.ts` (direct Credly issuance with recipient email) is **superseded**. Badges are issued through Canvas. Keep the stub disabled and remove it once the Canvas-side badge path is confirmed.
 - **Research identity:** a stable `iss`+`sub` from LTI makes Arash's stable pseudonymous ID feasible, through a keyed hash held server-side. It is still subject to the IRB and consent design. The master PRD's cohort-only model would need to change.
 - **License terms:** Canvas Dev URLs, client IDs and keys go in `.env` only. They are never pasted into Claude.

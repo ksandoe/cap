@@ -49,7 +49,7 @@ export async function getEvaluation(req: Request, res: Response): Promise<void> 
 
 export async function listSessions(req: Request, res: Response): Promise<void> {
   // TODO: query DynamoDB for sessions by moduleId
-  // Strip: sapUsername, canvasUuid, ltiContextId, lisResultSourcedId, agsEndpoint
+  // Strip: sapUsername, canvasUuid, ltiSub, ltiContextId, lisResultSourcedId, agsEndpoint
   res.status(501).json({ error: 'Not implemented.' });
 }
 

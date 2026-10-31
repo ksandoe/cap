@@ -59,6 +59,7 @@ function stateForPhase(phase: number): string {
 export async function createSession(ltiContext: {
   canvasUuid: string; ltiContextId: string; ltiResourceLinkId: string;
   agsEndpoint: string; lisResultSourcedId: string; moduleId: string;
+  ltiSub?: string;
 }, opts: { sessionKey?: string } = {}): Promise<{ sessionToken: string; redirectPhase: number; sessionKey: string }> {
 
   // Resume path 1 — opaque session key. In production this is the value
@@ -137,7 +138,10 @@ export async function createSession(ltiContext: {
     phaseReached: PHASES.CHECKIN,
     attemptNumber: 1,
     completedBlockIds: [] as string[],
-    canvasUuid:         ltiContext.canvasUuid,   // server-side only — resume lookup
+    // Opaque learner key (HMAC of iss+sub, see identity/learnerKey.ts) —
+    // the field keeps its historical name to match the DynamoDB GSI.
+    canvasUuid:         ltiContext.canvasUuid,   // resume lookup
+    ltiSub:             ltiContext.ltiSub,       // raw LTI sub — server-side only, grade write-back
     ltiContextId:       ltiContext.ltiContextId,
     ltiResourceLinkId:  ltiContext.ltiResourceLinkId,
     agsEndpoint:        ltiContext.agsEndpoint,
@@ -196,7 +200,10 @@ export async function getSession(req: Request, res: Response): Promise<void> {
   if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
   // Strip server-side-only fields before returning to browser.
   // `parameters` stays — they are this student's own assignment values.
-  const { sapUsername: _sap, canvasUuid: _cu, ...safeSession } = session as any;
+  const {
+    sapUsername: _sap, canvasUuid: _cu, ltiSub: _sub,
+    agsEndpoint: _ags, lisResultSourcedId: _lis, ...safeSession
+  } = session as any;
   res.json(safeSession);
 }
 
@@ -325,8 +332,9 @@ export async function completeSession(req: Request, res: Response): Promise<void
   }).catch(err => logger.error('EVAL_RECORD_FAILED', { sessionId: id, error: String(err) }));
 
   // Post-completion workflow (parallel where possible)
-  const score = badgeAwarded ? 1.0
-    : ratings.some((d: any) => d.rating !== 'Needs further work') ? 0.5 : 0.0;
+  // Completion is all-or-nothing points in Canvas
+  // (docs/decisions/2026-10-canvas-lti-atec.md) — no partial credit.
+  const score = badgeAwarded ? 1.0 : 0.0;
 
   await Promise.allSettled([
     postGradeToCanvas(session, score),

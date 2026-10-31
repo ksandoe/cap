@@ -14,6 +14,7 @@
  */
 import { Request, Response } from 'express';
 import { createSession }     from '../orchestrator/orchestratorService';
+import { deriveLearnerKey }  from '../identity/learnerKey';
 import { logger }            from '../eventLogger';
 import { EVENTS }            from '@cap/shared';
 
@@ -50,17 +51,26 @@ export async function handleLaunch(req: Request, res: Response): Promise<void> {
     const claims  = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64').toString());
     // ^ placeholder: replace with jose jwtVerify() against Canvas JWKS
 
+    // Phase 1 launch data (docs/decisions/2026-10-canvas-lti-atec.md):
+    // learner = iss + sub, activity = LIFT-owned custom parameter.
+    // No name/email/roster claims are read.
+    const custom   = claims['https://purl.imsglobal.org/spec/lti/claim/custom'] ?? {};
+    // activity_id is the agreed parameter; module_id is the pre-decision
+    // name, accepted so existing placements keep working.
+    const moduleId = custom.activity_id ?? custom.module_id;
+    if (!moduleId) throw new Error('LTI launch is missing the activity_id custom parameter');
+
     const ltiContext = {
-      canvasUuid:        claims.sub,
+      canvasUuid:        deriveLearnerKey(claims.iss, claims.sub),
+      ltiSub:            claims.sub,   // raw — server-side only, for grade write-back
       ltiContextId:      claims['https://purl.imsglobal.org/spec/lti/claim/context']?.id,
       ltiResourceLinkId: claims['https://purl.imsglobal.org/spec/lti/claim/resource_link']?.id,
       agsEndpoint:       claims['https://purl.imsglobal.org/spec/lti-ags/claim/endpoint']?.lineitem,
       lisResultSourcedId:claims['https://purl.imsglobal.org/spec/lti/claim/lis']?.result_sourcedid,
-      // moduleId is derived from resource link or custom claim
-      moduleId:          claims['https://purl.imsglobal.org/spec/lti/claim/custom']?.module_id,
+      moduleId,
     };
 
-    logger.info(EVENTS.LTI_LAUNCH_VALIDATED, { canvasUuid: 'REDACTED', moduleId: ltiContext.moduleId });
+    logger.info(EVENTS.LTI_LAUNCH_VALIDATED, { moduleId: ltiContext.moduleId });
 
     const { sessionToken, redirectPhase } = await createSession(ltiContext);
 

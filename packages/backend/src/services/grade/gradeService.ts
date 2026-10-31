@@ -7,10 +7,13 @@
  * Uses the client_credentials OAuth 2.0 flow to obtain a Canvas
  * access token before posting.
  *
- * Score mapping:
- *   badge_awarded = true  → 1.0
- *   partial pass          → 0.5
- *   not yet meeting       → 0.0
+ * Score mapping — all-or-nothing completion
+ * (docs/decisions/2026-10-canvas-lti-atec.md):
+ *   passed (thresholds met) → 1.0
+ *   otherwise               → 0.0
+ *
+ * Write-back is Phase 2 and AGS vs. a scoped Canvas API is still open;
+ * this module assumes AGS until that is decided.
  *
  * TODO: implement Canvas OAuth 2.0 client_credentials token fetch
  * TODO: implement retry with exponential backoff
@@ -36,7 +39,7 @@ export async function postGradeToCanvas(session: any, score: number): Promise<vo
       activityProgress: 'Completed',
       gradingProgress:  'FullyGraded',
       timestamp:     new Date().toISOString(),
-      userId:        session.lisResultSourcedId,
+      userId:        session.ltiSub,   // AGS identifies the learner by LTI sub
     }, {
       headers: { Authorization: `Bearer ${accessToken}` },
       timeout: 10_000,
