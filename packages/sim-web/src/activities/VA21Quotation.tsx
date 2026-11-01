@@ -243,6 +243,12 @@ export default function VA21Quotation({
           )}
         </div>
       )}
+      {step.id === 'item-pricing' && deluxeIndex < 0 && (
+        <MessageStrip design="Negative">
+          This quotation has no Deluxe Touring Bike line, so there's nothing to apply K004 to. Check your Reference
+          Documents for the exact products you were asked to quote, then go back and copy the right inquiry.
+        </MessageStrip>
+      )}
 
       {step.id === 'header-pricing' && (
         <div>
