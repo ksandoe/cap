@@ -3,6 +3,7 @@ import { Button, MessageStrip, Title } from '@ui5/webcomponents-react';
 import type { AssignmentInstance, SalesDocument } from '@sap-sim/shared';
 import { VA01_CONFIG, getMaterial } from '@sap-sim/engine';
 import ActivityLayout from '../components/ActivityLayout';
+import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
 import { createDocument, logEvent, searchByReference } from '../api';
 import { todayIso } from '../dateUtils';
 
@@ -161,5 +162,10 @@ export default function VA01Order({
     </div>
   );
 
-  return <ActivityLayout instructions={instructionsPane} screen={screenPane} />;
+  return (
+    <div>
+      <ReferenceDocumentsButton instance={instance} />
+      <ActivityLayout instructions={instructionsPane} screen={screenPane} />
+    </div>
+  );
 }

@@ -164,3 +164,20 @@ body {
 .search-result-row:hover {
   background: #f0f7ff;
 }
+
+.reference-doc {
+  font-family: Georgia, 'Times New Roman', serif;
+  background: #fffdf5;
+  border: 1px solid #d8d0b8;
+  border-radius: 2px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.reference-doc-title {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #d8d0b8;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}

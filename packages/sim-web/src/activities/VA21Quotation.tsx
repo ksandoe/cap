@@ -3,6 +3,7 @@ import { Button, MessageStrip, Title } from '@ui5/webcomponents-react';
 import type { AppliedCondition, AssignmentInstance, SalesDocument, SalesDocumentItem } from '@sap-sim/shared';
 import { VA21_CONFIG, priceDocument, getMaterial } from '@sap-sim/engine';
 import ActivityLayout from '../components/ActivityLayout';
+import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
 import SearchDialog, { type SearchItem } from '../components/SearchDialog';
 import { createDocument, logEvent, searchByReference } from '../api';
 import { todayIso, monthFromNowIso } from '../dateUtils';
@@ -289,5 +290,10 @@ export default function VA21Quotation({
     </div>
   );
 
-  return <ActivityLayout instructions={instructionsPane} screen={screenPane} />;
+  return (
+    <div>
+      <ReferenceDocumentsButton instance={instance} />
+      <ActivityLayout instructions={instructionsPane} screen={screenPane} />
+    </div>
+  );
 }

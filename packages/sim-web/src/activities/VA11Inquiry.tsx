@@ -3,6 +3,7 @@ import { Button, MessageStrip, Title } from '@ui5/webcomponents-react';
 import type { AssignmentInstance, SalesDocument, SalesDocumentItem } from '@sap-sim/shared';
 import { CUSTOMERS, MATERIALS, VA11_CONFIG, priceDocument, getMaterial } from '@sap-sim/engine';
 import ActivityLayout from '../components/ActivityLayout';
+import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
 import SearchDialog, { type SearchItem } from '../components/SearchDialog';
 import { createDocument, logEvent } from '../api';
 import { todayIso, monthFromNowIso } from '../dateUtils';
@@ -287,6 +288,7 @@ export default function VA11Inquiry({
 
   return (
     <div>
+      <ReferenceDocumentsButton instance={instance} />
       <ActivityLayout instructions={instructionsPane} screen={screenPane} />
       <SearchDialog
         open={customerDialogOpen}

@@ -352,6 +352,23 @@ PoC** — noted as a roadmap item, not something to build now.
 `SalesDocument.custReference` (below) is populated from `AssignmentInstance.custPoNumber`, not from
 `studentKey` directly. `studentKey` goes back to being a purely internal identity — see §4.
 
+**Built, after Kent's first hands-on pass:** the lead-in prose states a student's customer, PO
+number, materials, and discount amounts once, but nothing carried that forward into the activity
+screens themselves — so a student several steps into the Inquiry activity had no way to recall how
+many of each bicycle were actually requested. Fixed with a **Reference Documents** button, present
+throughout every activity screen (not just the lead-in), opening a small modal with two pretend
+source documents built from the student's own `AssignmentInstance`:
+
+- **Purchase Request** — styled like the customer's own paperwork: their name and address, the PO
+  number, and a line-item table of exactly what was requested (qty + material).
+- **Pricing Authorization** — styled like an internal sales-management note: the K004 per-unit
+  amount and which material it applies to, and the RA00 percentage.
+
+This isn't just a bug fix — it makes §3c's "the PO number is the customer's own document, not
+something SAP generated" argument concrete instead of asserted: the Purchase Request *is* that
+document, something the student can open and re-read anytime, the way a rep would keep the
+customer's actual paperwork on their desk rather than re-reading an onboarding email.
+
 ### Student-generated data
 
 ```ts
