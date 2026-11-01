@@ -181,3 +181,170 @@ body {
   padding-bottom: 8px;
   margin-bottom: 12px;
 }
+
+/* --- SAP chrome: classic header bar / menu / toolbar, see SapChrome.tsx --- */
+.sap-chrome-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #354a5f;
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.sap-chrome-back {
+  font-size: 16px;
+  opacity: 0.8;
+}
+.sap-chrome-logo {
+  font-weight: 800;
+  font-style: italic;
+  background: #fff;
+  color: #354a5f;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-size: 12px;
+}
+.sap-chrome-title {
+  flex: 1;
+}
+.sap-chrome-exit {
+  opacity: 0.8;
+  cursor: default;
+}
+.sap-chrome-menu {
+  display: flex;
+  gap: 14px;
+  background: #f5f6f7;
+  border-bottom: 1px solid #d9d9d9;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #0a6ed1;
+  overflow-x: auto;
+}
+.sap-chrome-menu-item {
+  white-space: nowrap;
+  cursor: default;
+}
+.sap-chrome-toolbar {
+  display: flex;
+  gap: 4px;
+  background: #fff;
+  border-bottom: 1px solid #ececec;
+  padding: 6px 12px;
+}
+.sap-chrome-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #c4d4e4;
+  border-radius: 3px;
+  color: #0a6ed1;
+  cursor: pointer;
+}
+.sap-chrome-icon-btn--decorative {
+  cursor: default;
+  opacity: 0.6;
+}
+.sap-chrome-icon-btn--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.sap-screen-body {
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-top: none;
+  padding: 16px;
+}
+
+/* --- Dense items grid, see ItemsGrid.tsx --- */
+.sap-items-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sap-items-grid th {
+  text-align: left;
+  font-weight: 600;
+  color: #556;
+  border-bottom: 1px solid #d9d9d9;
+  padding: 5px 6px;
+  background: #fafafa;
+}
+.sap-items-grid td {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 4px 6px;
+}
+.sap-items-grid tr.selected {
+  background: #e8f1fb;
+}
+.sap-items-grid input[type='text'],
+.sap-items-grid input[type='number'] {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+}
+.sap-items-grid input[type='text']:focus,
+.sap-items-grid input[type='number']:focus {
+  border-color: #0a6ed1;
+  background: #fff;
+}
+
+/* --- Tab strip, see ItemDetailPanel.tsx --- */
+.sap-tab-strip {
+  display: flex;
+  gap: 18px;
+  border-bottom: 1px solid #d9d9d9;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+.sap-tab {
+  padding: 6px 2px 10px;
+  cursor: pointer;
+  color: #666;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.sap-tab.active {
+  color: #0a6ed1;
+  border-bottom-color: #0a6ed1;
+  font-weight: 600;
+}
+
+/* --- Pricing Elements table, see PricingElementsTable.tsx --- */
+.sap-pricing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.sap-pricing-table th {
+  text-align: left;
+  font-weight: 600;
+  color: #556;
+  border-bottom: 1px solid #d9d9d9;
+  padding: 4px 6px;
+}
+.sap-pricing-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.sap-pricing-table tr.subtotal td {
+  color: #0a6ed1;
+}
+.sap-pricing-table tr.editable-row input {
+  border: 1px solid #c4d4e4;
+  width: 100%;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+.sap-pricing-table .status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2b7d2b;
+}

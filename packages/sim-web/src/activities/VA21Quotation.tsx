@@ -1,12 +1,18 @@
 import { useState } from 'react';
-import { Button, MessageStrip, Title } from '@ui5/webcomponents-react';
+import { Button, Dialog, Bar, MessageStrip, Title } from '@ui5/webcomponents-react';
 import type { AppliedCondition, AssignmentInstance, SalesDocument, SalesDocumentItem } from '@sap-sim/shared';
-import { VA21_CONFIG, priceDocument, getMaterial } from '@sap-sim/engine';
+import { VA21_CONFIG, priceDocument, getMaterial, getConditionType } from '@sap-sim/engine';
 import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
-import SearchDialog, { type SearchItem } from '../components/SearchDialog';
+import SapChrome from '../components/SapChrome';
+import ItemsGrid from '../components/ItemsGrid';
+import ItemDetailPanel from '../components/ItemDetailPanel';
+import PricingElementsTable from '../components/PricingElementsTable';
 import { createDocument, logEvent, searchByReference } from '../api';
 import { todayIso, monthFromNowIso } from '../dateUtils';
+
+const K004 = getConditionType('K004');
+const RA00 = getConditionType('RA00');
 
 export default function VA21Quotation({
   instance,
@@ -19,7 +25,6 @@ export default function VA21Quotation({
 }) {
   const steps = VA21_CONFIG.steps;
   const [stepIndex, setStepIndex] = useState(0);
-  const [refDialogOpen, setRefDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SalesDocument[] | null>(null);
   const [inquiry, setInquiry] = useState<SalesDocument | null>(null);
@@ -32,13 +37,17 @@ export default function VA21Quotation({
 
   const [items, setItems] = useState<SalesDocumentItem[]>([]);
   const [headerConditions, setHeaderConditions] = useState<AppliedCondition[]>([]);
-  const [itemDiscountInput, setItemDiscountInput] = useState('');
-  const [headerDiscountInput, setHeaderDiscountInput] = useState('');
+
+  // Item Pricing: the student selects which row to open — no hardcoded "the Deluxe one", per
+  // docs/decisions/001. Wrong item selected still saves; it just produces a wrong net value.
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+  const [itemDetailOpen, setItemDetailOpen] = useState(false);
+  const [headerDialogOpen, setHeaderDialogOpen] = useState(false);
 
   const [saved, setSaved] = useState<SalesDocument | null>(null);
 
   const step = steps[stepIndex];
-  const deluxeIndex = items.findIndex((i) => i.materialId.startsWith('DXTR'));
+  const selectedItem = items.find((i) => i.lineNumber === selectedLine) ?? null;
 
   async function runSearch() {
     const results = await searchByReference('inquiry', searchQuery.trim());
@@ -69,7 +78,7 @@ export default function VA21Quotation({
       case 'reference':
         return Boolean(custReference && custReferenceDate && validTo && requestedDeliveryDate);
       case 'item-pricing':
-        return items[deluxeIndex]?.itemConditions.length > 0;
+        return items.some((i) => i.itemConditions.length > 0);
       case 'header-pricing':
         return headerConditions.length > 0 && headerConditions[0].active;
       default:
@@ -84,19 +93,16 @@ export default function VA21Quotation({
     setStepIndex((i) => i + 1);
   }
 
-  function applyItemDiscount() {
-    const amount = Number(itemDiscountInput);
-    if (!amount || deluxeIndex < 0) return;
+  function commitItemCondition(amount: number) {
+    if (selectedLine === null) return;
     setItems((prev) =>
-      prev.map((it, i) =>
-        i === deluxeIndex ? { ...it, itemConditions: [{ conditionCode: 'K004', amount, active: true }] } : it,
+      prev.map((it) =>
+        it.lineNumber === selectedLine ? { ...it, itemConditions: [{ conditionCode: 'K004', amount, active: true }] } : it,
       ),
     );
   }
 
-  function applyHeaderDiscount() {
-    const amount = Number(headerDiscountInput);
-    if (!amount) return;
+  function commitHeaderCondition(amount: number) {
     setHeaderConditions([{ conditionCode: 'RA00', amount, active: false }]);
   }
 
@@ -156,159 +162,128 @@ export default function VA21Quotation({
 
   const screenPane = (
     <div>
-      <Title level="H5">{VA21_CONFIG.title}: Overview</Title>
-
-      {step.id === 'create-with-reference' && (
-        <div>
-          <div className="field-row">
-            <label className="required">Customer Reference</label>
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="e.g. PO-10238"
-              style={{ marginRight: 8 }}
-            />
-            <Button onClick={runSearch} disabled={!searchQuery.trim()}>
-              Search
-            </Button>
-          </div>
-          {searchResults && (
-            <div style={{ marginTop: 12 }}>
-              {searchResults.length === 0 && (
-                <MessageStrip design="Negative">
-                  No inquiry found with Customer Reference "{searchQuery}". Check the Purchase Request in your
-                  Reference Documents for the exact PO number.
-                </MessageStrip>
-              )}
-              {searchResults.map((doc) => (
-                <div key={doc.id} className="search-result-row" onClick={() => copyFromInquiry(doc)}>
-                  {doc.id} — Cust. Ref. {doc.custReference} — click to Copy
-                </div>
-              ))}
+      <SapChrome
+        title={`${VA21_CONFIG.title}: Overview`}
+        itemDetailIcon={step.id === 'item-pricing'}
+        itemDetailDisabled={!selectedItem}
+        onItemDetail={() => setItemDetailOpen(true)}
+      />
+      <div className="sap-screen-body">
+        {step.id === 'create-with-reference' && (
+          <div>
+            <div className="field-row">
+              <label className="required">Customer Reference</label>
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="e.g. PO-10238"
+                style={{ marginRight: 8 }}
+              />
+              <Button onClick={runSearch} disabled={!searchQuery.trim()}>
+                Search
+              </Button>
             </div>
-          )}
-        </div>
-      )}
-
-      {step.id === 'reference' && (
-        <>
-          {pendingWarning ? (
-            <MessageStrip design={pendingWarning.kind === 'warning' ? 'Negative' : 'Information'}>
-              {pendingWarning.message}
-              <div style={{ marginTop: 8 }}>
-                <Button onClick={() => setWarningIndex((i) => i + 1)}>
-                  {pendingWarning.dismissAction === 'enter' ? 'Enter' : '✓ OK'}
-                </Button>
+            {searchResults && (
+              <div style={{ marginTop: 12 }}>
+                {searchResults.length === 0 && (
+                  <MessageStrip design="Negative">
+                    No inquiry found with Customer Reference "{searchQuery}". Check the Purchase Request in your
+                    Reference Documents for the exact PO number.
+                  </MessageStrip>
+                )}
+                {searchResults.map((doc) => (
+                  <div key={doc.id} className="search-result-row" onClick={() => copyFromInquiry(doc)}>
+                    {doc.id} — Cust. Ref. {doc.custReference} — click to Copy
+                  </div>
+                ))}
               </div>
-            </MessageStrip>
-          ) : (
-            <>
-              <div className="field-row">
-                <label className="required">Cust. Reference</label>
-                <input value={custReference} onChange={(e) => setCustReference(e.target.value)} />
-              </div>
-              <div className="field-row">
-                <label className="required">Cust. Ref. Date</label>
-                <input type="date" value={custReferenceDate} onChange={(e) => setCustReferenceDate(e.target.value)} />
-              </div>
-              <div className="field-row">
-                <label className="required">Valid To</label>
-                <input type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
-              </div>
-              <div className="field-row">
-                <label className="required">Req. Deliv. Date</label>
-                <input
-                  type="date"
-                  value={requestedDeliveryDate}
-                  onChange={(e) => setRequestedDeliveryDate(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-        </>
-      )}
-
-      {step.id === 'item-pricing' && deluxeIndex >= 0 && (
-        <div>
-          <p>{getMaterial(items[deluxeIndex].materialId).description}</p>
-          <div className="field-row">
-            <label className="required">K004 — Material Discount ($ per unit)</label>
-            <input value={itemDiscountInput} onChange={(e) => setItemDiscountInput(e.target.value)} style={{ width: 80 }} />
-            <Button onClick={applyItemDiscount} style={{ marginLeft: 8 }}>
-              Apply
-            </Button>
+            )}
           </div>
-          {items[deluxeIndex].itemConditions.length > 0 && (
-            <MessageStrip design="Positive">K004 applied: ${items[deluxeIndex].itemConditions[0].amount}/unit</MessageStrip>
-          )}
-        </div>
-      )}
-      {step.id === 'item-pricing' && deluxeIndex < 0 && (
-        <MessageStrip design="Negative">
-          This quotation has no Deluxe Touring Bike line, so there's nothing to apply K004 to. Check your Reference
-          Documents for the exact products you were asked to quote, then go back and copy the right inquiry.
-        </MessageStrip>
-      )}
-
-      {step.id === 'header-pricing' && (
-        <div>
-          <div className="field-row">
-            <label className="required">RA00 — Net Discount (%)</label>
-            <input value={headerDiscountInput} onChange={(e) => setHeaderDiscountInput(e.target.value)} style={{ width: 80 }} />
-            <Button onClick={applyHeaderDiscount} style={{ marginLeft: 8 }}>
-              Enter
-            </Button>
-          </div>
-          {headerConditions.length > 0 && !headerConditions[0].active && (
-            <MessageStrip design="Negative">
-              RA00 entered but not yet active — the discount above does not apply until you Activate it.
-              <div style={{ marginTop: 8 }}>
-                <Button onClick={activateHeaderDiscount}>Activate</Button>
-              </div>
-            </MessageStrip>
-          )}
-          {headerConditions.length > 0 && headerConditions[0].active && (
-            <MessageStrip design="Positive">RA00 active: {headerConditions[0].amount}% off</MessageStrip>
-          )}
-        </div>
-      )}
-
-      {step.id === 'review' && (
-        <div>
-          <table className="item-table">
-            <thead>
-              <tr>
-                <th>Material</th>
-                <th>Qty</th>
-                <th>Net Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, idx) => (
-                <tr key={idx}>
-                  <td>{getMaterial(item.materialId).description}</td>
-                  <td>{item.quantity}</td>
-                  <td>${pricing.itemNetValues[idx]?.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p>
-            <strong>Net Value: ${pricing.netValue.toFixed(2)}</strong>
-          </p>
-          <Button design="Emphasized" onClick={handleSave}>
-            Save
-          </Button>
-        </div>
-      )}
-
-      <div className="step-actions">
-        {stepIndex > 0 && <Button onClick={() => setStepIndex((i) => i - 1)}>Back</Button>}
-        {step.id !== 'review' && (
-          <Button design="Emphasized" disabled={!canAdvance() || Boolean(pendingWarning)} onClick={handleNext}>
-            Next
-          </Button>
         )}
+
+        {step.id === 'reference' && (
+          <>
+            {pendingWarning ? (
+              <MessageStrip design={pendingWarning.kind === 'warning' ? 'Negative' : 'Information'}>
+                {pendingWarning.message}
+                <div style={{ marginTop: 8 }}>
+                  <Button onClick={() => setWarningIndex((i) => i + 1)}>
+                    {pendingWarning.dismissAction === 'enter' ? 'Enter' : '✓ OK'}
+                  </Button>
+                </div>
+              </MessageStrip>
+            ) : (
+              <>
+                <div className="field-row">
+                  <label className="required">Cust. Reference</label>
+                  <input value={custReference} onChange={(e) => setCustReference(e.target.value)} />
+                </div>
+                <div className="field-row">
+                  <label className="required">Cust. Ref. Date</label>
+                  <input type="date" value={custReferenceDate} onChange={(e) => setCustReferenceDate(e.target.value)} />
+                </div>
+                <div className="field-row">
+                  <label className="required">Valid To</label>
+                  <input type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
+                </div>
+                <div className="field-row">
+                  <label className="required">Req. Deliv. Date</label>
+                  <input
+                    type="date"
+                    value={requestedDeliveryDate}
+                    onChange={(e) => setRequestedDeliveryDate(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {step.id === 'item-pricing' && (
+          <ItemsGrid
+            items={items}
+            selectedLines={selectedLine !== null ? [selectedLine] : []}
+            onToggleSelect={(line) => setSelectedLine((cur) => (cur === line ? null : line))}
+            readOnly
+          />
+        )}
+
+        {step.id === 'header-pricing' && (
+          <div>
+            <Button onClick={() => setHeaderDialogOpen(true)}>Goto ▸ Header ▸ Conditions</Button>
+            {headerConditions.length > 0 && !headerConditions[0].active && (
+              <MessageStrip design="Negative" style={{ marginTop: 8 }}>
+                RA00 entered but not yet active — open Header Conditions to Activate it.
+              </MessageStrip>
+            )}
+            {headerConditions.length > 0 && headerConditions[0].active && (
+              <MessageStrip design="Positive" style={{ marginTop: 8 }}>
+                RA00 active: {headerConditions[0].amount}% off
+              </MessageStrip>
+            )}
+          </div>
+        )}
+
+        {step.id === 'review' && (
+          <div>
+            <ItemsGrid items={items} selectedLines={[]} onToggleSelect={() => {}} readOnly />
+            <p style={{ marginTop: 12 }}>
+              <strong>Net Value: ${pricing.netValue.toFixed(2)}</strong>
+            </p>
+            <Button design="Emphasized" onClick={handleSave}>
+              Save
+            </Button>
+          </div>
+        )}
+
+        <div className="step-actions">
+          {stepIndex > 0 && <Button onClick={() => setStepIndex((i) => i - 1)}>Back</Button>}
+          {step.id !== 'review' && (
+            <Button design="Emphasized" disabled={!canAdvance() || Boolean(pendingWarning)} onClick={handleNext}>
+              Next
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -317,6 +292,46 @@ export default function VA21Quotation({
     <div>
       <ReferenceDocumentsButton instance={instance} />
       <ActivityLayout instructions={instructionsPane} screen={screenPane} />
+
+      {selectedItem && (
+        <ItemDetailPanel
+          open={itemDetailOpen}
+          materialId={selectedItem.materialId}
+          lineNumber={selectedItem.lineNumber}
+          quantity={selectedItem.quantity}
+          conditionDef={K004}
+          appliedCondition={selectedItem.itemConditions[0] ?? null}
+          onCommitCondition={commitItemCondition}
+          initialTab="Conditions"
+          onClose={() => setItemDetailOpen(false)}
+        />
+      )}
+
+      <Dialog
+        open={headerDialogOpen}
+        headerText="Create Quotation: Header Data — Conditions"
+        onAfterClose={() => setHeaderDialogOpen(false)}
+        footer={
+          <Bar
+            endContent={
+              <Button design="Transparent" onClick={() => setHeaderDialogOpen(false)}>
+                Back
+              </Button>
+            }
+          />
+        }
+      >
+        <div style={{ minWidth: 480, maxWidth: 560 }}>
+          <PricingElementsTable
+            level="header"
+            basePrice={items.reduce((sum, item, idx) => sum + pricing.itemNetValues[idx], 0)}
+            conditionDef={RA00}
+            appliedCondition={headerConditions[0] ?? null}
+            onCommitCondition={commitHeaderCondition}
+            onActivate={activateHeaderDiscount}
+          />
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Button, MessageStrip, Title } from '@ui5/webcomponents-react';
 import type { AssignmentInstance, SalesDocument } from '@sap-sim/shared';
-import { VA01_CONFIG, getMaterial } from '@sap-sim/engine';
+import { VA01_CONFIG } from '@sap-sim/engine';
 import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
+import SapChrome from '../components/SapChrome';
+import ItemsGrid from '../components/ItemsGrid';
 import { createDocument, logEvent, searchByReference } from '../api';
 import { todayIso } from '../dateUtils';
 
@@ -88,93 +90,77 @@ export default function VA01Order({
 
   const screenPane = (
     <div>
-      <Title level="H5">{VA01_CONFIG.title}: Overview</Title>
+      <SapChrome title={`${VA01_CONFIG.title}: Overview`} />
+      <div className="sap-screen-body">
+        {step.id === 'create-with-reference' && (
+          <div>
+            <div className="field-row">
+              <label className="required">Customer Reference</label>
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="e.g. PO-10238"
+                style={{ marginRight: 8 }}
+              />
+              <Button onClick={runSearch} disabled={!searchQuery.trim()}>
+                Search
+              </Button>
+            </div>
+            {searchResults && (
+              <div style={{ marginTop: 12 }}>
+                {searchResults.length === 0 && (
+                  <MessageStrip design="Negative">
+                    No quotation found with Customer Reference "{searchQuery}". Check the Purchase Request in your
+                    Reference Documents for the exact PO number.
+                  </MessageStrip>
+                )}
+                {searchResults.map((doc) => (
+                  <div key={doc.id} className="search-result-row" onClick={() => copyFromQuotation(doc)}>
+                    {doc.id} — Cust. Ref. {doc.custReference} — click to Copy
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-      {step.id === 'create-with-reference' && (
-        <div>
-          <div className="field-row">
-            <label className="required">Customer Reference</label>
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="e.g. PO-10238"
-              style={{ marginRight: 8 }}
-            />
-            <Button onClick={runSearch} disabled={!searchQuery.trim()}>
-              Search
+        {step.id === 'reference' && (
+          <>
+            <div className="field-row">
+              <label className="required">Cust. Reference</label>
+              <input value={custReference} onChange={(e) => setCustReference(e.target.value)} />
+            </div>
+            <div className="field-row">
+              <label className="required">Cust. Ref. Date</label>
+              <input type="date" value={custReferenceDate} onChange={(e) => setCustReferenceDate(e.target.value)} />
+            </div>
+            <div className="field-row">
+              <label>Req. Deliv. Date (copied)</label>
+              <input value={quotation?.requestedDeliveryDate ?? ''} disabled />
+            </div>
+          </>
+        )}
+
+        {step.id === 'review' && quotation && (
+          <div>
+            <ItemsGrid items={quotation.items} selectedLines={[]} onToggleSelect={() => {}} readOnly />
+            <p style={{ marginTop: 12 }}>
+              <strong>Net Value: ${quotation.netValue.toFixed(2)}</strong> (copied from the quotation)
+            </p>
+            <Button design="Emphasized" onClick={handleSave}>
+              Save
             </Button>
           </div>
-          {searchResults && (
-            <div style={{ marginTop: 12 }}>
-              {searchResults.length === 0 && (
-                <MessageStrip design="Negative">
-                  No quotation found with Customer Reference "{searchQuery}". Check the Purchase Request in your
-                  Reference Documents for the exact PO number.
-                </MessageStrip>
-              )}
-              {searchResults.map((doc) => (
-                <div key={doc.id} className="search-result-row" onClick={() => copyFromQuotation(doc)}>
-                  {doc.id} — Cust. Ref. {doc.custReference} — click to Copy
-                </div>
-              ))}
-            </div>
+        )}
+
+        <div className="step-actions">
+          {stepIndex > 0 && <Button onClick={() => setStepIndex((i) => i - 1)}>Back</Button>}
+          {step.id !== 'review' && (
+            <Button design="Emphasized" disabled={!canAdvance()} onClick={() => setStepIndex((i) => i + 1)}>
+              Next
+            </Button>
           )}
         </div>
-      )}
-
-      {step.id === 'reference' && (
-        <>
-          <div className="field-row">
-            <label className="required">Cust. Reference</label>
-            <input value={custReference} onChange={(e) => setCustReference(e.target.value)} />
-          </div>
-          <div className="field-row">
-            <label className="required">Cust. Ref. Date</label>
-            <input type="date" value={custReferenceDate} onChange={(e) => setCustReferenceDate(e.target.value)} />
-          </div>
-          <div className="field-row">
-            <label>Req. Deliv. Date (copied)</label>
-            <input value={quotation?.requestedDeliveryDate ?? ''} disabled />
-          </div>
-        </>
-      )}
-
-      {step.id === 'review' && quotation && (
-        <div>
-          <table className="item-table">
-            <thead>
-              <tr>
-                <th>Material</th>
-                <th>Qty</th>
-                <th>Net Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {quotation.items.map((item) => (
-                <tr key={item.lineNumber}>
-                  <td>{getMaterial(item.materialId).description}</td>
-                  <td>{item.quantity}</td>
-                  <td>${item.itemNetValue.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p>
-            <strong>Net Value: ${quotation.netValue.toFixed(2)}</strong> (copied from the quotation)
-          </p>
-          <Button design="Emphasized" onClick={handleSave}>
-            Save
-          </Button>
-        </div>
-      )}
-
-      <div className="step-actions">
-        {stepIndex > 0 && <Button onClick={() => setStepIndex((i) => i - 1)}>Back</Button>}
-        {step.id !== 'review' && (
-          <Button design="Emphasized" disabled={!canAdvance()} onClick={() => setStepIndex((i) => i + 1)}>
-            Next
-          </Button>
-        )}
       </div>
     </div>
   );

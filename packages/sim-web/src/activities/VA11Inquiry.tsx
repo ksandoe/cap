@@ -4,6 +4,9 @@ import type { AssignmentInstance, SalesDocument, SalesDocumentItem } from '@sap-
 import { CUSTOMERS, MATERIALS, VA11_CONFIG, priceDocument, getMaterial } from '@sap-sim/engine';
 import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
+import SapChrome from '../components/SapChrome';
+import ItemsGrid from '../components/ItemsGrid';
+import ItemDetailPanel from '../components/ItemDetailPanel';
 import SearchDialog, { type SearchItem } from '../components/SearchDialog';
 import { createDocument, logEvent } from '../api';
 import { todayIso, monthFromNowIso } from '../dateUtils';
@@ -12,9 +15,14 @@ const CUSTOMER_ITEMS: SearchItem[] = CUSTOMERS.map((c) => ({ id: c.id, label: c.
 const MATERIAL_ITEMS: SearchItem[] = MATERIALS.map((m) => ({ id: m.id, label: m.description, sublabel: `$${m.basePrice}/unit` }));
 
 interface DraftItem {
+  lineNumber: number;
   materialId: string;
   quantity: number;
   orderProbability: number;
+}
+
+function nextLineNumber(items: DraftItem[]): number {
+  return items.length === 0 ? 10 : Math.max(...items.map((i) => i.lineNumber)) + 10;
 }
 
 export default function VA11Inquiry({
@@ -40,11 +48,29 @@ export default function VA11Inquiry({
   const [saved, setSaved] = useState<SalesDocument | null>(null);
   const [showBlankTabNotice, setShowBlankTabNotice] = useState(false);
 
+  // Materials step selection (for "Remove selected"); Probability step selection (for item detail).
+  const [selectedLines, setSelectedLines] = useState<number[]>([]);
+  const [itemDetailOpen, setItemDetailOpen] = useState(false);
+
   const step = steps[stepIndex];
+  const selectedLine = selectedLines[0] ?? null;
+  const selectedItem = items.find((i) => i.lineNumber === selectedLine) ?? null;
 
   function addMaterial(item: SearchItem) {
-    setItems((prev) => [...prev, { materialId: item.id, quantity: 0, orderProbability: 30 }]);
+    setItems((prev) => [...prev, { lineNumber: nextLineNumber(prev), materialId: item.id, quantity: 0, orderProbability: 30 }]);
     setMaterialDialogOpen(false);
+  }
+
+  function removeSelected() {
+    setItems((prev) => prev.filter((i) => !selectedLines.includes(i.lineNumber)));
+    setSelectedLines([]);
+  }
+
+  function navigateItem(direction: 'prev' | 'next') {
+    const idx = items.findIndex((i) => i.lineNumber === selectedLine);
+    if (idx < 0) return;
+    const nextIdx = direction === 'next' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
+    setSelectedLines([items[nextIdx].lineNumber]);
   }
 
   function canAdvance(): boolean {
@@ -73,7 +99,7 @@ export default function VA11Inquiry({
 
   async function handleSave() {
     const docItems: SalesDocumentItem[] = items.map((item, idx) => ({
-      lineNumber: idx + 1,
+      lineNumber: item.lineNumber,
       materialId: item.materialId,
       quantity: item.quantity,
       orderProbability: item.orderProbability,
@@ -129,159 +155,91 @@ export default function VA11Inquiry({
 
   const screenPane = (
     <div>
-      <Title level="H5">{VA11_CONFIG.title}: Overview</Title>
-
-      {step.id === 'customer' && (
-        <div className="field-row">
-          <label className="required">Sold-To Party</label>
-          {soldToParty ? (
-            <p>
-              {soldToParty.label} ({soldToParty.id})
-            </p>
-          ) : (
-            <p style={{ color: '#888' }}>Not selected</p>
-          )}
-          <Button onClick={() => setCustomerDialogOpen(true)}>Search…</Button>
-        </div>
-      )}
-
-      {step.id === 'reference' && (
-        <>
+      <SapChrome
+        title={`${VA11_CONFIG.title}: Overview`}
+        itemDetailIcon={step.id === 'probability'}
+        itemDetailDisabled={!selectedItem}
+        onItemDetail={() => setItemDetailOpen(true)}
+      />
+      <div className="sap-screen-body">
+        {step.id === 'customer' && (
           <div className="field-row">
-            <label className="required">Cust. Reference</label>
-            <input value={custReference} onChange={(e) => setCustReference(e.target.value)} placeholder="PO-xxxxx" />
+            <label className="required">Sold-To Party</label>
+            {soldToParty ? (
+              <p>
+                {soldToParty.label} ({soldToParty.id})
+              </p>
+            ) : (
+              <p style={{ color: '#888' }}>Not selected</p>
+            )}
+            <Button onClick={() => setCustomerDialogOpen(true)}>Search…</Button>
           </div>
-          <div className="field-row">
-            <label className="required">Customer Ref. Date</label>
-            <input type="date" value={custReferenceDate} onChange={(e) => setCustReferenceDate(e.target.value)} />
-          </div>
-          <div className="field-row">
-            <label className="required">Valid From</label>
-            <input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
-          </div>
-          <div className="field-row">
-            <label className="required">Valid To</label>
-            <input type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
-          </div>
-        </>
-      )}
-
-      {step.id === 'materials' && (
-        <>
-          <table className="item-table">
-            <thead>
-              <tr>
-                <th>Material</th>
-                <th>Qty</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, idx) => (
-                <tr key={idx}>
-                  <td>{getMaterial(item.materialId).description}</td>
-                  <td>
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.quantity || ''}
-                      onChange={(e) => {
-                        const q = Number(e.target.value);
-                        setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, quantity: q } : it)));
-                      }}
-                      style={{ width: 60 }}
-                    />
-                  </td>
-                  <td>
-                    <Button
-                      design="Transparent"
-                      onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                    >
-                      Remove
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {items.length < 2 && <Button onClick={() => setMaterialDialogOpen(true)}>Search Material…</Button>}
-        </>
-      )}
-
-      {step.id === 'probability' && (
-        <table className="item-table">
-          <thead>
-            <tr>
-              <th>Material</th>
-              <th>Net Value</th>
-              <th>Order Probability (%)</th>
-              <th>Expected Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, idx) => (
-              <tr key={idx}>
-                <td>{getMaterial(item.materialId).description}</td>
-                <td>${pricing.itemNetValues[idx]?.toFixed(2)}</td>
-                <td>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={item.orderProbability}
-                    onChange={(e) => {
-                      const p = Number(e.target.value);
-                      setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, orderProbability: p } : it)));
-                    }}
-                    style={{ width: 60 }}
-                  />
-                </td>
-                <td>${((pricing.itemNetValues[idx] ?? 0) * (item.orderProbability / 100)).toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {step.id === 'review' && (
-        <div>
-          <p>Sold-To Party: {soldToParty?.label}</p>
-          <p>Cust. Reference: {custReference}</p>
-          <table className="item-table">
-            <thead>
-              <tr>
-                <th>Material</th>
-                <th>Qty</th>
-                <th>Net Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, idx) => (
-                <tr key={idx}>
-                  <td>{getMaterial(item.materialId).description}</td>
-                  <td>{item.quantity}</td>
-                  <td>${pricing.itemNetValues[idx]?.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p>
-            <strong>Net Value: ${pricing.netValue.toFixed(2)}</strong>
-          </p>
-          <p>Expected Order Value: ${expectedOrderValue.toFixed(2)}</p>
-          <Button design="Emphasized" onClick={handleSave}>
-            Save
-          </Button>
-        </div>
-      )}
-
-      <div className="step-actions">
-        {stepIndex > 0 && <Button onClick={() => setStepIndex((i) => i - 1)}>Back</Button>}
-        {step.id !== 'review' && (
-          <Button design="Emphasized" disabled={!canAdvance()} onClick={() => setStepIndex((i) => i + 1)}>
-            Next
-          </Button>
         )}
+
+        {step.id === 'reference' && (
+          <>
+            <div className="field-row">
+              <label className="required">Cust. Reference</label>
+              <input value={custReference} onChange={(e) => setCustReference(e.target.value)} placeholder="PO-xxxxx" />
+            </div>
+            <div className="field-row">
+              <label className="required">Customer Ref. Date</label>
+              <input type="date" value={custReferenceDate} onChange={(e) => setCustReferenceDate(e.target.value)} />
+            </div>
+            <div className="field-row">
+              <label className="required">Valid From</label>
+              <input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
+            </div>
+            <div className="field-row">
+              <label className="required">Valid To</label>
+              <input type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
+            </div>
+          </>
+        )}
+
+        {step.id === 'materials' && (
+          <ItemsGrid
+            items={items}
+            selectedLines={selectedLines}
+            onToggleSelect={(line) => setSelectedLines((cur) => (cur.includes(line) ? cur.filter((l) => l !== line) : [...cur, line]))}
+            onQuantityChange={(line, qty) => setItems((prev) => prev.map((it) => (it.lineNumber === line ? { ...it, quantity: qty } : it)))}
+            onAddRow={items.length < 2 ? () => setMaterialDialogOpen(true) : undefined}
+            onRemoveSelected={removeSelected}
+          />
+        )}
+
+        {step.id === 'probability' && (
+          <ItemsGrid
+            items={items}
+            selectedLines={selectedLine !== null ? [selectedLine] : []}
+            onToggleSelect={(line) => setSelectedLines((cur) => (cur[0] === line ? [] : [line]))}
+            readOnly
+          />
+        )}
+
+        {step.id === 'review' && (
+          <div>
+            <p>Sold-To Party: {soldToParty?.label}</p>
+            <p>Cust. Reference: {custReference}</p>
+            <ItemsGrid items={items} selectedLines={[]} onToggleSelect={() => {}} readOnly />
+            <p style={{ marginTop: 12 }}>
+              <strong>Net Value: ${pricing.netValue.toFixed(2)}</strong>
+            </p>
+            <p>Expected Order Value: ${expectedOrderValue.toFixed(2)}</p>
+            <Button design="Emphasized" onClick={handleSave}>
+              Save
+            </Button>
+          </div>
+        )}
+
+        <div className="step-actions">
+          {stepIndex > 0 && <Button onClick={() => setStepIndex((i) => i - 1)}>Back</Button>}
+          {step.id !== 'review' && (
+            <Button design="Emphasized" disabled={!canAdvance()} onClick={() => setStepIndex((i) => i + 1)}>
+              Next
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -309,6 +267,20 @@ export default function VA11Inquiry({
         onSelect={addMaterial}
         onClose={() => setMaterialDialogOpen(false)}
       />
+      {selectedItem && (
+        <ItemDetailPanel
+          open={itemDetailOpen}
+          materialId={selectedItem.materialId}
+          lineNumber={selectedItem.lineNumber}
+          quantity={selectedItem.quantity}
+          orderProbability={selectedItem.orderProbability}
+          onProbabilityChange={(value) =>
+            setItems((prev) => prev.map((it) => (it.lineNumber === selectedItem.lineNumber ? { ...it, orderProbability: value } : it)))
+          }
+          onNavigate={items.length > 1 ? navigateItem : undefined}
+          onClose={() => setItemDetailOpen(false)}
+        />
+      )}
     </div>
   );
 }
