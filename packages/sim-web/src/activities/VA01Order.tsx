@@ -18,6 +18,7 @@ export default function VA01Order({
 }) {
   const steps = VA01_CONFIG.steps;
   const [stepIndex, setStepIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SalesDocument[] | null>(null);
   const [quotation, setQuotation] = useState<SalesDocument | null>(null);
   const [custReference, setCustReference] = useState('');
@@ -27,7 +28,7 @@ export default function VA01Order({
   const step = steps[stepIndex];
 
   async function runSearch() {
-    const results = await searchByReference('quotation', instance.custPoNumber);
+    const results = await searchByReference('quotation', searchQuery.trim());
     setSearchResults(results);
   }
 
@@ -91,10 +92,26 @@ export default function VA01Order({
 
       {step.id === 'create-with-reference' && (
         <div>
-          <Button onClick={runSearch}>Search by Customer PO Number ({instance.custPoNumber})…</Button>
+          <div className="field-row">
+            <label className="required">Customer Reference</label>
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="e.g. PO-10238"
+              style={{ marginRight: 8 }}
+            />
+            <Button onClick={runSearch} disabled={!searchQuery.trim()}>
+              Search
+            </Button>
+          </div>
           {searchResults && (
             <div style={{ marginTop: 12 }}>
-              {searchResults.length === 0 && <p>No quotation found for that reference.</p>}
+              {searchResults.length === 0 && (
+                <MessageStrip design="Negative">
+                  No quotation found with Customer Reference "{searchQuery}". Check the Purchase Request in your
+                  Reference Documents for the exact PO number.
+                </MessageStrip>
+              )}
               {searchResults.map((doc) => (
                 <div key={doc.id} className="search-result-row" onClick={() => copyFromQuotation(doc)}>
                   {doc.id} — Cust. Ref. {doc.custReference} — click to Copy

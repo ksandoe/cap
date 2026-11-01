@@ -20,6 +20,7 @@ export default function VA21Quotation({
   const steps = VA21_CONFIG.steps;
   const [stepIndex, setStepIndex] = useState(0);
   const [refDialogOpen, setRefDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SalesDocument[] | null>(null);
   const [inquiry, setInquiry] = useState<SalesDocument | null>(null);
 
@@ -40,9 +41,9 @@ export default function VA21Quotation({
   const deluxeIndex = items.findIndex((i) => i.materialId.startsWith('DXTR'));
 
   async function runSearch() {
-    const results = await searchByReference('inquiry', instance.custPoNumber);
+    const results = await searchByReference('inquiry', searchQuery.trim());
     setSearchResults(results);
-    logEvent(studentKey, 'search_dialog_opened', { for: 'create-with-reference', docType: 'inquiry' });
+    logEvent(studentKey, 'search_dialog_opened', { for: 'create-with-reference', docType: 'inquiry', query: searchQuery });
   }
 
   function copyFromInquiry(doc: SalesDocument) {
@@ -159,10 +160,26 @@ export default function VA21Quotation({
 
       {step.id === 'create-with-reference' && (
         <div>
-          <Button onClick={runSearch}>Search by Customer PO Number ({instance.custPoNumber})…</Button>
+          <div className="field-row">
+            <label className="required">Customer Reference</label>
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="e.g. PO-10238"
+              style={{ marginRight: 8 }}
+            />
+            <Button onClick={runSearch} disabled={!searchQuery.trim()}>
+              Search
+            </Button>
+          </div>
           {searchResults && (
             <div style={{ marginTop: 12 }}>
-              {searchResults.length === 0 && <p>No inquiry found for that reference.</p>}
+              {searchResults.length === 0 && (
+                <MessageStrip design="Negative">
+                  No inquiry found with Customer Reference "{searchQuery}". Check the Purchase Request in your
+                  Reference Documents for the exact PO number.
+                </MessageStrip>
+              )}
               {searchResults.map((doc) => (
                 <div key={doc.id} className="search-result-row" onClick={() => copyFromInquiry(doc)}>
                   {doc.id} — Cust. Ref. {doc.custReference} — click to Copy
