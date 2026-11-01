@@ -348,3 +348,50 @@ body {
   border-radius: 50%;
   background: #2b7d2b;
 }
+
+.easy-access-menu {
+  font-size: 13px;
+}
+.easy-access-title {
+  font-weight: 600;
+  padding: 6px 12px;
+  background: #eef1f4;
+  border-bottom: 1px solid #d9d9d9;
+}
+.easy-access-hint {
+  padding: 6px 12px;
+  color: #a94442;
+  font-size: 12px;
+  background: #fdf3f3;
+  border-bottom: 1px solid #f0d9d9;
+}
+.easy-access-tree {
+  padding: 6px 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.easy-access-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.easy-access-row:hover {
+  background: #eef6fd;
+}
+.easy-access-caret {
+  width: 12px;
+  display: inline-block;
+  color: #888;
+  font-size: 10px;
+}
+.easy-access-label-target {
+  font-weight: 600;
+  color: #0a6ed1;
+}
+
+.initial-screen-fields {
+  padding: 4px 0;
+}

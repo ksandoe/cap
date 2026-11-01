@@ -152,7 +152,8 @@ export type EventType =
   | 'search_dialog_selected'
   | 'create_with_reference_used'
   | 'document_flow_viewed'
-  | 'block_entered';
+  | 'block_entered'
+  | 'menu_navigated';
 
 export interface AppEvent {
   id: string;
@@ -194,12 +195,26 @@ export interface StepConfig {
   warningsOnAdvance?: WarningConfig[];
 }
 
+export interface InitialScreenField {
+  name: string;
+  label: string;
+  value: string;
+}
+
 export interface TransactionConfig {
   id: TransactionId;
   docType: DocType;
   title: string;
   createWithReference?: { predecessorDocType: DocType; searchBy: 'custReference' };
   postSaveBehavior: 'blank-tab' | 'none';
+  /** SAP Easy Access folder path a student follows to reach this transaction — e.g. ['Logistics', 'Sales and Distribution', 'Sales', 'Inquiry', 'Create']. */
+  menuPath: string[];
+  /** The type/org/channel screen SAP shows before the transaction's own Overview screen opens. */
+  initialScreen: {
+    title: string;
+    fields: InitialScreenField[];
+    continueLabel: string;
+  };
   steps: StepConfig[];
 }
 

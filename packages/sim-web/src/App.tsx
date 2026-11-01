@@ -104,11 +104,11 @@ export default function App() {
         <VA11Inquiry
           instance={instance}
           studentKey={studentKey}
-          onSaved={(doc) => {
+          onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, inquiry: doc }));
             setStatusMessage(`Inquiry ${doc.id} saved.`);
-            advance(3);
           }}
+          onSaved={() => advance(3)}
         />
       );
       break;
@@ -120,11 +120,11 @@ export default function App() {
         <VA21Quotation
           instance={instance}
           studentKey={studentKey}
-          onSaved={(doc) => {
+          onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, quotation: doc }));
             setStatusMessage(`Quotation ${doc.id} saved.`);
-            advance(5);
           }}
+          onSaved={() => advance(5)}
         />
       );
       break;
@@ -136,9 +136,11 @@ export default function App() {
         <VA01Order
           instance={instance}
           studentKey={studentKey}
-          onSaved={(doc) => {
+          onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, order: doc }));
             setStatusMessage(`Order ${doc.id} saved.`);
+          }}
+          onSaved={(doc) => {
             advance(7);
             logEvent(studentKey, 'document_flow_viewed', {}, doc.id);
           }}

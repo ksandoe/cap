@@ -10,6 +10,17 @@ export const VA11_CONFIG: TransactionConfig = {
   docType: 'inquiry',
   title: 'Create Inquiry',
   postSaveBehavior: 'blank-tab',
+  menuPath: ['Logistics', 'Sales and Distribution', 'Sales', 'Inquiry', 'Create'],
+  initialScreen: {
+    title: 'Create Inquiry: Initial Screen',
+    fields: [
+      { name: 'inquiryType', label: 'Inquiry Type', value: 'IN' },
+      { name: 'salesOrg', label: 'Sales Organization', value: 'UE00' },
+      { name: 'distChannel', label: 'Distribution Channel', value: 'WH' },
+      { name: 'division', label: 'Division', value: 'BI' },
+    ],
+    continueLabel: 'Continue',
+  },
   steps: [
     {
       id: 'customer',
@@ -67,6 +78,12 @@ export const VA21_CONFIG: TransactionConfig = {
   title: 'Create Quotation',
   postSaveBehavior: 'blank-tab',
   createWithReference: { predecessorDocType: 'inquiry', searchBy: 'custReference' },
+  menuPath: ['Logistics', 'Sales and Distribution', 'Sales', 'Quotation', 'Create'],
+  initialScreen: {
+    title: 'Create Quotation: Initial Screen',
+    fields: [{ name: 'quotationType', label: 'Quotation Type', value: 'QT' }],
+    continueLabel: 'Create with Reference',
+  },
   steps: [
     {
       id: 'create-with-reference',
@@ -139,6 +156,12 @@ export const VA01_CONFIG: TransactionConfig = {
   title: 'Create Sales Order',
   postSaveBehavior: 'none',
   createWithReference: { predecessorDocType: 'quotation', searchBy: 'custReference' },
+  menuPath: ['Logistics', 'Sales and Distribution', 'Sales', 'Order', 'Create'],
+  initialScreen: {
+    title: 'Create Sales Order: Initial Screen',
+    fields: [{ name: 'orderType', label: 'Order Type', value: 'OR' }],
+    continueLabel: 'Create with Reference',
+  },
   steps: [
     {
       id: 'create-with-reference',

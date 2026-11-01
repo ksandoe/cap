@@ -7,6 +7,7 @@ import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
 import SapChrome from '../components/SapChrome';
 import ItemsGrid from '../components/ItemsGrid';
 import ItemDetailPanel from '../components/ItemDetailPanel';
+import EasyAccessMenu from '../components/EasyAccessMenu';
 import SearchDialog, { type SearchItem } from '../components/SearchDialog';
 import { createDocument, logEvent } from '../api';
 import { todayIso, monthFromNowIso } from '../dateUtils';
@@ -28,13 +29,17 @@ function nextLineNumber(items: DraftItem[]): number {
 export default function VA11Inquiry({
   instance,
   studentKey,
+  onDocumentSaved,
   onSaved,
 }: {
   instance: AssignmentInstance;
   studentKey: string;
+  /** Fired immediately on save, while still showing the in-screen confirmation — drives the status bar. */
+  onDocumentSaved: (doc: SalesDocument) => void;
   onSaved: (doc: SalesDocument) => void;
 }) {
   const steps = VA11_CONFIG.steps;
+  const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>('menu');
   const [stepIndex, setStepIndex] = useState(0);
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [materialDialogOpen, setMaterialDialogOpen] = useState(false);
@@ -124,6 +129,7 @@ export default function VA11Inquiry({
     });
     logEvent(studentKey, 'document_saved', { docId: doc.id, docType: 'inquiry' }, doc.id);
     setSaved(doc);
+    onDocumentSaved(doc);
     setShowBlankTabNotice(VA11_CONFIG.postSaveBehavior === 'blank-tab');
   }
 
@@ -142,6 +148,74 @@ export default function VA11Inquiry({
         <Button design="Emphasized" style={{ marginTop: 16 }} onClick={() => onSaved(saved)}>
           Continue
         </Button>
+      </div>
+    );
+  }
+
+  if (phase === 'menu') {
+    return (
+      <div>
+        <ReferenceDocumentsButton instance={instance} />
+        <ActivityLayout
+          instructions={
+            <div>
+              <Title level="H5">Find the Transaction</Title>
+              <p>
+                Real SAP users reach every transaction through this menu, not a bookmark or search bar. Open{' '}
+                <strong>{VA11_CONFIG.menuPath.join(' ▸ ')}</strong>.
+              </p>
+            </div>
+          }
+          screen={
+            <EasyAccessMenu
+              targetPath={VA11_CONFIG.menuPath}
+              onNavigate={() => {
+                logEvent(studentKey, 'menu_navigated', { transaction: 'VA11' });
+                setPhase('initial');
+              }}
+            />
+          }
+        />
+      </div>
+    );
+  }
+
+  if (phase === 'initial') {
+    return (
+      <div>
+        <ReferenceDocumentsButton instance={instance} />
+        <ActivityLayout
+          instructions={
+            <div>
+              <Title level="H5">{VA11_CONFIG.initialScreen.title}</Title>
+              <p>
+                Every inquiry starts from the same organizational values for this exercise. Confirm them and
+                click {VA11_CONFIG.initialScreen.continueLabel}.
+              </p>
+            </div>
+          }
+          screen={
+            <div>
+              <SapChrome title={VA11_CONFIG.initialScreen.title} />
+              <div className="sap-screen-body">
+                <div className="initial-screen-fields">
+                  {VA11_CONFIG.initialScreen.fields.map((f) => (
+                    <div className="field-row" key={f.name}>
+                      <label>{f.label}</label>
+                      <input value={f.value} disabled style={{ width: 100 }} />
+                    </div>
+                  ))}
+                </div>
+                <div className="step-actions">
+                  <Button onClick={() => setPhase('menu')}>Back</Button>
+                  <Button design="Emphasized" onClick={() => setPhase('steps')}>
+                    {VA11_CONFIG.initialScreen.continueLabel}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          }
+        />
       </div>
     );
   }

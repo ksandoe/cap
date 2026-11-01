@@ -8,6 +8,7 @@ import SapChrome from '../components/SapChrome';
 import ItemsGrid from '../components/ItemsGrid';
 import ItemDetailPanel from '../components/ItemDetailPanel';
 import PricingElementsTable from '../components/PricingElementsTable';
+import EasyAccessMenu from '../components/EasyAccessMenu';
 import { createDocument, logEvent, searchByReference } from '../api';
 import { todayIso, monthFromNowIso } from '../dateUtils';
 
@@ -17,13 +18,17 @@ const RA00 = getConditionType('RA00');
 export default function VA21Quotation({
   instance,
   studentKey,
+  onDocumentSaved,
   onSaved,
 }: {
   instance: AssignmentInstance;
   studentKey: string;
+  /** Fired immediately on save, while still showing the in-screen confirmation — drives the status bar. */
+  onDocumentSaved: (doc: SalesDocument) => void;
   onSaved: (doc: SalesDocument) => void;
 }) {
   const steps = VA21_CONFIG.steps;
+  const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>('menu');
   const [stepIndex, setStepIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SalesDocument[] | null>(null);
@@ -132,6 +137,7 @@ export default function VA21Quotation({
     });
     logEvent(studentKey, 'document_saved', { docId: doc.id, docType: 'quotation' }, doc.id);
     setSaved(doc);
+    onDocumentSaved(doc);
   }
 
   if (saved) {
@@ -146,6 +152,74 @@ export default function VA21Quotation({
         <Button design="Emphasized" style={{ marginTop: 16 }} onClick={() => onSaved(saved)}>
           Continue
         </Button>
+      </div>
+    );
+  }
+
+  if (phase === 'menu') {
+    return (
+      <div>
+        <ReferenceDocumentsButton instance={instance} />
+        <ActivityLayout
+          instructions={
+            <div>
+              <Title level="H5">Find the Transaction</Title>
+              <p>
+                Real SAP users reach every transaction through this menu, not a bookmark or search bar. Open{' '}
+                <strong>{VA21_CONFIG.menuPath.join(' ▸ ')}</strong>.
+              </p>
+            </div>
+          }
+          screen={
+            <EasyAccessMenu
+              targetPath={VA21_CONFIG.menuPath}
+              onNavigate={() => {
+                logEvent(studentKey, 'menu_navigated', { transaction: 'VA21' });
+                setPhase('initial');
+              }}
+            />
+          }
+        />
+      </div>
+    );
+  }
+
+  if (phase === 'initial') {
+    return (
+      <div>
+        <ReferenceDocumentsButton instance={instance} />
+        <ActivityLayout
+          instructions={
+            <div>
+              <Title level="H5">{VA21_CONFIG.initialScreen.title}</Title>
+              <p>
+                Every quotation in this exercise uses the same Quotation Type. Confirm it and click{' '}
+                {VA21_CONFIG.initialScreen.continueLabel}.
+              </p>
+            </div>
+          }
+          screen={
+            <div>
+              <SapChrome title={VA21_CONFIG.initialScreen.title} />
+              <div className="sap-screen-body">
+                <div className="initial-screen-fields">
+                  {VA21_CONFIG.initialScreen.fields.map((f) => (
+                    <div className="field-row" key={f.name}>
+                      <label>{f.label}</label>
+                      <input value={f.value} disabled style={{ width: 100 }} />
+                    </div>
+                  ))}
+                </div>
+                <div className="step-actions">
+                  <Button onClick={() => setPhase('menu')}>Back</Button>
+                  <Button design="Emphasized" onClick={() => setPhase('steps')}>
+                    {VA21_CONFIG.initialScreen.continueLabel}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          }
+        />
       </div>
     );
   }

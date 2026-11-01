@@ -6,19 +6,24 @@ import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
 import SapChrome from '../components/SapChrome';
 import ItemsGrid from '../components/ItemsGrid';
+import EasyAccessMenu from '../components/EasyAccessMenu';
 import { createDocument, logEvent, searchByReference } from '../api';
 import { todayIso } from '../dateUtils';
 
 export default function VA01Order({
   instance,
   studentKey,
+  onDocumentSaved,
   onSaved,
 }: {
   instance: AssignmentInstance;
   studentKey: string;
+  /** Fired immediately on save, while still showing the in-screen confirmation — drives the status bar. */
+  onDocumentSaved: (doc: SalesDocument) => void;
   onSaved: (doc: SalesDocument) => void;
 }) {
   const steps = VA01_CONFIG.steps;
+  const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>('menu');
   const [stepIndex, setStepIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SalesDocument[] | null>(null);
@@ -66,6 +71,7 @@ export default function VA01Order({
     });
     logEvent(studentKey, 'document_saved', { docId: doc.id, docType: 'order' }, doc.id);
     setSaved(doc);
+    onDocumentSaved(doc);
   }
 
   if (saved) {
@@ -77,6 +83,74 @@ export default function VA01Order({
         <Button design="Emphasized" style={{ marginTop: 16 }} onClick={() => onSaved(saved)}>
           Continue to Document Flow
         </Button>
+      </div>
+    );
+  }
+
+  if (phase === 'menu') {
+    return (
+      <div>
+        <ReferenceDocumentsButton instance={instance} />
+        <ActivityLayout
+          instructions={
+            <div>
+              <Title level="H5">Find the Transaction</Title>
+              <p>
+                Real SAP users reach every transaction through this menu, not a bookmark or search bar. Open{' '}
+                <strong>{VA01_CONFIG.menuPath.join(' ▸ ')}</strong>.
+              </p>
+            </div>
+          }
+          screen={
+            <EasyAccessMenu
+              targetPath={VA01_CONFIG.menuPath}
+              onNavigate={() => {
+                logEvent(studentKey, 'menu_navigated', { transaction: 'VA01' });
+                setPhase('initial');
+              }}
+            />
+          }
+        />
+      </div>
+    );
+  }
+
+  if (phase === 'initial') {
+    return (
+      <div>
+        <ReferenceDocumentsButton instance={instance} />
+        <ActivityLayout
+          instructions={
+            <div>
+              <Title level="H5">{VA01_CONFIG.initialScreen.title}</Title>
+              <p>
+                Every order in this exercise uses the same Order Type. Confirm it and click{' '}
+                {VA01_CONFIG.initialScreen.continueLabel}.
+              </p>
+            </div>
+          }
+          screen={
+            <div>
+              <SapChrome title={VA01_CONFIG.initialScreen.title} />
+              <div className="sap-screen-body">
+                <div className="initial-screen-fields">
+                  {VA01_CONFIG.initialScreen.fields.map((f) => (
+                    <div className="field-row" key={f.name}>
+                      <label>{f.label}</label>
+                      <input value={f.value} disabled style={{ width: 100 }} />
+                    </div>
+                  ))}
+                </div>
+                <div className="step-actions">
+                  <Button onClick={() => setPhase('menu')}>Back</Button>
+                  <Button design="Emphasized" onClick={() => setPhase('steps')}>
+                    {VA01_CONFIG.initialScreen.continueLabel}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          }
+        />
       </div>
     );
   }
