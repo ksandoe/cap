@@ -6,7 +6,7 @@ import { getAssignmentInstance, getFlowProgress, listDocuments, saveFlowProgress
 import { inquiryLeadIn, orderLeadIn, quotationLeadIn, assignedProductsSentence } from './content/leadIn';
 import StatusBar from './components/StatusBar';
 import BackgroundBlock from './blocks/BackgroundBlock';
-import DocumentFlowView from './components/DocumentFlowView';
+import ConclusionBlock from './blocks/ConclusionBlock';
 import VA11Inquiry from './activities/VA11Inquiry';
 import VA21Quotation from './activities/VA21Quotation';
 import VA01Order from './activities/VA01Order';
@@ -148,9 +148,7 @@ export default function App() {
     case 7:
     default:
       content = docs.order ? (
-        <div>
-          <DocumentFlowView orderId={docs.order.id} />
-        </div>
+        <ConclusionBlock instance={instance} orderId={docs.order.id} />
       ) : (
         <p>Complete the sales order first.</p>
       );
