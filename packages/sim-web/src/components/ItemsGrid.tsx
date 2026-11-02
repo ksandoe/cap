@@ -154,6 +154,13 @@ export default function ItemsGrid({
               key={item.lineNumber}
               className={selectedLines.includes(item.lineNumber) ? 'selected' : ''}
               onDoubleClick={onRowOpen ? () => onRowOpen(item.lineNumber) : undefined}
+              // Clicking anywhere on the row selects it, not just the small checkbox — the toolbar's
+              // Item Conditions icon stays disabled until a row is selected.
+              onClick={(e) => {
+                if (!selectedLines.includes(item.lineNumber) && !(e.target instanceof HTMLInputElement)) {
+                  onToggleSelect(item.lineNumber);
+                }
+              }}
             >
               <td>
                 <input type="checkbox" checked={selectedLines.includes(item.lineNumber)} onChange={() => onToggleSelect(item.lineNumber)} />
