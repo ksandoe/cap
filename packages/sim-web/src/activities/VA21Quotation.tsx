@@ -16,7 +16,8 @@ import DocumentTabStrip from '../components/DocumentTabStrip';
 import CreateWithReferenceDialog from '../components/CreateWithReferenceDialog';
 import { createDocument, listDocuments, logEvent, updateDocument } from '../api';
 import { todayIso } from '../dateUtils';
-import { formatCurrency } from '../formatUtils';
+import { addressLine, formatCurrency } from '../formatUtils';
+import type { StatusMessage } from '../components/StatusBar';
 
 const OVERVIEW_TABS = ['Sales', 'Item Overview', 'Item detail', 'Ordering party', 'Procurement', 'Shipping', 'Reason for rejection'];
 
@@ -29,11 +30,14 @@ const SAVE_WARNINGS = VA21_CONFIG.steps.find((s) => s.id === 'reference')?.warni
 export default function VA21Quotation({
   instance,
   studentKey,
+  onStatus,
   onDocumentSaved,
   onSaved,
 }: {
   instance: AssignmentInstance;
   studentKey: string;
+  /** Pushes a message into the shell's status bar (e.g. "Select one or more items"). */
+  onStatus: (message: StatusMessage | null) => void;
   /** Fired immediately on save, while still showing the in-screen confirmation — drives the status bar. */
   onDocumentSaved: (doc: SalesDocument) => void;
   onSaved: (doc: SalesDocument) => void;
@@ -417,7 +421,7 @@ export default function VA21Quotation({
   }, 0);
 
   const customer = inquiry ? getCustomer(inquiry.customerId) : null;
-  const customerLine = customer ? `${customer.name}, ${customer.city}, ${customer.country}` : '';
+  const customerLine = inquiry && customer ? addressLine(inquiry.customerId) : '';
 
   // The exercise says "Goto ▸ Header ▸ Conditions" — a real menu path in SAP, so the Menu works.
   const MENU_ITEMS: MenuItem[] = [
@@ -568,6 +572,7 @@ export default function VA21Quotation({
             setItemDetailInitialTab('Conditions');
             setItemDetailOpen(true);
           }}
+          onNoSelection={() => onStatus({ text: 'Select one or more items', kind: 'success' })}
           readOnly
         />
 

@@ -120,6 +120,7 @@ export default function App() {
         <VA21Quotation
           instance={instance}
           studentKey={studentKey}
+          onStatus={setStatusMessage}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, quotation: doc }));
             setStatusMessage({ text: `Quotation ${doc.id} has been saved.`, kind: 'success' });

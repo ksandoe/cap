@@ -14,12 +14,10 @@ import { Icon } from '@ui5/webcomponents-react';
 // Overview". "Display" is the classic SAP eyeglasses icon, confirmed against the icon explorer as
 // `display` (not `show`, which is a Fiori eye). None of these open the item-detail drill-in; that's
 // triggered by double-clicking a row in the items grid instead (see ItemsGrid's onRowOpen).
-export const OVERVIEW_TOOLBAR_ICONS = ['display', 'add-process', 'header', 'decline', 'sum', 'overflow'];
-
-// The sales order's own Overview toolbar differs from the inquiry/quotation one (Kent's 2026-11-02
-// screenshots of VA01): display, an arrow-into-box, a document with a magnifier, a person with a red
-// cross, aggregation, More. Names are best guesses against the icon explorer.
-export const ORDER_OVERVIEW_TOOLBAR_ICONS = ['display', 'log', 'inspection', 'employee-rejections', 'sum', 'overflow'];
+// Corrected from Kent's 2026-11-02 screenshots of the real VA01 and VA21 Overviews, which share one
+// toolbar: display, an arrow-into-box, a document with a magnifier, a person with a red cross,
+// aggregation, More. Names are best guesses against the icon explorer.
+export const OVERVIEW_TOOLBAR_ICONS = ['display', 'log', 'inspection', 'employee-rejections', 'sum', 'overflow'];
 
 /**
  * The classic SAP header bar + menu row + toolbar — docs/decisions/001 and the real screenshots

@@ -8,21 +8,13 @@ export interface GridItem {
   quantity: number;
 }
 
-// Decorative icons flanking the real add/remove controls — see Kent's 2026-11-02 screenshot of the
-// real "All Items" toolbar (15 icons total). Confirmed names so far: detail-view, sys-add, sys-minus,
-// it-instance, currency (11th — opens Item Data on the Conditions tab for the selected row); the
-// rest are still being identified against the icon explorer, so the placeholders below just pad the
-// count out to 15 until Kent supplies the real names. "+"/"−"/currency are the only ones that do
-// anything; the rest (and the trailing "Group" button / gear) are clutter, same reasoning as
-// SapChrome's decorative icons.
+// The real "All Items" toolbar, identical on the quotation and order Overviews (Kent's 2026-11-02
+// screenshots): 13 icons, the faded 10th being Item Conditions, then Group and a wrench. Only
+// "+"/"−" and Item Conditions do anything; the rest are clutter, same reasoning as SapChrome's
+// decorative icons. Names are best guesses against the icon explorer.
 const LEADING_DECORATIVE_ICONS = ['detail-view'];
-const TRAILING_BEFORE_CONDITIONS = ['it-instance', 'sort-ascending', 'copy', 'paste', 'cancel', 'duplicate', 'collapse-group'];
-const TRAILING_AFTER_CONDITIONS = ['measuring-point', 'trend-up'];
-// The sales order's grid toolbar is a different set again (Kent's 2026-11-02 VA01 screenshot): 13
-// icons, the faded one being Item Conditions (disabled until a row is selected), then Group and a
-// wrench. Names are best guesses.
-const ORDER_BEFORE_CONDITIONS = ['it-instance', 'grid', 'table-view', 'compare', 'tree', 'vertical-bar-chart'];
-const ORDER_AFTER_CONDITIONS = ['screen-split-one', 'area-chart', 'action-settings'];
+const BEFORE_CONDITIONS = ['it-instance', 'grid', 'table-view', 'compare', 'tree', 'vertical-bar-chart'];
+const AFTER_CONDITIONS = ['screen-split-one', 'area-chart', 'action-settings'];
 const MIN_BLANK_ROWS = 16;
 
 /**
@@ -40,6 +32,7 @@ export default function ItemsGrid({
   onRemoveSelected,
   onRowOpen,
   onOpenConditions,
+  onNoSelection,
   readOnly,
   variant = 'quotation',
 }: {
@@ -54,20 +47,22 @@ export default function ItemsGrid({
   /** The toolbar's currency icon (11th) — jumps straight to the Conditions tab for the one
    * selected row, same "Item Data" screen as onRowOpen (Kent, 2026-11-02). */
   onOpenConditions?: (lineNumber: number) => void;
+  /** The Item Conditions icon is clickable even when it looks faded: with no row selected real SAP
+   * answers in the status bar ("Select one or more items"), so the screen supplies that message. */
+  onNoSelection?: () => void;
   readOnly?: boolean;
   /** 'order' swaps in the sales order's columns (S, ItCa) and toolbar, and an inert entry row. */
   variant?: 'quotation' | 'order';
 }) {
   const isOrder = variant === 'order';
-  const beforeConditions = isOrder ? ORDER_BEFORE_CONDITIONS : TRAILING_BEFORE_CONDITIONS;
-  const afterConditions = isOrder ? ORDER_AFTER_CONDITIONS : TRAILING_AFTER_CONDITIONS;
   const columnCount = isOrder ? 10 : 9;
   const blankRows = Math.max(1, MIN_BLANK_ROWS - items.length);
   // Real SAP lets you add an item by clicking straight into the blank row below the data — the
   // Material cell becomes a text box with a matchcode icon next to it (Kent, 2026-11-02), same
   // trigger as the toolbar's "+", not a separate add flow.
   const [newRowFocused, setNewRowFocused] = useState(false);
-  const canAddInline = isOrder || (!readOnly && Boolean(onAddRow));
+  // Read-only Overviews show the same entry row, inert (Kent's 2026-11-02 VA21 screenshot).
+  const canAddInline = readOnly || Boolean(onAddRow);
 
   return (
     <div>
@@ -100,19 +95,23 @@ export default function ItemsGrid({
               <Icon name="sys-minus" />
             </span>
           )}
-          {beforeConditions.map((icon) => (
+          {BEFORE_CONDITIONS.map((icon) => (
             <span key={icon} className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
               <Icon name={icon} />
             </span>
           ))}
           <span
-            className={`sap-chrome-icon-btn${onOpenConditions && selectedLines.length === 1 ? '' : ' sap-chrome-icon-btn--disabled'}`}
+            className={`sap-chrome-icon-btn${onOpenConditions && selectedLines.length === 1 ? '' : ' sap-chrome-icon-btn--faded'}`}
             title="Item Conditions"
-            onClick={onOpenConditions && selectedLines.length === 1 ? () => onOpenConditions(selectedLines[0]) : undefined}
+            onClick={() => {
+              if (!onOpenConditions) return;
+              if (selectedLines.length === 1) onOpenConditions(selectedLines[0]);
+              else if (selectedLines.length === 0) onNoSelection?.();
+            }}
           >
             <Icon name="currency" />
           </span>
-          {afterConditions.map((icon) => (
+          {AFTER_CONDITIONS.map((icon) => (
             <span key={icon} className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
               <Icon name={icon} />
             </span>
@@ -122,7 +121,7 @@ export default function ItemsGrid({
           Group
         </Button>
         <span className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
-          <Icon name={isOrder ? 'wrench' : 'settings'} />
+          <Icon name="wrench" />
         </span>
       </div>
 

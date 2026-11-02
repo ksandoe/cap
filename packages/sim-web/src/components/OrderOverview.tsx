@@ -2,12 +2,12 @@ import FooterActions from './FooterActions';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Icon } from '@ui5/webcomponents-react';
 import type { SalesDocumentItem } from '@sap-sim/shared';
-import { getCustomer, getMaterial } from '@sap-sim/engine';
-import SapChrome, { ORDER_OVERVIEW_TOOLBAR_ICONS, type MenuItem } from './SapChrome';
+import { getMaterial } from '@sap-sim/engine';
+import SapChrome, { OVERVIEW_TOOLBAR_ICONS, type MenuItem } from './SapChrome';
 import DocumentTabStrip from './DocumentTabStrip';
 import ItemsGrid from './ItemsGrid';
 import { todayIso } from '../dateUtils';
-import { formatCurrency } from '../formatUtils';
+import { addressLine, formatCurrency } from '../formatUtils';
 
 const OVERVIEW_TABS = ['Sales', 'Item Overview', 'Item detail', 'Ordering party', 'Procurement', 'Shipping', 'Reason for rejection'];
 
@@ -15,12 +15,6 @@ export interface OrderFocusRequest {
   field: 'custReference' | 'custReferenceDate' | 'requestedDeliveryDate';
   /** Bumped on every request so asking for the same field twice still re-focuses it. */
   tick: number;
-}
-
-function addressLine(customerId: string): string {
-  const c = getCustomer(customerId);
-  const country = c.country === 'US' ? 'USA' : c.country;
-  return `Company ${c.name}, ${c.street}, ${c.city}${c.state ? ` ${c.state}` : ''} ${c.postalCode}, ${country}`;
 }
 
 /**
@@ -44,6 +38,7 @@ export default function OrderOverview({
   onSelectLine,
   onRowOpen,
   onOpenConditions,
+  onNoSelection,
   custReference = '',
   custReferenceDate = '',
   onCustReferenceChange,
@@ -65,6 +60,7 @@ export default function OrderOverview({
   onSelectLine?: (line: number | null) => void;
   onRowOpen?: (line: number) => void;
   onOpenConditions?: (line: number) => void;
+  onNoSelection?: () => void;
   custReference?: string;
   custReferenceDate?: string;
   onCustReferenceChange?: (value: string) => void;
@@ -118,7 +114,7 @@ export default function OrderOverview({
 
   return (
     <div>
-      <SapChrome title={title} code={code} toolbarIcons={ORDER_OVERVIEW_TOOLBAR_ICONS} menuItems={menuItems} />
+      <SapChrome title={title} code={code} toolbarIcons={OVERVIEW_TOOLBAR_ICONS} menuItems={menuItems} />
       <div className="order-scroll" ref={scrollRef}>
         <div className="order-header">
           <div className="field-row" style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -299,6 +295,7 @@ export default function OrderOverview({
                 onToggleSelect={(line) => onSelectLine?.(selectedLine === line ? null : line)}
                 onRowOpen={onRowOpen}
                 onOpenConditions={onOpenConditions}
+                onNoSelection={onNoSelection}
                 readOnly
               />
             </>

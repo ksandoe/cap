@@ -371,6 +371,9 @@ body {
   cursor: default;
   opacity: 0.6;
 }
+.sap-chrome-icon-btn--faded {
+  opacity: 0.35;
+}
 .sap-chrome-icon-btn--disabled {
   opacity: 0.35;
   cursor: not-allowed;
