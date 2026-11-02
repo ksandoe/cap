@@ -9,7 +9,9 @@
 export interface Customer {
   id: string; // SAP-style customer number, e.g. "127999" — flavor only, no live SAP connection
   name: string;
+  street: string; // flavor only; the Order Overview prints the full address
   city: string;
+  state: string; // two-letter code, printed between city and postal code
   postalCode: string;
   country: string;
 }
@@ -18,6 +20,7 @@ export interface Material {
   id: string; // e.g. "DXTR1999"
   description: string;
   basePrice: number;
+  weightGrams: number; // drives the Order Overview's Total Weight
 }
 
 export type ConditionCode = 'K004' | 'RA00';

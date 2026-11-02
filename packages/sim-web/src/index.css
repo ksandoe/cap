@@ -880,3 +880,78 @@ body {
   display: flex;
   gap: 8px;
 }
+
+.status-bar-warn {
+  color: #e9730c;
+}
+
+/* --- Sales order Overview (Kent's 2026-11-02 VA01 screenshots) --- */
+/* Real SAP scrolls the document inside the frame under the toolbar: after Copy the screen opens
+   already scrolled to the tab bar, so the Cust. Reference fields above it are out of sight. */
+.order-scroll {
+  position: relative;
+  max-height: min(560px, calc(100vh - 300px));
+  min-height: 360px;
+  overflow-y: auto;
+}
+.order-header {
+  background: #f5f6f7;
+  padding: 10px 16px 6px;
+}
+.order-header .field-row-inline > label,
+.order-body .field-row-inline > label {
+  min-width: 110px;
+  justify-content: flex-end;
+  text-align: right;
+}
+.order-header .sap-display-value,
+.order-body .sap-display-value {
+  background: #ececec;
+  padding: 2px 6px;
+  text-decoration-color: #888;
+}
+.sap-label-required {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+input.sap-required-empty {
+  background: #fff3c4;
+}
+input.sap-field-error {
+  background: #fff;
+  border: 2px solid #e9730c;
+  outline: none;
+}
+.sap-grid-display-cell {
+  background: #ececec;
+}
+.order-body .field-row {
+  margin-bottom: 6px;
+}
+.order-header .field-row-inline,
+.order-body .field-row-inline {
+  flex-wrap: nowrap;
+}
+.order-header input,
+.order-body input:not([type='checkbox']),
+.order-body select {
+  width: auto;
+}
+.order-header .field-row-inline > label,
+.order-body .field-row-inline > label {
+  flex: 0 0 auto;
+}
+
+.order-header,
+.order-body {
+  font-size: 13px;
+}
+.order-header .sap-display-value,
+.order-body .sap-display-value {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.order-body .field-row-inline span {
+  white-space: nowrap;
+}

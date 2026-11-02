@@ -4,7 +4,7 @@ import type { AssignmentInstance, SalesDocument } from '@sap-sim/shared';
 import { getStudentKey } from './studentKey';
 import { getAssignmentInstance, getFlowProgress, listDocuments, saveFlowProgress, logEvent } from './api';
 import { inquiryLeadIn, orderLeadIn, quotationLeadIn, assignedProductsSentence } from './content/leadIn';
-import StatusBar from './components/StatusBar';
+import StatusBar, { type StatusMessage } from './components/StatusBar';
 import BackgroundBlock from './blocks/BackgroundBlock';
 import ConclusionBlock from './blocks/ConclusionBlock';
 import VA11Inquiry from './activities/VA11Inquiry';
@@ -29,7 +29,7 @@ export default function App() {
   const [docs, setDocs] = useState<{ inquiry?: SalesDocument; quotation?: SalesDocument; order?: SalesDocument }>({});
   const [current, setCurrent] = useState(0);
   const [furthest, setFurthest] = useState(0);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function App() {
           studentKey={studentKey}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, inquiry: doc }));
-            setStatusMessage(`Inquiry ${doc.id} has been saved.`);
+            setStatusMessage({ text: `Inquiry ${doc.id} has been saved.`, kind: 'success' });
           }}
           onSaved={() => advance(3)}
         />
@@ -122,7 +122,7 @@ export default function App() {
           studentKey={studentKey}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, quotation: doc }));
-            setStatusMessage(`Quotation ${doc.id} has been saved.`);
+            setStatusMessage({ text: `Quotation ${doc.id} has been saved.`, kind: 'success' });
           }}
           onSaved={() => advance(5)}
         />
@@ -136,9 +136,10 @@ export default function App() {
         <VA01Order
           instance={instance}
           studentKey={studentKey}
+          onStatus={setStatusMessage}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, order: doc }));
-            setStatusMessage(`Order ${doc.id} has been saved.`);
+            setStatusMessage({ text: `Standard Order ${doc.id} has been saved.`, kind: 'success' });
           }}
           onSaved={(doc) => {
             advance(7);

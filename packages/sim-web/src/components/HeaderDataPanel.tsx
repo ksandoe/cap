@@ -29,6 +29,7 @@ const HEADER_TABS = [
 export default function HeaderDataPanel({
   title,
   code,
+  docLabel = 'Quotation',
   custReference,
   customerId,
   customerLine,
@@ -42,6 +43,8 @@ export default function HeaderDataPanel({
 }: {
   title: string;
   code?: string;
+  /** Label for the document-number field; the document is not numbered yet while being created. */
+  docLabel?: string;
   custReference: string;
   customerId: string;
   customerLine: string;
@@ -51,8 +54,9 @@ export default function HeaderDataPanel({
   itemDiscount: number;
   conditionDef: ConditionTypeDef;
   appliedCondition: AppliedCondition | null;
-  onCommitCondition: (amount: number) => void;
-  onActivate: () => void;
+  /** Omit both to show the conditions read-only, as on an order whose pricing was copied. */
+  onCommitCondition?: (amount: number) => void;
+  onActivate?: () => void;
   onBack: () => void;
 }) {
   return (
@@ -61,7 +65,7 @@ export default function HeaderDataPanel({
       <div className="sap-screen-body">
         <div className="field-row" style={{ display: 'flex', justifyContent: 'space-between' }}>
           <div className="field-row-inline">
-            <label>Quotation:</label>
+            <label>{docLabel}:</label>
             <span className="sap-display-value" style={{ minWidth: 120 }}>
               &nbsp;
             </span>

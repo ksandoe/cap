@@ -29,6 +29,9 @@ interface Props {
   fieldColumns?: number;
   /** Wider results grids (13 columns for sales documents) need a wider dialog body. */
   wide?: boolean;
+  /** Filter fields real SAP fills in for you (e.g. Sales Organization UE00); they show their value but are
+   * not wired to the search, and with them present Go works on an empty Customer Reference. */
+  prefilled?: Record<string, string>;
   items: SearchItem[];
   onSelect: (item: SearchItem) => void;
   onClose: () => void;
@@ -69,6 +72,7 @@ export default function SearchDialog({
   placeholder = 'full name, or e.g. bos*',
   fieldColumns = 3,
   wide = false,
+  prefilled,
   items,
   onSelect,
   onClose,
@@ -135,7 +139,7 @@ export default function SearchDialog({
         </div>
         <div className="value-range-header">
           <span className="value-range-entity">{entityLabel} ⌄</span>
-          <Button design="Emphasized" disabled={!query.trim()} onClick={handleGo}>
+          <Button design="Emphasized" disabled={!query.trim() && !prefilled} onClick={handleGo}>
             Go
           </Button>
           <span className="value-range-hide-filters">Hide Filters</span>
@@ -168,7 +172,11 @@ export default function SearchDialog({
               <div className="value-range-field" key={f}>
                 <label>{f}:</label>
                 <span className="sap-input-with-icon" style={{ width: '100%' }}>
-                  <input disabled style={{ width: '100%' }} />
+                  {prefilled?.[f] !== undefined ? (
+                    <input value={prefilled[f]} readOnly style={{ width: '100%' }} />
+                  ) : (
+                    <input disabled style={{ width: '100%' }} />
+                  )}
                   <span className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
                     <Icon name="value-help" />
                   </span>

@@ -38,6 +38,10 @@ const VALUE_HELP_COLUMNS = [
   'Item (SD)',
 ];
 
+// SAP's transaction group: 1 = inquiry, 2 = quotation. The value help also opens with Sales
+// Organization UE00 and the matching group already filled in (Kent's 2026-11-02 screenshot).
+const TRANSACTION_GROUP = { Inquiry: '1', Quotation: '2' } as const;
+
 function usDate(iso: string): string {
   const [y, m, d] = iso.split('-');
   return y && m && d ? `${m}/${d}/${y}` : iso;
@@ -86,7 +90,7 @@ export default function CreateWithReferenceDialog({
       'TEACH-001',
       activeTab === 'Inquiry' ? 'IN' : 'QT',
       usDate(d.custReferenceDate),
-      '1',
+      TRANSACTION_GROUP[activeTab],
       d.id,
       '000010',
     ],
@@ -203,6 +207,7 @@ export default function CreateWithReferenceDialog({
         fieldColumns={4}
         wide
         activeField="Customer Reference"
+        prefilled={{ 'Sales Organization': 'UE00', 'Transaction Group': TRANSACTION_GROUP[activeTab] }}
         placeholder="e.g. PO-1*"
         resultColumns={VALUE_HELP_COLUMNS}
         items={items}

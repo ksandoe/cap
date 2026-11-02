@@ -16,6 +16,11 @@ import { Icon } from '@ui5/webcomponents-react';
 // triggered by double-clicking a row in the items grid instead (see ItemsGrid's onRowOpen).
 export const OVERVIEW_TOOLBAR_ICONS = ['display', 'add-process', 'header', 'decline', 'sum', 'overflow'];
 
+// The sales order's own Overview toolbar differs from the inquiry/quotation one (Kent's 2026-11-02
+// screenshots of VA01): display, an arrow-into-box, a document with a magnifier, a person with a red
+// cross, aggregation, More. Names are best guesses against the icon explorer.
+export const ORDER_OVERVIEW_TOOLBAR_ICONS = ['display', 'log', 'inspection', 'employee-rejections', 'sum', 'overflow'];
+
 /**
  * The classic SAP header bar + menu row + toolbar — docs/decisions/001 and the real screenshots
  * in "The Sales Process in SAP.pdf" (pages 3, 9, 18) and Kent's own perth.cob.csuchico.edu

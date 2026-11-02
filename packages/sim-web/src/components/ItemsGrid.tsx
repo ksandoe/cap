@@ -18,6 +18,11 @@ export interface GridItem {
 const LEADING_DECORATIVE_ICONS = ['detail-view'];
 const TRAILING_BEFORE_CONDITIONS = ['it-instance', 'sort-ascending', 'copy', 'paste', 'cancel', 'duplicate', 'collapse-group'];
 const TRAILING_AFTER_CONDITIONS = ['measuring-point', 'trend-up'];
+// The sales order's grid toolbar is a different set again (Kent's 2026-11-02 VA01 screenshot): 13
+// icons, the faded one being Item Conditions (disabled until a row is selected), then Group and a
+// wrench. Names are best guesses.
+const ORDER_BEFORE_CONDITIONS = ['it-instance', 'grid', 'table-view', 'compare', 'tree', 'vertical-bar-chart'];
+const ORDER_AFTER_CONDITIONS = ['screen-split-one', 'area-chart', 'action-settings'];
 const MIN_BLANK_ROWS = 16;
 
 /**
@@ -36,6 +41,7 @@ export default function ItemsGrid({
   onRowOpen,
   onOpenConditions,
   readOnly,
+  variant = 'quotation',
 }: {
   items: GridItem[];
   selectedLines: number[];
@@ -49,13 +55,19 @@ export default function ItemsGrid({
    * selected row, same "Item Data" screen as onRowOpen (Kent, 2026-11-02). */
   onOpenConditions?: (lineNumber: number) => void;
   readOnly?: boolean;
+  /** 'order' swaps in the sales order's columns (S, ItCa) and toolbar, and an inert entry row. */
+  variant?: 'quotation' | 'order';
 }) {
+  const isOrder = variant === 'order';
+  const beforeConditions = isOrder ? ORDER_BEFORE_CONDITIONS : TRAILING_BEFORE_CONDITIONS;
+  const afterConditions = isOrder ? ORDER_AFTER_CONDITIONS : TRAILING_AFTER_CONDITIONS;
+  const columnCount = isOrder ? 10 : 9;
   const blankRows = Math.max(1, MIN_BLANK_ROWS - items.length);
   // Real SAP lets you add an item by clicking straight into the blank row below the data — the
   // Material cell becomes a text box with a matchcode icon next to it (Kent, 2026-11-02), same
   // trigger as the toolbar's "+", not a separate add flow.
   const [newRowFocused, setNewRowFocused] = useState(false);
-  const canAddInline = !readOnly && Boolean(onAddRow);
+  const canAddInline = isOrder || (!readOnly && Boolean(onAddRow));
 
   return (
     <div>
@@ -88,7 +100,7 @@ export default function ItemsGrid({
               <Icon name="sys-minus" />
             </span>
           )}
-          {TRAILING_BEFORE_CONDITIONS.map((icon) => (
+          {beforeConditions.map((icon) => (
             <span key={icon} className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
               <Icon name={icon} />
             </span>
@@ -100,7 +112,7 @@ export default function ItemsGrid({
           >
             <Icon name="currency" />
           </span>
-          {TRAILING_AFTER_CONDITIONS.map((icon) => (
+          {afterConditions.map((icon) => (
             <span key={icon} className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
               <Icon name={icon} />
             </span>
@@ -110,7 +122,7 @@ export default function ItemsGrid({
           Group
         </Button>
         <span className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
-          <Icon name="settings" />
+          <Icon name={isOrder ? 'wrench' : 'settings'} />
         </span>
       </div>
 
@@ -129,10 +141,11 @@ export default function ItemsGrid({
             <th>Material</th>
             <th>Req. Segment</th>
             <th>Order Quantity</th>
-            <th>SU</th>
-            <th>AltItm</th>
+            <th>{isOrder ? 'Un' : 'SU'}</th>
+            <th>{isOrder ? 'S' : 'AltItm'}</th>
             <th>Item Description</th>
-            <th>Customer Material</th>
+            <th>{isOrder ? 'Customer Material Number' : 'Customer Material'}</th>
+            {isOrder && <th>ItCa</th>}
           </tr>
         </thead>
         <tbody>
@@ -145,8 +158,10 @@ export default function ItemsGrid({
               <td>
                 <input type="checkbox" checked={selectedLines.includes(item.lineNumber)} onChange={() => onToggleSelect(item.lineNumber)} />
               </td>
-              <td>{item.lineNumber}</td>
-              <td>{item.materialId}</td>
+              <td className={isOrder ? 'sap-grid-display-cell' : undefined}>
+                {isOrder ? <span className="sap-display-value">{item.lineNumber}</span> : item.lineNumber}
+              </td>
+              <td className={isOrder ? 'sap-grid-display-cell' : undefined}>{item.materialId}</td>
               <td></td>
               <td style={{ textAlign: 'right' }}>
                 {onQuantityChange ? (
@@ -162,9 +177,12 @@ export default function ItemsGrid({
                 )}
               </td>
               <td>EA</td>
-              <td style={{ textAlign: 'right' }}>0</td>
+              <td style={isOrder ? undefined : { textAlign: 'right' }}>
+                {isOrder ? <input type="checkbox" checked disabled readOnly /> : 0}
+              </td>
               <td>{getMaterial(item.materialId).description}</td>
               <td></td>
+              {isOrder && <td>TAN</td>}
             </tr>
           ))}
           {/* Blank rows, same as the real grid showing many empty rows below the data. The first one
@@ -191,11 +209,11 @@ export default function ItemsGrid({
                     )}
                   </span>
                 </td>
-                <td colSpan={5}></td>
+                <td colSpan={isOrder ? 6 : 5}></td>
               </tr>
             ) : (
               <tr key={`blank-${i}`}>
-                <td colSpan={9}></td>
+                <td colSpan={columnCount}></td>
               </tr>
             ),
           )}
