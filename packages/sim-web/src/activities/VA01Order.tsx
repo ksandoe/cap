@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { Button, MessageStrip, Title } from '@ui5/webcomponents-react';
 import type { AssignmentInstance, SalesDocument } from '@sap-sim/shared';
-import { VA01_CONFIG } from '@sap-sim/engine';
+import { VA01_CONFIG, getCustomer } from '@sap-sim/engine';
 import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
-import SapChrome from '../components/SapChrome';
+import SapChrome, { OVERVIEW_TOOLBAR_ICONS } from '../components/SapChrome';
 import ItemsGrid from '../components/ItemsGrid';
 import EasyAccessMenu from '../components/EasyAccessMenu';
+import InitialScreenFields from '../components/InitialScreenFields';
+import DocumentTabStrip from '../components/DocumentTabStrip';
 import { createDocument, logEvent, searchByReference } from '../api';
 import { todayIso } from '../dateUtils';
+
+const OVERVIEW_TABS = ['Sales', 'Item Overview', 'Item detail', 'Ordering party', 'Procurement', 'Shipping', 'Reason for rejection'];
 
 export default function VA01Order({
   instance,
@@ -24,6 +28,7 @@ export default function VA01Order({
 }) {
   const steps = VA01_CONFIG.steps;
   const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>('menu');
+  const [continueNotice, setContinueNotice] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SalesDocument[] | null>(null);
@@ -131,18 +136,18 @@ export default function VA01Order({
           }
           screen={
             <div>
-              <SapChrome title={VA01_CONFIG.initialScreen.title} />
+              <SapChrome title={VA01_CONFIG.initialScreen.title} code={VA01_CONFIG.id} onBack={() => setPhase('menu')} />
               <div className="sap-screen-body">
-                <div className="initial-screen-fields">
-                  {VA01_CONFIG.initialScreen.fields.map((f) => (
-                    <div className="field-row" key={f.name}>
-                      <label>{f.label}</label>
-                      <input value={f.value} disabled style={{ width: 100 }} />
-                    </div>
-                  ))}
-                </div>
+                {continueNotice && (
+                  <MessageStrip design="Information" style={{ marginBottom: 12 }} onClose={() => setContinueNotice(false)}>
+                    Not used in this exercise — every order here is created with reference to a quotation.
+                  </MessageStrip>
+                )}
+                <InitialScreenFields fields={VA01_CONFIG.initialScreen.fields} />
                 <div className="step-actions">
-                  <Button onClick={() => setPhase('menu')}>Back</Button>
+                  <Button design="Transparent" onClick={() => setContinueNotice(true)}>
+                    Continue
+                  </Button>
                   <Button design="Emphasized" onClick={() => setPhase('steps')}>
                     {VA01_CONFIG.initialScreen.continueLabel}
                   </Button>
@@ -164,7 +169,18 @@ export default function VA01Order({
 
   const screenPane = (
     <div>
-      <SapChrome title={`${VA01_CONFIG.title}: Overview`} />
+      <SapChrome title={`${VA01_CONFIG.title}: Overview`} code={VA01_CONFIG.id} toolbarIcons={OVERVIEW_TOOLBAR_ICONS} />
+      {step.id !== 'create-with-reference' && quotation && (
+        <div className="sap-screen-body document-header">
+          <div className="field-row">
+            <label>Sold-to Party</label>
+            <div>
+              {quotation.customerId} — {getCustomer(quotation.customerId).name}, {getCustomer(quotation.customerId).city}
+            </div>
+          </div>
+        </div>
+      )}
+      {step.id !== 'create-with-reference' && <DocumentTabStrip tabs={OVERVIEW_TABS} active="Item Overview" />}
       <div className="sap-screen-body">
         {step.id === 'create-with-reference' && (
           <div>

@@ -1,56 +1,50 @@
 import type { AppEvent, AssignmentInstance, DocType, EventType, FlowProgress, SalesDocument } from '@sap-sim/shared';
+import * as networkApi from './networkApi';
+import * as localApi from './localApi';
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  });
-  if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${path} failed: ${res.status}`);
-  return res.json();
-}
+// Deployed builds (Amplify Hosting) have no server to talk to — VITE_LOCAL_STORAGE_MODE, set in
+// the Amplify build environment only, switches every call below to the localStorage-backed
+// implementation instead. Local `npm run dev` is untouched and keeps hitting the real server.
+const impl = import.meta.env.VITE_LOCAL_STORAGE_MODE === 'true' ? localApi : networkApi;
 
 export function getAssignmentInstance(studentKey: string): Promise<AssignmentInstance> {
-  return request(`/assignment-instance?studentKey=${encodeURIComponent(studentKey)}`);
+  return impl.getAssignmentInstance(studentKey);
 }
 
 export function listDocuments(studentKey: string, docType?: DocType): Promise<SalesDocument[]> {
-  const q = docType ? `&docType=${docType}` : '';
-  return request(`/documents?studentKey=${encodeURIComponent(studentKey)}${q}`);
+  return impl.listDocuments(studentKey, docType);
 }
 
 export function getDocument(id: string): Promise<SalesDocument> {
-  return request(`/documents/${id}`);
+  return impl.getDocument(id);
 }
 
 export function searchByReference(docType: DocType, custReference: string): Promise<SalesDocument[]> {
-  return request(`/documents/search-by-reference?docType=${docType}&custReference=${encodeURIComponent(custReference)}`);
+  return impl.searchByReference(docType, custReference);
 }
 
 export function createDocument(doc: Omit<SalesDocument, 'id' | 'createdAt' | 'netValue'>): Promise<SalesDocument> {
-  return request('/documents', { method: 'POST', body: JSON.stringify(doc) });
+  return impl.createDocument(doc);
 }
 
 export function updateDocument(id: string, patch: Partial<SalesDocument>): Promise<SalesDocument> {
-  return request(`/documents/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  return impl.updateDocument(id, patch);
 }
 
 export function getDocumentFlow(id: string): Promise<SalesDocument[]> {
-  return request(`/document-flow/${id}`);
+  return impl.getDocumentFlow(id);
 }
 
 export function getFlowProgress(studentKey: string): Promise<FlowProgress> {
-  return request(`/flow-progress?studentKey=${encodeURIComponent(studentKey)}`);
+  return impl.getFlowProgress(studentKey);
 }
 
 export function saveFlowProgress(progress: FlowProgress): Promise<FlowProgress> {
-  return request('/flow-progress', { method: 'POST', body: JSON.stringify(progress) });
+  return impl.saveFlowProgress(progress);
 }
 
 export function logEvent(studentKey: string, type: EventType, payload?: Record<string, unknown>, docId?: string | null): void {
-  // Fire-and-forget — the event log (§6) should never block the student's flow.
-  request('/events', { method: 'POST', body: JSON.stringify({ studentKey, type, payload, docId }) }).catch(() => {
-    /* non-critical */
-  });
+  impl.logEvent(studentKey, type, payload, docId);
 }
 
 export type { AppEvent };

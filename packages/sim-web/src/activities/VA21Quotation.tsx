@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { Button, Dialog, Bar, MessageStrip, Title } from '@ui5/webcomponents-react';
 import type { AppliedCondition, AssignmentInstance, SalesDocument, SalesDocumentItem } from '@sap-sim/shared';
-import { VA21_CONFIG, priceDocument, getMaterial, getConditionType } from '@sap-sim/engine';
+import { VA21_CONFIG, priceDocument, getMaterial, getConditionType, getCustomer } from '@sap-sim/engine';
 import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
-import SapChrome from '../components/SapChrome';
+import SapChrome, { OVERVIEW_TOOLBAR_ICONS } from '../components/SapChrome';
 import ItemsGrid from '../components/ItemsGrid';
 import ItemDetailPanel from '../components/ItemDetailPanel';
 import PricingElementsTable from '../components/PricingElementsTable';
 import EasyAccessMenu from '../components/EasyAccessMenu';
+import InitialScreenFields from '../components/InitialScreenFields';
+import DocumentTabStrip from '../components/DocumentTabStrip';
 import { createDocument, logEvent, searchByReference } from '../api';
 import { todayIso, monthFromNowIso } from '../dateUtils';
+
+const OVERVIEW_TABS = ['Sales', 'Item Overview', 'Item detail', 'Ordering party', 'Procurement', 'Shipping', 'Reason for rejection'];
 
 const K004 = getConditionType('K004');
 const RA00 = getConditionType('RA00');
@@ -29,6 +33,7 @@ export default function VA21Quotation({
 }) {
   const steps = VA21_CONFIG.steps;
   const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>('menu');
+  const [continueNotice, setContinueNotice] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SalesDocument[] | null>(null);
@@ -200,24 +205,57 @@ export default function VA21Quotation({
           }
           screen={
             <div>
-              <SapChrome title={VA21_CONFIG.initialScreen.title} />
+              <SapChrome title={VA21_CONFIG.initialScreen.title} code={VA21_CONFIG.id} onBack={() => setPhase('menu')} />
               <div className="sap-screen-body">
-                <div className="initial-screen-fields">
-                  {VA21_CONFIG.initialScreen.fields.map((f) => (
-                    <div className="field-row" key={f.name}>
-                      <label>{f.label}</label>
-                      <input value={f.value} disabled style={{ width: 100 }} />
-                    </div>
-                  ))}
-                </div>
+                {continueNotice && (
+                  <MessageStrip design="Information" style={{ marginBottom: 12 }} onClose={() => setContinueNotice(false)}>
+                    Not used in this exercise — every quotation here is created with reference to an inquiry.
+                  </MessageStrip>
+                )}
+                <InitialScreenFields fields={VA21_CONFIG.initialScreen.fields} />
                 <div className="step-actions">
-                  <Button onClick={() => setPhase('menu')}>Back</Button>
+                  <Button design="Transparent" onClick={() => setContinueNotice(true)}>
+                    Continue
+                  </Button>
                   <Button design="Emphasized" onClick={() => setPhase('steps')}>
                     {VA21_CONFIG.initialScreen.continueLabel}
                   </Button>
                 </div>
               </div>
             </div>
+          }
+        />
+      </div>
+    );
+  }
+
+  // Item Data is a full screen navigation, not a popup (Kent, 2026-11-02) — it replaces the
+  // Overview screen pane entirely while open.
+  if (itemDetailOpen && selectedItem) {
+    return (
+      <div>
+        <ReferenceDocumentsButton instance={instance} />
+        <ActivityLayout
+          instructions={
+            <div>
+              <Title level="H5">Item Data</Title>
+              <p>Enter the K004 discount from your assignment brief on the Conditions tab.</p>
+            </div>
+          }
+          screen={
+            <ItemDetailPanel
+              title={VA21_CONFIG.title}
+              code={VA21_CONFIG.id}
+              materialId={selectedItem.materialId}
+              lineNumber={selectedItem.lineNumber}
+              quantity={selectedItem.quantity}
+              itemCategory={{ code: 'AGN', label: 'Standard Item' }}
+              conditionDef={K004}
+              appliedCondition={selectedItem.itemConditions[0] ?? null}
+              onCommitCondition={commitItemCondition}
+              initialTab="Conditions"
+              onBack={() => setItemDetailOpen(false)}
+            />
           }
         />
       </div>
@@ -236,12 +274,18 @@ export default function VA21Quotation({
 
   const screenPane = (
     <div>
-      <SapChrome
-        title={`${VA21_CONFIG.title}: Overview`}
-        itemDetailIcon={step.id === 'item-pricing'}
-        itemDetailDisabled={!selectedItem}
-        onItemDetail={() => setItemDetailOpen(true)}
-      />
+      <SapChrome title={`${VA21_CONFIG.title}: Overview`} code={VA21_CONFIG.id} toolbarIcons={OVERVIEW_TOOLBAR_ICONS} />
+      {step.id !== 'create-with-reference' && inquiry && (
+        <div className="sap-screen-body document-header">
+          <div className="field-row">
+            <label>Sold-to Party</label>
+            <div>
+              {inquiry.customerId} — {getCustomer(inquiry.customerId).name}, {getCustomer(inquiry.customerId).city}
+            </div>
+          </div>
+        </div>
+      )}
+      {step.id !== 'create-with-reference' && <DocumentTabStrip tabs={OVERVIEW_TABS} active="Item Overview" />}
       <div className="sap-screen-body">
         {step.id === 'create-with-reference' && (
           <div>
@@ -318,6 +362,10 @@ export default function VA21Quotation({
             items={items}
             selectedLines={selectedLine !== null ? [selectedLine] : []}
             onToggleSelect={(line) => setSelectedLine((cur) => (cur === line ? null : line))}
+            onRowOpen={(line) => {
+              setSelectedLine(line);
+              setItemDetailOpen(true);
+            }}
             readOnly
           />
         )}
@@ -366,20 +414,6 @@ export default function VA21Quotation({
     <div>
       <ReferenceDocumentsButton instance={instance} />
       <ActivityLayout instructions={instructionsPane} screen={screenPane} />
-
-      {selectedItem && (
-        <ItemDetailPanel
-          open={itemDetailOpen}
-          materialId={selectedItem.materialId}
-          lineNumber={selectedItem.lineNumber}
-          quantity={selectedItem.quantity}
-          conditionDef={K004}
-          appliedCondition={selectedItem.itemConditions[0] ?? null}
-          onCommitCondition={commitItemCondition}
-          initialTab="Conditions"
-          onClose={() => setItemDetailOpen(false)}
-        />
-      )}
 
       <Dialog
         open={headerDialogOpen}

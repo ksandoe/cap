@@ -199,6 +199,8 @@ export interface InitialScreenField {
   name: string;
   label: string;
   value: string;
+  /** Decorative text shown next to the code, e.g. "US East" next to "UE00" — real SAP shows these. */
+  description?: string;
 }
 
 export interface TransactionConfig {

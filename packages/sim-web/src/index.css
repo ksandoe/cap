@@ -9,6 +9,20 @@ body {
   color: #1d2d3e;
 }
 
+/* Scoped to the simulated SAP screen only (not our own instructions copy) — real Fiori runs at
+   13px base, and plain <input>/<p> elements don't inherit that the way labels/menus already do. */
+.sap-screen-body,
+.sap-screen-body input,
+.sap-screen-body select,
+.value-range,
+.value-range input,
+.initial-screen-fields input,
+.easy-access-menu,
+.sap-items-grid,
+.sap-pricing-table {
+  font-size: 13px;
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -58,7 +72,7 @@ body {
 .block-content {
   flex: 1;
   padding: 24px;
-  max-width: 1100px;
+  max-width: 1480px;
   width: 100%;
   margin: 0 auto;
 }
@@ -130,9 +144,68 @@ body {
   color: #556;
 }
 
+.field-row input:not([type='checkbox']):not([type='number']),
+.field-row select {
+  width: 220px;
+  max-width: 100%;
+}
+
+/* Label and its value/input on the same line, e.g. Inquiry, Net Value, Sold-to/Ship-to Party,
+   Req. Deliv. Date, Expect.Ord.Val. — see Kent's 2026-11-02 note (not every field-row: Cust.
+   Reference and Valid From/To keep the label-above-input layout). */
+.field-row-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.field-row-inline > label {
+  display: inline-block;
+  margin-bottom: 0;
+}
+
+/* Real SAP only shows a field's calendar/matchcode icon once you click into it — it's hidden the
+   rest of the time (Kent, 2026-11-02). Native date inputs' own picker icon can be toggled this way
+   in Chromium; our own duplicate/matchcode icon buttons are toggled in JS via a `focused` state
+   instead (see VA11Inquiry's and InitialScreenFields' usage of .sap-input-with-icon). */
+.sap-screen-body input[type='date']::-webkit-calendar-picker-indicator {
+  opacity: 0;
+}
+.sap-screen-body input[type='date']:focus::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
 .field-row .required::after {
   content: ' *';
   color: #bb0000;
+}
+.initial-field-row .required::after {
+  content: '*';
+  color: #bb0000;
+}
+
+/* The classic SAP GUI "field has F4 help" dotted underline on the initial screen's own editable
+   fields — see Kent's 2026-11-01 screenshot. The Overview screen uses the underline differently
+   (see .sap-display-value below), so this is scoped to the initial screen only. */
+.sap-screen-body .initial-field-row > label {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+/* A read-only, non-input display value (Inquiry number, Net Value, Sold-to/Ship-to ID,
+   Expect.Ord.Val.) — real SAP underlines the VALUE here, not the label (Kent, 2026-11-02),
+   unlike the initial screen's F4-help fields above. */
+.sap-display-value {
+  display: inline-block;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.partner-field-empty {
+  background: #fdeef0;
+  border-color: #e2a0a8;
 }
 
 .item-table {
@@ -151,6 +224,7 @@ body {
 
 .step-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
 }
@@ -187,30 +261,43 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #354a5f;
-  color: #fff;
-  padding: 6px 12px;
-  font-size: 13px;
+  background: #fff;
+  border-bottom: 1px solid #d9d9d9;
+  color: #1d2d3e;
+  padding: 8px 12px;
+  font-size: 15px;
 }
 .sap-chrome-back {
-  font-size: 16px;
-  opacity: 0.8;
+  font-size: 18px;
+  color: #556;
+  opacity: 0.6;
+}
+.sap-chrome-back--active {
+  cursor: pointer;
+  opacity: 1;
+  color: #0a6ed1;
 }
 .sap-chrome-logo {
   font-weight: 800;
   font-style: italic;
-  background: #fff;
-  color: #354a5f;
+  background: #0a6ed1;
+  color: #fff;
   padding: 1px 6px;
   border-radius: 2px;
   font-size: 12px;
 }
 .sap-chrome-title {
   flex: 1;
+  font-weight: 700;
 }
 .sap-chrome-exit {
-  opacity: 0.8;
+  color: #0a6ed1;
   cursor: default;
+}
+.sap-chrome-code {
+  color: #0a6ed1;
+  font-size: 13px;
+  margin-right: 4px;
 }
 .sap-chrome-menu {
   display: flex;
@@ -229,9 +316,37 @@ body {
 .sap-chrome-toolbar {
   display: flex;
   gap: 4px;
+}
+.sap-chrome-minimal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: #fff;
   border-bottom: 1px solid #ececec;
   padding: 6px 12px;
+  color: #0a6ed1;
+  font-size: 12px;
+}
+.sap-chrome-command-field {
+  display: inline-flex;
+  align-items: center;
+  width: 220px;
+  height: 20px;
+  border: 1px solid #89919a;
+  background: #fff;
+  position: relative;
+}
+.sap-chrome-command-field::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin-top: -2px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #556;
 }
 .sap-chrome-icon-btn {
   display: inline-flex;
@@ -258,8 +373,32 @@ body {
   border-top: none;
   padding: 16px;
 }
+.sap-screen-body.document-header {
+  border-bottom: none;
+  padding-bottom: 8px;
+}
 
 /* --- Dense items grid, see ItemsGrid.tsx --- */
+.sap-grid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 6px;
+}
+.sap-grid-toolbar-icons {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+.sap-grid-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.sap-grid-title {
+  font-weight: 600;
+}
 .sap-items-grid {
   width: 100%;
   border-collapse: collapse;
@@ -275,7 +414,7 @@ body {
 }
 .sap-items-grid td {
   border-bottom: 1px solid #f0f0f0;
-  padding: 4px 6px;
+  padding: 8px 6px;
 }
 .sap-items-grid tr.selected {
   background: #e8f1fb;
@@ -315,6 +454,11 @@ body {
 }
 
 /* --- Pricing Elements table, see PricingElementsTable.tsx --- */
+.sap-pricing-toolbar {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
 .sap-pricing-table {
   width: 100%;
   border-collapse: collapse;
@@ -352,11 +496,29 @@ body {
 .easy-access-menu {
   font-size: 13px;
 }
-.easy-access-title {
-  font-weight: 600;
+.easy-access-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 6px 12px;
   background: #eef1f4;
   border-bottom: 1px solid #d9d9d9;
+  color: #0a6ed1;
+  font-size: 12px;
+}
+.easy-access-command-field {
+  display: inline-block;
+  width: 180px;
+  height: 18px;
+  border: 1px dashed #b7c4d1;
+  background: #fff;
+}
+.easy-access-toolbar-spacer {
+  flex: 1;
+}
+.easy-access-exit {
+  color: #556;
+  opacity: 0.8;
 }
 .easy-access-hint {
   padding: 6px 12px;
@@ -381,6 +543,11 @@ body {
 .easy-access-row:hover {
   background: #eef6fd;
 }
+.easy-access-row.selected {
+  background: #e5f1fb;
+  outline: 1px solid #0a6ed1;
+  outline-offset: -1px;
+}
 .easy-access-caret {
   width: 12px;
   display: inline-block;
@@ -391,7 +558,152 @@ body {
   font-weight: 600;
   color: #0a6ed1;
 }
+.easy-access-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  border-top: 1px solid #ececec;
+}
 
 .initial-screen-fields {
   padding: 4px 0;
+}
+.initial-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* The matchcode/search icon sits flush against its input's end, the way a native date input's
+   calendar icon does — not floating with a visible gap (Kent, 2026-11-02). */
+.sap-input-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.initial-field-row label {
+  flex: 0 0 150px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 400;
+  color: #556;
+}
+.org-data-box {
+  margin-top: 16px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  padding: 10px 12px;
+}
+.org-data-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.org-data-description {
+  margin-left: 8px;
+  color: #556;
+  font-size: 12px;
+}
+
+.value-range-tabs {
+  border-bottom: 1px solid #d9d9d9;
+  margin-bottom: 10px;
+}
+.value-range-tab {
+  display: inline-block;
+  padding: 4px 2px 8px;
+  font-size: 13px;
+  color: #0a6ed1;
+  border-bottom: 2px solid transparent;
+}
+.value-range-tab.active {
+  border-bottom-color: #0a6ed1;
+  font-weight: 600;
+}
+.value-range-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.value-range-entity {
+  color: #0a6ed1;
+  font-size: 13px;
+  flex: 1;
+}
+.value-range-hide-filters {
+  color: #0a6ed1;
+  font-size: 12px;
+}
+.value-range-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  column-gap: 16px;
+  row-gap: 10px;
+  margin-bottom: 14px;
+}
+.value-range-field label {
+  display: block;
+  font-size: 12px;
+  color: #556;
+  margin-bottom: 4px;
+}
+.value-range-count {
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+.value-range-results {
+  max-height: 260px;
+  overflow: auto;
+  border-top: 1px solid #ececec;
+}
+.value-range-empty {
+  padding: 8px 4px;
+  color: #888;
+}
+
+/* The results come back as a dense, sortable-looking data grid, not a label+sublabel list
+   (Kent, 2026-11-02) — but capped to our small curated pool, never the real system's 500+ rows. */
+.value-range-find-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+.value-range-find-link {
+  color: #0a6ed1;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.value-range-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.value-range-grid th {
+  text-align: left;
+  font-weight: 600;
+  color: #556;
+  border-bottom: 1px solid #d9d9d9;
+  padding: 5px 8px;
+  background: #fafafa;
+  white-space: nowrap;
+}
+.value-range-sort {
+  color: #89919a;
+  font-size: 10px;
+}
+.value-range-grid td {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 5px 8px;
+  white-space: nowrap;
+}
+.value-range-grid tbody tr {
+  cursor: pointer;
+}
+.value-range-grid tbody tr:hover {
+  background: #eef6fd;
+}
+.value-range-grid tr.selected {
+  background: #e5f1fb;
 }

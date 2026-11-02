@@ -12,12 +12,14 @@ export const VA11_CONFIG: TransactionConfig = {
   postSaveBehavior: 'blank-tab',
   menuPath: ['Logistics', 'Sales and Distribution', 'Sales', 'Inquiry', 'Create'],
   initialScreen: {
-    title: 'Create Inquiry: Initial Screen',
+    title: 'Create Inquiry',
     fields: [
-      { name: 'inquiryType', label: 'Inquiry Type', value: 'IN' },
-      { name: 'salesOrg', label: 'Sales Organization', value: 'UE00' },
-      { name: 'distChannel', label: 'Distribution Channel', value: 'WH' },
-      { name: 'division', label: 'Division', value: 'BI' },
+      { name: 'inquiryType', label: 'Inquiry Type', value: 'IN', description: 'Inquiry' },
+      { name: 'salesOrg', label: 'Sales Organization', value: 'UE00', description: 'US East' },
+      { name: 'distChannel', label: 'Distribution Channel', value: 'WH', description: 'Wholesale' },
+      { name: 'division', label: 'Division', value: 'BI', description: 'Bicycles' },
+      { name: 'salesOffice', label: 'Sales Office', value: '' },
+      { name: 'salesGroup', label: 'Sales Group', value: '' },
     ],
     continueLabel: 'Continue',
   },
@@ -36,13 +38,14 @@ export const VA11_CONFIG: TransactionConfig = {
       instructions:
         'Enter the Customer PO Number from your assignment brief into Customer Reference — this is ' +
         'the customer’s own purchase-order number, not anything our system generated. Set the ' +
-        'reference date to today, the valid-from date to today, and the valid-to date to one month ' +
-        'from today.',
+        'reference date to today, the valid-from date to today, the valid-to date to one month ' +
+        'from today, and the requested delivery date to today.',
       fields: [
         { name: 'custReference', label: 'Cust. Reference', required: true },
         { name: 'custReferenceDate', label: 'Customer Ref. Date', required: true },
         { name: 'validFrom', label: 'Valid From', required: true },
         { name: 'validTo', label: 'Valid To', required: true },
+        { name: 'requestedDeliveryDate', label: 'Req. Deliv. Date', required: true },
       ],
     },
     {
@@ -80,8 +83,15 @@ export const VA21_CONFIG: TransactionConfig = {
   createWithReference: { predecessorDocType: 'inquiry', searchBy: 'custReference' },
   menuPath: ['Logistics', 'Sales and Distribution', 'Sales', 'Quotation', 'Create'],
   initialScreen: {
-    title: 'Create Quotation: Initial Screen',
-    fields: [{ name: 'quotationType', label: 'Quotation Type', value: 'QT' }],
+    title: 'Create Quotations',
+    fields: [
+      { name: 'quotationType', label: 'Quotation Type', value: 'QT', description: 'Quotation' },
+      { name: 'salesOrg', label: 'Sales Organization', value: 'UE00', description: 'US East' },
+      { name: 'distChannel', label: 'Distribution Channel', value: 'WH', description: 'Wholesale' },
+      { name: 'division', label: 'Division', value: 'BI', description: 'Bicycles' },
+      { name: 'salesOffice', label: 'Sales Office', value: '' },
+      { name: 'salesGroup', label: 'Sales Group', value: '' },
+    ],
     continueLabel: 'Create with Reference',
   },
   steps: [
@@ -158,8 +168,15 @@ export const VA01_CONFIG: TransactionConfig = {
   createWithReference: { predecessorDocType: 'quotation', searchBy: 'custReference' },
   menuPath: ['Logistics', 'Sales and Distribution', 'Sales', 'Order', 'Create'],
   initialScreen: {
-    title: 'Create Sales Order: Initial Screen',
-    fields: [{ name: 'orderType', label: 'Order Type', value: 'OR' }],
+    title: 'Create Sales Documents',
+    fields: [
+      { name: 'orderType', label: 'Order Type', value: 'OR', description: 'Standard Order' },
+      { name: 'salesOrg', label: 'Sales Organization', value: 'UE00', description: 'US East' },
+      { name: 'distChannel', label: 'Distribution Channel', value: 'WH', description: 'Wholesale' },
+      { name: 'division', label: 'Division', value: 'BI', description: 'Bicycles' },
+      { name: 'salesOffice', label: 'Sales Office', value: '' },
+      { name: 'salesGroup', label: 'Sales Group', value: '' },
+    ],
     continueLabel: 'Create with Reference',
   },
   steps: [

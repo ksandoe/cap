@@ -1,58 +1,63 @@
 import { Icon } from '@ui5/webcomponents-react';
 
-const MENU_ITEMS = ['Sales Document', 'Edit', 'Goto', 'Extras', 'Environment', 'System', 'Help'];
-// Mostly decorative — real SAP buries the handful of icons a student actually needs among many
-// that do nothing for this exercise. A couple (search-help, item-detail) are wired by the caller.
-// Names must exist in the installed @ui5/webcomponents-icons set — verified against the running
-// app, since an unregistered name silently renders a blank box.
-const DECORATIVE_ICONS = ['add', 'less', 'sort', 'filter', 'refresh', 'grid', 'group-2', 'overflow'];
+// Initial screens and Overview screens both show just a single "Menu" dropdown plus a transaction-
+// code field — not a bar of menu-item words. Per Kent's 2026-11-01 note: "the menu is a dropdown,
+// not a bar." The old multi-item bar (Sales Document / Edit / Goto / ...) never matched any real
+// screenshot; those are items *inside* the one Menu dropdown, not a row of their own.
+//
+// The icons sit on the same row as the Menu dropdown, immediately to the right of the tcode field —
+// not a separate row below (Kent, 2026-11-01). They're screen-specific — the initial screen has none
+// at all (see Kent's 2026-11-01 screenshot of "Create Inquiry"); callers that want some pass
+// `toolbarIcons` explicitly. The Overview screen's own set: Display / Propose Items / Header Preview /
+// Reject Document / Aggregation / More — per Kent's 2026-11-01 walkthrough of "Create Inquiry:
+// Overview". "Display" is the classic SAP eyeglasses icon, confirmed against the icon explorer as
+// `display` (not `show`, which is a Fiori eye). None of these open the item-detail drill-in; that's
+// triggered by double-clicking a row in the items grid instead (see ItemsGrid's onRowOpen).
+export const OVERVIEW_TOOLBAR_ICONS = ['display', 'add-process', 'header', 'decline', 'sum', 'overflow'];
 
 /**
  * The classic SAP header bar + menu row + toolbar — docs/decisions/001 and the real screenshots
- * in "The Sales Process in SAP.pdf" (pages 3, 9, 18). Visual density on purpose: this is what
- * Kent asked us to replicate after seeing the thin slice's screens looked too clean next to the
- * real SAP UI.
+ * in "The Sales Process in SAP.pdf" (pages 3, 9, 18) and Kent's own perth.cob.csuchico.edu
+ * captures. Visual density on purpose: this is what Kent asked us to replicate after seeing the
+ * thin slice's screens looked too clean next to the real SAP UI.
  */
 export default function SapChrome({
   title,
-  itemDetailIcon,
-  onItemDetail,
-  itemDetailDisabled,
+  code,
+  toolbarIcons = [],
+  onBack,
 }: {
   title: string;
-  itemDetailIcon?: boolean;
-  onItemDetail?: () => void;
-  itemDetailDisabled?: boolean;
+  /** The transaction code shown top-right, e.g. "VA11" — see "The Sales Process in SAP.pdf" screenshots. */
+  code?: string;
+  /** The decorative icon row — e.g. OVERVIEW_TOOLBAR_ICONS for the Overview screen. Omit entirely
+   * for the initial screen, which has no icon row at all. */
+  toolbarIcons?: string[];
+  /** Real SAP's back arrow is the actual way back — there's no separate Back button anywhere. */
+  onBack?: () => void;
 }) {
   return (
     <div className="sap-chrome">
       <div className="sap-chrome-bar">
-        <span className="sap-chrome-back">‹</span>
+        <span className={`sap-chrome-back${onBack ? ' sap-chrome-back--active' : ''}`} onClick={onBack}>
+          ‹
+        </span>
         <span className="sap-chrome-logo">SAP</span>
         <span className="sap-chrome-title">{title}</span>
+        {code && <span className="sap-chrome-code">› {code} ⌄</span>}
         <span className="sap-chrome-exit">Exit</span>
       </div>
-      <div className="sap-chrome-menu">
-        {MENU_ITEMS.map((m) => (
-          <span key={m} className="sap-chrome-menu-item">
-            {m} ⌄
-          </span>
-        ))}
-      </div>
-      <div className="sap-chrome-toolbar">
-        {DECORATIVE_ICONS.map((icon) => (
-          <span key={icon} className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
-            <Icon name={icon} />
-          </span>
-        ))}
-        {itemDetailIcon && (
-          <span
-            className={`sap-chrome-icon-btn${itemDetailDisabled ? ' sap-chrome-icon-btn--disabled' : ''}`}
-            title="Item conditions / detail"
-            onClick={itemDetailDisabled ? undefined : onItemDetail}
-          >
-            <Icon name="document" />
-          </span>
+      <div className="sap-chrome-minimal-row">
+        <span>Menu ⌄</span>
+        <span className="sap-chrome-command-field" />
+        {toolbarIcons.length > 0 && (
+          <div className="sap-chrome-toolbar">
+            {toolbarIcons.map((icon) => (
+              <span key={icon} className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
+                <Icon name={icon} />
+              </span>
+            ))}
+          </div>
         )}
       </div>
     </div>

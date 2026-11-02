@@ -17,3 +17,9 @@ export const CUSTOMERS: Customer[] = [
   { id: '134999', postalCode: '94304', city: 'Palo Alto', name: 'Silicon Valley Bikes', country: 'US' },
   { id: '136999', postalCode: '98146', city: 'Seattle', name: 'Northwest Bikes', country: 'US' },
 ];
+
+export function getCustomer(id: string): Customer {
+  const customer = CUSTOMERS.find((c) => c.id === id);
+  if (!customer) throw new Error(`Unknown customer id: ${id}`);
+  return customer;
+}

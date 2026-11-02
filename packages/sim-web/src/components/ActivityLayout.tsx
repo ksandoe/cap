@@ -53,8 +53,10 @@ export default function ActivityLayout({
 
       {mode === 'side-by-side' && (
         <div className="activity-layout">
-          <div className="activity-pane instructions-pane">{instructions}</div>
-          <div className="activity-pane screen-pane" style={{ flex: 1.3 }}>
+          <div className="activity-pane instructions-pane" style={{ flex: '0 1 360px' }}>
+            {instructions}
+          </div>
+          <div className="activity-pane screen-pane" style={{ flex: '1 1 auto', minWidth: 0 }}>
             {screen}
           </div>
         </div>

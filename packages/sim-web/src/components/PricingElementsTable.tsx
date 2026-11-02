@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { Button, MessageStrip } from '@ui5/webcomponents-react';
 import type { AppliedCondition, ConditionTypeDef } from '@sap-sim/shared';
-
-function money(n: number): string {
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { formatCurrency } from '../formatUtils';
 
 /**
  * The "Conditions" tab's Pricing Elements table — the real interaction behind both the item-level
@@ -15,6 +12,10 @@ function money(n: number): string {
  * Per docs/decisions/001: a wrong condition type code is rejected (structural — real SAP would
  * reject an unrecognized code too), but a wrong *amount*, or applying the condition to the wrong
  * item/level entirely, is accepted and simply produces a wrong net value downstream.
+ *
+ * `conditionDef` is omitted on the Inquiry's Conditions tab — real SAP still shows the full pricing
+ * procedure there (Kent, 2026-11-02), but K004/RA00 aren't enterable until Quotation, so there's no
+ * discount row or entry field: Net Value just equals Gross Value.
  */
 export default function PricingElementsTable({
   level,
@@ -28,10 +29,10 @@ export default function PricingElementsTable({
   level: 'item' | 'header';
   basePrice: number; // unit price (item level) or subtotal (header level)
   quantity?: number; // item level only
-  conditionDef: ConditionTypeDef;
-  appliedCondition: AppliedCondition | null;
-  onCommitCondition: (amount: number) => void;
-  onActivate: () => void;
+  conditionDef?: ConditionTypeDef;
+  appliedCondition?: AppliedCondition | null;
+  onCommitCondition?: (amount: number) => void;
+  onActivate?: () => void;
 }) {
   const [codeInput, setCodeInput] = useState('');
   const [amountInput, setAmountInput] = useState('');
@@ -39,14 +40,16 @@ export default function PricingElementsTable({
 
   const grossValue = level === 'item' ? basePrice * (quantity ?? 1) : basePrice;
   const isActive = appliedCondition?.active ?? false;
-  const discountValue = appliedCondition
-    ? conditionDef.calcType === 'amount'
-      ? -(appliedCondition.amount * (quantity ?? 1))
-      : -(grossValue * (appliedCondition.amount / 100))
-    : 0;
-  const netValue = grossValue + (isActive || !conditionDef.requiresActivation ? discountValue : 0);
+  const discountValue =
+    conditionDef && appliedCondition
+      ? conditionDef.calcType === 'amount'
+        ? -(appliedCondition.amount * (quantity ?? 1))
+        : -(grossValue * (appliedCondition.amount / 100))
+      : 0;
+  const netValue = grossValue + (isActive || !conditionDef?.requiresActivation ? discountValue : 0);
 
   function handleCommit() {
+    if (!conditionDef || !onCommitCondition) return;
     setError(null);
     if (codeInput.trim().toUpperCase() !== conditionDef.code) {
       setError(`Unknown condition type "${codeInput}" — check your Reference Documents for the authorized condition.`);
@@ -64,20 +67,32 @@ export default function PricingElementsTable({
 
   return (
     <div>
-      <div className="field-row" style={{ display: 'flex', gap: 24 }}>
+      <div className="field-row" style={{ display: 'flex', gap: 24, alignItems: 'flex-end' }}>
         <div>
           <label>Net</label>
-          <div>${money(netValue)}</div>
+          <div>{formatCurrency(netValue)}</div>
         </div>
         <div>
           <label>Tax</label>
-          <div>$0.00</div>
+          <div>{formatCurrency(0)}</div>
         </div>
-        {conditionDef.requiresActivation && appliedCondition && (
+        {conditionDef?.requiresActivation && appliedCondition && onActivate && (
           <Button design={isActive ? 'Transparent' : 'Emphasized'} disabled={isActive} onClick={onActivate}>
             {isActive ? 'Active' : 'Activate'}
           </Button>
         )}
+      </div>
+
+      <div className="sap-pricing-toolbar">
+        <Button design="Transparent" icon="search">
+          Condition Record
+        </Button>
+        <Button design="Transparent" icon="bar-chart">
+          Analysis
+        </Button>
+        <Button design="Transparent" icon="refresh">
+          Update
+        </Button>
       </div>
 
       <table className="sap-pricing-table">
@@ -89,6 +104,8 @@ export default function PricingElementsTable({
             <th>Amount</th>
             {level === 'item' && <th>per/UoM</th>}
             <th>Condition Value</th>
+            <th>NumC</th>
+            <th>ATO/MTS Component</th>
           </tr>
         </thead>
         <tbody>
@@ -96,9 +113,11 @@ export default function PricingElementsTable({
             <td></td>
             <td>PR00</td>
             <td>Price</td>
-            <td>{level === 'item' ? `$${money(basePrice)}` : ''}</td>
+            <td>{level === 'item' ? formatCurrency(basePrice) : ''}</td>
             {level === 'item' && <td>1 EA</td>}
-            <td>${money(grossValue)}</td>
+            <td>{formatCurrency(grossValue)}</td>
+            <td>1</td>
+            <td></td>
           </tr>
           <tr className="subtotal">
             <td></td>
@@ -106,9 +125,11 @@ export default function PricingElementsTable({
             <td>Gross Value</td>
             <td></td>
             {level === 'item' && <td></td>}
-            <td>${money(grossValue)}</td>
+            <td>{formatCurrency(grossValue)}</td>
+            <td></td>
+            <td></td>
           </tr>
-          {appliedCondition && (
+          {conditionDef && appliedCondition && (
             <tr>
               <td>
                 <span className="status-dot" />
@@ -116,10 +137,12 @@ export default function PricingElementsTable({
               <td>{conditionDef.code}</td>
               <td>{conditionDef.name}</td>
               <td>
-                {conditionDef.calcType === 'amount' ? `-$${money(appliedCondition.amount)}` : `-${appliedCondition.amount}%`}
+                {conditionDef.calcType === 'amount' ? `-${formatCurrency(appliedCondition.amount)}` : `-${appliedCondition.amount}%`}
               </td>
               {level === 'item' && <td>1 EA</td>}
-              <td>-${money(-discountValue)}</td>
+              <td>-{formatCurrency(-discountValue)}</td>
+              <td>1</td>
+              <td></td>
             </tr>
           )}
           <tr>
@@ -128,7 +151,9 @@ export default function PricingElementsTable({
             <td>Discount Amount</td>
             <td></td>
             {level === 'item' && <td></td>}
-            <td>${money(isActive || !conditionDef.requiresActivation ? discountValue : 0)}</td>
+            <td>{formatCurrency(isActive || !conditionDef?.requiresActivation ? discountValue : 0)}</td>
+            <td></td>
+            <td></td>
           </tr>
           <tr>
             <td></td>
@@ -136,7 +161,9 @@ export default function PricingElementsTable({
             <td>Rebate Basis</td>
             <td></td>
             {level === 'item' && <td></td>}
-            <td>${money(grossValue)}</td>
+            <td>{formatCurrency(grossValue)}</td>
+            <td></td>
+            <td></td>
           </tr>
           <tr className="subtotal">
             <td></td>
@@ -144,7 +171,19 @@ export default function PricingElementsTable({
             <td>{level === 'item' ? 'Net Value for Item' : 'Net Value'}</td>
             <td></td>
             {level === 'item' && <td></td>}
-            <td>${money(netValue)}</td>
+            <td>{formatCurrency(netValue)}</td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr className="subtotal">
+            <td></td>
+            <td></td>
+            <td>Net Value 2</td>
+            <td></td>
+            {level === 'item' && <td></td>}
+            <td>{formatCurrency(netValue)}</td>
+            <td></td>
+            <td></td>
           </tr>
           <tr className="subtotal">
             <td></td>
@@ -152,9 +191,49 @@ export default function PricingElementsTable({
             <td>Total</td>
             <td></td>
             {level === 'item' && <td></td>}
-            <td>${money(netValue)}</td>
+            <td>{formatCurrency(netValue)}</td>
+            <td></td>
+            <td></td>
           </tr>
-          {!appliedCondition && (
+          <tr>
+            <td>
+              <span className="status-dot" />
+            </td>
+            <td>SKTO</td>
+            <td>Cash Discount</td>
+            <td>0.000%</td>
+            {level === 'item' && <td></td>}
+            <td>{formatCurrency(0)}</td>
+            <td>0</td>
+            <td></td>
+          </tr>
+          {/* Decorative only — not part of pricing.ts, never affects net value or CAP verification.
+              Real SAP always shows a cost (VPRS) and a tax-jurisdiction line here; the specific
+              figures are cosmetic (fixed fractions of gross/net), matching the *shape* of the
+              screen Kent captured on 2026-11-01, not any real costing/tax data we model. */}
+          <tr>
+            <td>
+              <span className="status-dot" />
+            </td>
+            <td>VPRS</td>
+            <td>Internal price</td>
+            <td>{level === 'item' ? formatCurrency((grossValue * 0.6) / (quantity || 1)) : ''}</td>
+            {level === 'item' && <td>1 EA</td>}
+            <td>{formatCurrency(grossValue * 0.6)}</td>
+            <td>1</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td>Standard - USA /With Jur...</td>
+            <td>{level === 'item' ? formatCurrency((netValue * 0.13) / (quantity || 1)) : ''}</td>
+            {level === 'item' && <td>1 EA</td>}
+            <td>{formatCurrency(netValue * 0.13)}</td>
+            <td>1</td>
+            <td></td>
+          </tr>
+          {conditionDef && !appliedCondition && (
             <tr className="editable-row">
               <td></td>
               <td>
@@ -170,6 +249,8 @@ export default function PricingElementsTable({
                   Enter
                 </Button>
               </td>
+              <td></td>
+              <td></td>
             </tr>
           )}
         </tbody>
