@@ -1,3 +1,4 @@
+import FooterActions from './FooterActions';
 import { useState } from 'react';
 import { Button, Icon } from '@ui5/webcomponents-react';
 
@@ -232,11 +233,11 @@ export default function EasyAccessMenu({ targetPath, onNavigate }: { targetPath:
           ))}
         </div>
       </div>
-      <div className="easy-access-footer">
+      <FooterActions>
         <Button design="Emphasized" disabled={!selectedPath} onClick={() => selectedPath && executeLeaf(selectedPath)}>
           Execute
         </Button>
-      </div>
+      </FooterActions>
     </div>
   );
 }

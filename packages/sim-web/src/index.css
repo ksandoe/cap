@@ -82,11 +82,19 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: #32363a;
-  color: #fff;
-  font-size: 13px;
-  padding: 8px 16px;
-  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  color: #1d2d3e;
+  border-top: 1px solid #d9d9d9;
+  font-size: 14px;
+  padding: 8px 20px;
+  min-height: 40px;
+}
+.status-bar-ok {
+  color: #2b7d2b;
+  font-size: 18px;
 }
 
 .lead-in h2 {
@@ -453,43 +461,99 @@ body {
   font-weight: 600;
 }
 
-/* --- Pricing Elements table, see PricingElementsTable.tsx --- */
-.sap-pricing-toolbar {
+/* --- Pricing Elements table, see PricingElementsTable.tsx (Kent's 2026-11-02 Item Data screenshots) --- */
+.pe-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 24px;
+  margin-bottom: 14px;
+}
+.pe-summary-right {
+  grid-column: 2;
+}
+.pe-summary-right .field-row-inline {
+  margin-bottom: 4px;
+}
+.pe-toolbar {
   display: flex;
-  gap: 8px;
-  margin: 8px 0;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 14px;
+}
+.pe-btn {
+  min-width: 140px;
+  margin-left: 6px;
+}
+.pe-btn-update {
+  margin-left: 40px;
+}
+.pe-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 8px 4px;
+}
+.pe-scroll {
+  overflow-x: auto;
+  border-top: 1px solid #d9d9d9;
 }
 .sap-pricing-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
-  margin-top: 8px;
 }
 .sap-pricing-table th {
   text-align: left;
   font-weight: 600;
-  color: #556;
+  white-space: nowrap;
   border-bottom: 1px solid #d9d9d9;
-  padding: 4px 6px;
+  padding: 6px 6px;
 }
 .sap-pricing-table td {
   padding: 3px 6px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid #f0f0f0;
+  height: 24px;
+  white-space: nowrap;
 }
-.sap-pricing-table tr.subtotal td {
-  color: #0a6ed1;
+.sap-pricing-table td.pe-display {
+  background: #ececec;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
 }
-.sap-pricing-table tr.editable-row input {
-  border: 1px solid #c4d4e4;
-  width: 100%;
+.sap-pricing-table td.pe-num {
+  text-align: right;
+  font-family: monospace;
+}
+.sap-pricing-table tr.subtotal td.pe-display {
+  font-weight: 600;
+}
+.sap-pricing-table td.pe-value-bold {
+  font-weight: 700;
+}
+.pe-header-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+}
+.pe-header-actions .pe-btn {
+  margin-left: 0;
+  min-width: 150px;
+}
+.sap-pricing-table input[type='checkbox'] {
+  margin: 0;
+}
+.sap-pricing-table tr.editable-row input:not([type='checkbox']) {
+  border: 1px solid #89919a;
   font-size: 12px;
   padding: 2px 4px;
 }
 .sap-pricing-table .status-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 10px;
+  height: 10px;
   background: #2b7d2b;
 }
 
@@ -706,4 +770,113 @@ body {
 }
 .value-range-grid tr.selected {
   background: #e5f1fb;
+}
+
+/* Create with Reference popup — Kent's 2026-11-02 screenshots of VA21/VA01. */
+.cwr-body {
+  min-width: 720px;
+  font-size: 13px;
+}
+.cwr-form {
+  padding: 12px 8px 0;
+}
+.cwr-form .initial-field-row label {
+  flex-basis: 170px;
+}
+.cwr-section {
+  margin: 20px 0 10px 24px;
+  padding-bottom: 6px;
+  font-weight: 600;
+  font-size: 15px;
+  border-bottom: 1px solid #d9d9d9;
+}
+.cwr-search {
+  margin: 36px 0 0 12px;
+}
+.cwr-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  width: 100%;
+  padding: 6px 12px;
+}
+.cwr-action {
+  color: #0a6ed1;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cwr-accept {
+  color: #2b7d2b;
+}
+.cwr-decline {
+  color: #bb0000;
+}
+
+/* The Menu dropdown on screens where it does something (VA21's Goto ▸ Header ▸ Conditions). */
+.sap-menu-trigger {
+  position: relative;
+  cursor: pointer;
+}
+.sap-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.sap-menu-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 41;
+  min-width: 150px;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  color: #1d2d3e;
+  font-size: 13px;
+}
+.sap-menu-sub > .sap-menu-list {
+  top: -1px;
+  left: 100%;
+}
+.sap-menu-item {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+.sap-menu-item:hover {
+  background: #eef6fd;
+}
+.sap-menu-sub {
+  position: absolute;
+  top: 0;
+  left: 100%;
+}
+
+/* "Save Incomplete Document" popup — Kent's 2026-11-02 screenshot of the real VA21 save. */
+.incomplete-dialog {
+  min-width: 560px;
+  font-size: 14px;
+}
+.incomplete-question {
+  margin-top: 36px;
+}
+.incomplete-actions {
+  display: flex;
+  gap: 12px;
+  margin: 28px 0 8px;
+}
+.incomplete-actions ui5-button {
+  flex: 1;
+}
+
+/* The screen's own buttons live at the right of the status bar, as in real SAP. */
+.status-bar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
 }

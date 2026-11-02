@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Icon } from '@ui5/webcomponents-react';
 
 // Initial screens and Overview screens both show just a single "Menu" dropdown plus a transaction-
@@ -21,10 +22,50 @@ export const OVERVIEW_TOOLBAR_ICONS = ['display', 'add-process', 'header', 'decl
  * captures. Visual density on purpose: this is what Kent asked us to replicate after seeing the
  * thin slice's screens looked too clean next to the real SAP UI.
  */
+export interface MenuItem {
+  label: string;
+  children?: MenuItem[];
+  /** Leaf actions only; anything without one is decorative clutter, like most of real SAP's menu. */
+  onSelect?: () => void;
+}
+
+function MenuList({ items, onPick }: { items: MenuItem[]; onPick: () => void }) {
+  const [openLabel, setOpenLabel] = useState<string | null>(null);
+  return (
+    <div className="sap-menu-list">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="sap-menu-item"
+          onMouseEnter={() => setOpenLabel(item.children ? item.label : null)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (item.children) {
+              setOpenLabel(item.label);
+              return;
+            }
+            item.onSelect?.();
+            onPick();
+          }}
+        >
+          {item.label}
+          {item.children && <span className="sap-menu-arrow">›</span>}
+          {item.children && openLabel === item.label && (
+            <div className="sap-menu-sub">
+              <MenuList items={item.children} onPick={onPick} />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function SapChrome({
   title,
   code,
   toolbarIcons = [],
+  menuItems,
   onBack,
 }: {
   title: string;
@@ -33,9 +74,12 @@ export default function SapChrome({
   /** The decorative icon row — e.g. OVERVIEW_TOOLBAR_ICONS for the Overview screen. Omit entirely
    * for the initial screen, which has no icon row at all. */
   toolbarIcons?: string[];
+  /** Makes the "Menu" dropdown real — the exercise sends students through Goto ▸ Header ▸ Conditions. */
+  menuItems?: MenuItem[];
   /** Real SAP's back arrow is the actual way back — there's no separate Back button anywhere. */
   onBack?: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="sap-chrome">
       <div className="sap-chrome-bar">
@@ -48,7 +92,15 @@ export default function SapChrome({
         <span className="sap-chrome-exit">Exit</span>
       </div>
       <div className="sap-chrome-minimal-row">
-        <span>Menu ⌄</span>
+        <span className={menuItems ? 'sap-menu-trigger' : undefined} onClick={() => menuItems && setMenuOpen((o) => !o)}>
+          Menu ⌄
+          {menuItems && menuOpen && (
+            <>
+              <div className="sap-menu-backdrop" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
+              <MenuList items={menuItems} onPick={() => setMenuOpen(false)} />
+            </>
+          )}
+        </span>
         <span className="sap-chrome-command-field" />
         {toolbarIcons.length > 0 && (
           <div className="sap-chrome-toolbar">

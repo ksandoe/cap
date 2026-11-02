@@ -1,3 +1,4 @@
+import FooterActions from './FooterActions';
 import { useState } from 'react';
 import { Button } from '@ui5/webcomponents-react';
 import type { AppliedCondition, ConditionTypeDef } from '@sap-sim/shared';
@@ -54,7 +55,7 @@ export default function ItemDetailPanel({
   initialTab?: (typeof TABS)[number];
   onBack: () => void;
   /** Original exercise quirk: "advance to the next item" without leaving the item-detail screen. */
-  onNavigate?: (direction: 'prev' | 'next') => void;
+  onNavigate?: (direction: 'first' | 'prev' | 'next' | 'last') => void;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>(initialTab);
   const material = getMaterial(materialId);
@@ -65,8 +66,10 @@ export default function ItemDetailPanel({
       <div className="sap-screen-body">
         {onNavigate && (
           <div className="layout-toggle">
-            <Button icon="slim-arrow-left" design="Transparent" onClick={() => onNavigate('prev')} />
-            <Button icon="slim-arrow-right" design="Transparent" onClick={() => onNavigate('next')} />
+            <Button icon="close-command-field" design="Default" onClick={() => onNavigate('first')} />
+            <Button icon="slim-arrow-left" design="Default" onClick={() => onNavigate('prev')} />
+            <Button icon="slim-arrow-right" design="Default" onClick={() => onNavigate('next')} />
+            <Button icon="open-command-field" design="Default" onClick={() => onNavigate('last')} />
           </div>
         )}
         <div className="field-row" style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -198,7 +201,7 @@ export default function ItemDetailPanel({
                     style={{ width: 80 }}
                   />
                 ) : (
-                  <span className="sap-display-value">100</span>
+                  <span className="sap-display-value">{orderProbability ?? 100}</span>
                 )}
                 <span>%</span>
               </div>
@@ -224,14 +227,14 @@ export default function ItemDetailPanel({
 
         {tab !== 'Sales A' && tab !== 'Conditions' && <p style={{ color: '#888' }}>Not used in this exercise.</p>}
 
-        <div className="step-actions">
+        <FooterActions>
           <Button design="Emphasized" onClick={onBack}>
             Save
           </Button>
           <Button design="Transparent" onClick={onBack}>
             Cancel
           </Button>
-        </div>
+        </FooterActions>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import FooterActions from '../components/FooterActions';
 import { useState } from 'react';
 import { Button, Icon, MessageStrip, Title } from '@ui5/webcomponents-react';
 import type { AssignmentInstance, SalesDocument, SalesDocumentItem } from '@sap-sim/shared';
@@ -115,11 +116,18 @@ export default function VA11Inquiry({
     setSelectedLines([]);
   }
 
-  function navigateItem(direction: 'prev' | 'next') {
+  function navigateItem(direction: 'first' | 'prev' | 'next' | 'last') {
     const idx = items.findIndex((i) => i.lineNumber === selectedLine);
     if (idx < 0) return;
-    const nextIdx = direction === 'next' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
-    setSelectedLines([items[nextIdx].lineNumber]);
+    const target =
+      direction === 'first'
+        ? 0
+        : direction === 'last'
+          ? items.length - 1
+          : direction === 'next'
+            ? Math.min(idx + 1, items.length - 1)
+            : Math.max(idx - 1, 0);
+    setSelectedLines([items[target].lineNumber]);
   }
 
   const pricing = priceDocument(
@@ -244,14 +252,14 @@ export default function VA11Inquiry({
                   values={initialValues}
                   onChange={(name, value) => setInitialValues((prev) => ({ ...prev, [name]: value }))}
                 />
-                <div className="step-actions">
+                <FooterActions>
                   <Button design="Transparent" onClick={() => setCreateWithReferenceNotice(true)}>
                     Create with Reference
                   </Button>
                   <Button design="Emphasized" onClick={handleInitialContinue}>
                     {VA11_CONFIG.initialScreen.continueLabel}
                   </Button>
-                </div>
+                </FooterActions>
               </div>
             </div>
           }
@@ -484,11 +492,14 @@ export default function VA11Inquiry({
           }}
         />
 
-        <div className="step-actions">
+        <FooterActions>
           <Button design="Emphasized" onClick={validateAndSave}>
             Save
           </Button>
-        </div>
+          <Button design="Transparent" onClick={() => setPhase('initial')}>
+            Cancel
+          </Button>
+        </FooterActions>
       </div>
     </div>
   );

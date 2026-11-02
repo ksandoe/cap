@@ -66,17 +66,25 @@ export default function ItemsGrid({
               <Icon name={icon} />
             </span>
           ))}
-          {!readOnly && onAddRow && (
+          {!readOnly && onAddRow ? (
             <span className="sap-chrome-icon-btn" title="Add row" onClick={onAddRow}>
               <Icon name="sys-add" />
             </span>
+          ) : (
+            <span className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
+              <Icon name="sys-add" />
+            </span>
           )}
-          {!readOnly && onRemoveSelected && (
+          {!readOnly && onRemoveSelected ? (
             <span
               className={`sap-chrome-icon-btn${selectedLines.length === 0 ? ' sap-chrome-icon-btn--disabled' : ''}`}
               title="Remove selected"
               onClick={selectedLines.length === 0 ? undefined : onRemoveSelected}
             >
+              <Icon name="sys-minus" />
+            </span>
+          ) : (
+            <span className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
               <Icon name="sys-minus" />
             </span>
           )}

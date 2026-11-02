@@ -1,3 +1,4 @@
+import FooterActions from '../components/FooterActions';
 import { useState } from 'react';
 import { Button, MessageStrip, Title } from '@ui5/webcomponents-react';
 import type { AssignmentInstance, SalesDocument } from '@sap-sim/shared';
@@ -144,14 +145,14 @@ export default function VA01Order({
                   </MessageStrip>
                 )}
                 <InitialScreenFields fields={VA01_CONFIG.initialScreen.fields} />
-                <div className="step-actions">
+                <FooterActions>
                   <Button design="Transparent" onClick={() => setContinueNotice(true)}>
                     Continue
                   </Button>
                   <Button design="Emphasized" onClick={() => setPhase('steps')}>
                     {VA01_CONFIG.initialScreen.continueLabel}
                   </Button>
-                </div>
+                </FooterActions>
               </div>
             </div>
           }

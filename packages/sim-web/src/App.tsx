@@ -106,7 +106,7 @@ export default function App() {
           studentKey={studentKey}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, inquiry: doc }));
-            setStatusMessage(`Inquiry ${doc.id} saved.`);
+            setStatusMessage(`Inquiry ${doc.id} has been saved.`);
           }}
           onSaved={() => advance(3)}
         />
@@ -122,7 +122,7 @@ export default function App() {
           studentKey={studentKey}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, quotation: doc }));
-            setStatusMessage(`Quotation ${doc.id} saved.`);
+            setStatusMessage(`Quotation ${doc.id} has been saved.`);
           }}
           onSaved={() => advance(5)}
         />
@@ -138,7 +138,7 @@ export default function App() {
           studentKey={studentKey}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, order: doc }));
-            setStatusMessage(`Order ${doc.id} saved.`);
+            setStatusMessage(`Order ${doc.id} has been saved.`);
           }}
           onSaved={(doc) => {
             advance(7);

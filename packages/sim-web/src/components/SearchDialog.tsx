@@ -21,6 +21,14 @@ interface Props {
   activeField: string;
   /** Results grid column headers, matching each item's `columns` order. */
   resultColumns: string[];
+  /** Dialog title; real SAP names it after the entity, e.g. "Sales Document (1)". */
+  title?: string;
+  /** Hint inside the active field. */
+  placeholder?: string;
+  /** Filter fields per row — the real Sales Document value help is 4-wide, the customer one 3-wide. */
+  fieldColumns?: number;
+  /** Wider results grids (13 columns for sales documents) need a wider dialog body. */
+  wide?: boolean;
   items: SearchItem[];
   onSelect: (item: SearchItem) => void;
   onClose: () => void;
@@ -51,7 +59,20 @@ function matchesQuery(value: string, query: string): boolean {
  * 3-digit-ID mechanic with a small curated pool. We keep that curated pool; only the interaction
  * pattern (filter → Go → select → OK) is reproduced.
  */
-export default function SearchDialog({ open, entityLabel, fields, activeField, resultColumns, items, onSelect, onClose }: Props) {
+export default function SearchDialog({
+  open,
+  entityLabel,
+  fields,
+  activeField,
+  resultColumns,
+  title = 'Restrict Value Range (1)',
+  placeholder = 'full name, or e.g. bos*',
+  fieldColumns = 3,
+  wide = false,
+  items,
+  onSelect,
+  onClose,
+}: Props) {
   const [query, setQuery] = useState('');
   const [searched, setSearched] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -82,7 +103,7 @@ export default function SearchDialog({ open, entityLabel, fields, activeField, r
   return (
     <Dialog
       open={open}
-      headerText="Restrict Value Range (1)"
+      headerText={title}
       onAfterClose={handleClose}
       footer={
         <Bar
@@ -108,7 +129,7 @@ export default function SearchDialog({ open, entityLabel, fields, activeField, r
         />
       }
     >
-      <div className="value-range" style={{ minWidth: 540, maxWidth: 720 }}>
+      <div className="value-range" style={wide ? { minWidth: 760, maxWidth: 960 } : { minWidth: 540, maxWidth: 720 }}>
         <div className="value-range-tabs">
           <span className="value-range-tab active">Search and Select</span>
         </div>
@@ -122,7 +143,7 @@ export default function SearchDialog({ open, entityLabel, fields, activeField, r
             <Icon name="action-settings" />
           </span>
         </div>
-        <div className="value-range-fields">
+        <div className="value-range-fields" style={{ gridTemplateColumns: `repeat(${fieldColumns}, 1fr)` }}>
           {fields.map((f) =>
             f === activeField ? (
               <div className="value-range-field" key={f}>
@@ -131,7 +152,7 @@ export default function SearchDialog({ open, entityLabel, fields, activeField, r
                   <input
                     autoFocus
                     value={query}
-                    placeholder="full name, or e.g. bos*"
+                    placeholder={placeholder}
                     onChange={(e) => {
                       setQuery(e.target.value);
                       setSearched(false);
