@@ -9,12 +9,15 @@ export interface GridItem {
 }
 
 // The real "All Items" toolbar, identical on the quotation and order Overviews (Kent's 2026-11-02
-// screenshots): 13 icons, the faded 10th being Item Conditions, then Group and a wrench. Only
-// "+"/"−" and Item Conditions do anything; the rest are clutter, same reasoning as SapChrome's
-// decorative icons. Names are best guesses against the icon explorer.
+// screenshots, ids read from the page's SAPGUI-icons sprite): 13 icons, then Group and a wrench.
+// In order: s_doitde, s_b_insr, s_b_delr, s_b_posn, s_b_mrka, s_b_mrkd, s_avache, s_avasho, s_scline,
+// s_recrul (faded), s_xprice (Item Conditions, the one that does something), s_xbatch, s_b_conf.
+// UI5 has no exact twins, so each is the closest icon by meaning. Only "+"/"−" and Item Conditions
+// do anything; the rest are clutter, same reasoning as SapChrome's decorative icons.
 const LEADING_DECORATIVE_ICONS = ['detail-view'];
-const BEFORE_CONDITIONS = ['it-instance', 'grid', 'table-view', 'compare', 'tree', 'vertical-bar-chart'];
-const AFTER_CONDITIONS = ['screen-split-one', 'area-chart', 'action-settings'];
+const BEFORE_CONDITIONS = ['it-instance', 'multiselect-all', 'multiselect-none', 'inventory', 'org-chart', 'vertical-bar-chart', 'money-bills'];
+const FADED_ICONS = ['money-bills'];
+const AFTER_CONDITIONS = ['lab', 'action-settings'];
 const MIN_BLANK_ROWS = 16;
 
 /**
@@ -96,7 +99,10 @@ export default function ItemsGrid({
             </span>
           )}
           {BEFORE_CONDITIONS.map((icon) => (
-            <span key={icon} className="sap-chrome-icon-btn sap-chrome-icon-btn--decorative">
+            <span
+              key={icon}
+              className={`sap-chrome-icon-btn sap-chrome-icon-btn--decorative${FADED_ICONS.includes(icon) ? ' sap-chrome-icon-btn--faded' : ''}`}
+            >
               <Icon name={icon} />
             </span>
           ))}

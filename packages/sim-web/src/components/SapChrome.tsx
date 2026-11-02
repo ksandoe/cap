@@ -15,9 +15,9 @@ import { Icon } from '@ui5/webcomponents-react';
 // `display` (not `show`, which is a Fiori eye). None of these open the item-detail drill-in; that's
 // triggered by double-clicking a row in the items grid instead (see ItemsGrid's onRowOpen).
 // Corrected from Kent's 2026-11-02 screenshots of the real VA01 and VA21 Overviews, which share one
-// toolbar: display, an arrow-into-box, a document with a magnifier, a person with a red cross,
-// aggregation, More. Names are best guesses against the icon explorer.
-export const OVERVIEW_TOOLBAR_ICONS = ['display', 'log', 'inspection', 'employee-rejections', 'sum', 'overflow'];
+// toolbar: s_b_disp, s_dopopr (arrow into a document), s_b_layt (document with a magnifier),
+// s_b_okno (person with a red cross), s_b_summ, then More. Closest UI5 icons by meaning.
+export const OVERVIEW_TOOLBAR_ICONS = ['display', 'open-command-field', 'inspection', 'employee-rejections', 'sum', 'overflow'];
 
 /**
  * The classic SAP header bar + menu row + toolbar — docs/decisions/001 and the real screenshots
