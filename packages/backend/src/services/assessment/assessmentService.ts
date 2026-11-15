@@ -21,7 +21,7 @@ import { compileContext } from './contextCompiler';
 import { platformConfigDb } from '../../db/platformConfigDb';
 import { callModel, extractJson } from './llmProvider';
 import { logger }        from '../eventLogger';
-import { EVENTS, Evaluation } from '@cap/shared';
+import { EVENTS, Evaluation, normalizeCheckinOptions } from '@cap/shared';
 import { LLM_MODE }      from '../../config/env';
 import { mockCheckinQuestions, mockConversationTurn, mockEvaluation } from './mockAi';
 
@@ -49,7 +49,11 @@ export async function generateCheckinQuestions(req: Request, res: Response): Pro
 
   try {
     const parsed = extractJson<any>(raw);
-    const questions = Array.isArray(parsed) ? parsed : parsed.questions;
+    const list: any[] = (Array.isArray(parsed) ? parsed : parsed.questions) ?? [];
+    // The model emits options in varying shapes (object/numbers/strings)
+    // despite the prompt schema — normalize to string[] here so clients
+    // never see another form (white-screen bug: .map/.trim on non-strings).
+    const questions = list.map(q => ({ ...q, options: normalizeCheckinOptions(q.options) }));
     res.json({ questions });
   } catch {
     res.status(500).json({ error: 'Failed to parse check-in questions from AI response.' });

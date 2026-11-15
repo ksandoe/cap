@@ -7,31 +7,55 @@
  */
 import { Recipe, MASTER_RUBRIC, GeneratedRecipe } from '@cap/shared';
 
-/** Matches the JSON array shape generateCheckinQuestions parses. */
+/** Matches the JSON array shape generateCheckinQuestions parses — 7 questions
+ *  in past/present/future groups, mirroring the live generation prompt. */
 export function mockCheckinQuestions(): string {
   return JSON.stringify([
     {
-      questionKey:   'prior_experience',
-      questionText:  'Have you worked with sales or order-management processes before (in a job, internship, or class)?',
+      questionKey:   'work_experience',
+      questionText:  'Briefly describe any work experience you have (jobs, internships, or major class projects) — what did you do?',
+      responseType:  'short_text',
+      theme:         'past',
+    },
+    {
+      questionKey:   'process_experience',
+      questionText:  'How much experience do you have with sales or order-management processes like the one in this module?',
       responseType:  'multiple_choice',
-      options:       ['No experience', 'Some exposure', 'Worked with them regularly'],
+      theme:         'past',
+      options:       ['None', 'Some exposure in class or work', 'Worked with them regularly'],
+    },
+    {
+      questionKey:   'software_experience',
+      questionText:  'How much have you used business software like an ERP system (SAP, Oracle, NetSuite) or similar business applications?',
+      responseType:  'multiple_choice',
+      theme:         'past',
+      options:       ['Never', 'A little', 'Regularly'],
+    },
+    {
+      questionKey:   'concept_knowledge',
+      questionText:  'How familiar are you with the idea of linked business documents (e.g. a quote becoming an order)?',
+      responseType:  'likert',
+      theme:         'present',
+      options:       ['1 — Not at all', '2', '3 — Somewhat', '4', '5 — Very familiar'],
     },
     {
       questionKey:   'erp_comfort',
       questionText:  'How comfortable are you navigating ERP systems such as SAP?',
       responseType:  'likert',
+      theme:         'present',
       options:       ['1 — Not at all', '2', '3 — Somewhat', '4', '5 — Very comfortable'],
     },
     {
-      questionKey:   'doc_flow_familiarity',
-      questionText:  'How familiar are you with the idea of linked business documents (e.g. a quote becoming an order)?',
-      responseType:  'likert',
-      options:       ['1 — Not at all', '2', '3 — Somewhat', '4', '5 — Very familiar'],
+      questionKey:   'future_encounter',
+      questionText:  'Where might you run into a process like this again — another course, an internship, a part-time job, or somewhere else?',
+      responseType:  'short_text',
+      theme:         'future',
     },
     {
-      questionKey:   'context',
-      questionText:  'In a sentence or two, what do you already know about how a sales order gets created?',
+      questionKey:   'future_transfer',
+      questionText:  'If a future employer or team asked what you could handle with business software, what would you want to be able to say after this module?',
       responseType:  'short_text',
+      theme:         'future',
     },
   ]);
 }

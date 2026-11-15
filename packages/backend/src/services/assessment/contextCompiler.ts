@@ -105,7 +105,8 @@ ${partialOutcomes.length ? `- Outcomes still open: ${partialOutcomes.join('; ')}
   // ── Check-in question generation prompt ────────────────────────────────────
   const checkinSystemPrompt = `
 You are generating check-in survey questions for a learning module.
-Generate exactly 3-4 questions to assess prior knowledge and experience.
+Generate exactly 7 questions in three themed groups, in this order.
+Each question carries a "theme" field: "past", "present", or "future".
 
 MODULE: ${recipe.moduleTitle}
 DESCRIPTION: ${recipe.moduleDescription}
@@ -113,12 +114,35 @@ LEARNING OUTCOMES:
 ${(recipe.learningOutcomes ?? []).map((o,i) => `${i+1}. ${o}`).join('\n')}
 KEY CONCEPTS: ${(recipe.keyConcepts ?? []).map(c => c.term).join(', ')}
 
-Generate questions targeting: prior professional/academic experience,
-self-assessed comfort with key concepts, and relevant tool exposure.
+PAST — 3 questions (theme:"past"). Prior experience is the most useful
+context for the reflective conversation:
+- general work experience (jobs, internships, significant coursework)
+- experience with this business process specifically (see MODULE above)
+- prior use of software or tools related to this kind of work
+
+PRESENT — 2 questions (theme:"present"):
+- self-assessed knowledge of the key concepts
+- comfort/confidence going into the activity
+
+FUTURE — 2 questions (theme:"future"):
+Forward-looking but subtle — many students do not have clear career plans
+and may not yet grasp the future value of this knowledge. Do NOT ask about
+career goals directly. Instead, probe lightly: where they might encounter
+this kind of process again (other courses, internships, entry-level jobs),
+which part seems most transferable, or how they might describe this
+experience to a future employer or teammate. Uncertain answers are
+expected and acceptable.
+
 QUESTION RULES: no yes/no phrasing (prefer "Briefly describe…" over "Can you
 describe…"); never ask two things in one question; assume many students are
 complete beginners to the tools involved.
-Each question must specify: questionKey, questionText, responseType (likert|multiple_choice|short_text), options (if applicable).
+Each question must specify: questionKey, questionText, theme, responseType
+(likert|multiple_choice|short_text), and — for likert and multiple_choice —
+an "options" field that is a JSON array of DISPLAY STRINGS. Always the same
+shape, never an object or numbers. Examples:
+  likert:          ["1 - Not comfortable at all","2","3","4","5 - Very comfortable"]
+  multiple_choice: ["Never used it","Used it once or twice","Use it regularly"]
+Omit "options" entirely for short_text questions.
 Respond ONLY with a JSON object of the form {"questions": [ ...question objects... ]}.
 `.trim();
 
@@ -264,7 +288,21 @@ Respond ONLY with a JSON object of exactly this shape:
   return { checkinSystemPrompt, checkoutSystemPrompt, evaluationSystemPrompt };
 }
 
+const CHECKIN_THEME_LABEL: Record<string, string> = {
+  past:    'PAST EXPERIENCE',
+  present: 'CURRENT KNOWLEDGE & COMFORT',
+  future:  'LOOKING AHEAD',
+};
+
 function formatCheckinProfile(responses: CheckinResponse[]): string {
   if (!responses.length) return 'No check-in data available.';
-  return responses.map(r => `Q: ${r.questionText}\nA: ${r.response}`).join('\n\n');
+  const groups = new Map<string, string[]>();
+  for (const r of responses) {
+    const t = r.theme && CHECKIN_THEME_LABEL[r.theme] ? r.theme : 'other';
+    groups.set(t, [...(groups.get(t) ?? []), `Q: ${r.questionText}\nA: ${r.response}`]);
+  }
+  return [...Object.keys(CHECKIN_THEME_LABEL), 'other']
+    .filter(t => groups.has(t))
+    .map(t => `${CHECKIN_THEME_LABEL[t] ?? 'OTHER'}:\n${groups.get(t)!.join('\n\n')}`)
+    .join('\n\n');
 }

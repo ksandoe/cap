@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import { api, CheckinQuestion } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
-import { CheckinResponse } from '@cap/shared';
+import { CheckinResponse, normalizeCheckinOptions } from '@cap/shared';
 
 export function CheckinPhase() {
   const sessionId     = useSessionStore(s => s.sessionId);
@@ -22,7 +22,11 @@ export function CheckinPhase() {
 
   useEffect(() => {
     api.assessment.checkinQuestions()
-      .then(r => setQuestions(r.questions))
+      // The backend normalizes options too, but stay defensive — the LLM
+      // has emitted objects and number arrays here (white-screen crashes).
+      .then(r => setQuestions(r.questions.map(q => ({
+        ...q, options: normalizeCheckinOptions(q.options),
+      }))))
       .catch(e => setError(`Could not load the check-in questions. ${e.message}`));
   }, []);
 
@@ -35,6 +39,7 @@ export function CheckinPhase() {
       questionKey:  q.questionKey,
       questionText: q.questionText,
       responseType: q.responseType,
+      theme:        q.theme,
       response:     answers[q.questionKey],
     }));
     try {

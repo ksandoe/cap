@@ -81,9 +81,39 @@ export interface Session {
   ttl:                  number;     // Unix epoch seconds
 }
 
+export type CheckinTheme = 'past' | 'present' | 'future';
+
 export interface CheckinResponse {
   questionKey:   string;
   questionText:  string;
   responseType:  'likert' | 'multiple_choice' | 'short_text';
+  /** Check-in theme (v3.1): groups the profile for the debrief prompt. */
+  theme?:        CheckinTheme;
   response:      string | number;
+}
+
+/** AI-generated check-in question (likert/multiple_choice carry options). */
+export interface CheckinQuestion {
+  questionKey:  string;
+  questionText: string;
+  responseType: 'likert' | 'multiple_choice' | 'short_text';
+  /** Which check-in theme the question belongs to (past/present/future). */
+  theme?:       CheckinTheme;
+  options?:     string[];
+}
+
+/**
+ * The LLM returns Likert/MC options in whichever shape it invents —
+ * array of strings, array of numbers, or a {"1": "label"} object.
+ * Normalize to string[] (radio values must be strings; a number option
+ * stored as the answer later crashes .trim()). Integer-like object keys
+ * enumerate numerically, so Object.values preserves label order.
+ */
+export function normalizeCheckinOptions(options: unknown): string[] | undefined {
+  if (Array.isArray(options)) return options.map(String);
+  // Object form — fall back to the key when a label is empty so mid-scale
+  // options ({"3": ""}) don't render as blank radio buttons.
+  if (options && typeof options === 'object')
+    return Object.entries(options).map(([k, v]) => (v === '' || v == null ? k : String(v)));
+  return undefined;
 }

@@ -46,6 +46,7 @@ export interface CheckinQuestion {
   questionKey:  string;
   questionText: string;
   responseType: 'likert' | 'multiple_choice' | 'short_text';
+  theme?:       'past' | 'present' | 'future';
   options?:     string[];
 }
 

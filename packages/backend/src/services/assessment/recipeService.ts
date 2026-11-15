@@ -8,6 +8,7 @@ import { compileContext } from './contextCompiler';
 import { callModel, extractJson } from './llmProvider';
 import { LLM_MODE }       from '../../config/env';
 import { mockCheckinQuestions } from './mockAi';
+import { normalizeCheckinOptions } from '@cap/shared';
 
 export async function getRecipe(req: Request, res: Response): Promise<void> {
   const recipe = await recipeDb.getActiveRecipe(req.params.moduleId);
@@ -51,7 +52,9 @@ export async function previewCheckin(req: Request, res: Response): Promise<void>
 
   try {
     const parsed = extractJson<any>(raw);
-    res.json({ questions: Array.isArray(parsed) ? parsed : parsed.questions, sample: true });
+    const list: any[] = (Array.isArray(parsed) ? parsed : parsed.questions) ?? [];
+    const questions = list.map(q => ({ ...q, options: normalizeCheckinOptions(q.options) }));
+    res.json({ questions, sample: true });
   } catch {
     res.status(500).json({ error: 'Failed to parse check-in questions from AI response.' });
   }
