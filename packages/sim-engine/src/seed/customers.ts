@@ -1,4 +1,4 @@
-import type { Customer } from '@sap-sim/shared';
+import type { Customer } from '@cap/sim-shared';
 
 // Pilot customer pool — docs/architecture-proposal.md §3b.
 // Company code "999" and country "US" are constant for all of them, carried over from

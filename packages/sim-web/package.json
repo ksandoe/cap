@@ -1,5 +1,5 @@
 {
-  "name": "@sap-sim/web",
+  "name": "@cap/sim-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,8 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@sap-sim/engine": "*",
-    "@sap-sim/shared": "*",
+    "@cap/sim-engine": "*",
+    "@cap/sim-shared": "*",
     "@ui5/webcomponents": "^1.24.0",
     "@ui5/webcomponents-fiori": "^1.24.0",
     "@ui5/webcomponents-react": "^1.24.0",

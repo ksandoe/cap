@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@ui5/webcomponents-react';
-import type { ActivityLayoutMode } from '@sap-sim/shared';
+import type { ActivityLayoutMode } from '@cap/sim-shared';
 
 const BREAKPOINT_PX = 1024; // §10b — placeholder, open question in §8
 const STORAGE_KEY = 'sap-sim-layout-mode';

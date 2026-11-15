@@ -3,7 +3,7 @@ import path from 'node:path';
 
 // Local SQLite file, zero external services — docs/architecture-proposal.md §2.
 // Reference data (customers, materials, assignment config) is NOT stored here; it lives as
-// static code in @sap-sim/engine and is looked up directly. This file only holds per-student,
+// static code in @cap/sim-engine and is looked up directly. This file only holds per-student,
 // dynamically-generated state: resolved assignment variants, documents, events, PO counters,
 // and wizard progress.
 const DB_PATH = process.env.SAP_SIM_DB_PATH ?? path.join(__dirname, '..', 'sap-sim.db');

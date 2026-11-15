@@ -1,5 +1,5 @@
-import type { AssignmentInstance } from '@sap-sim/shared';
-import { CUSTOMERS, getMaterial } from '@sap-sim/engine';
+import type { AssignmentInstance } from '@cap/sim-shared';
+import { CUSTOMERS, getMaterial } from '@cap/sim-engine';
 
 export interface LeadIn {
   title: string;

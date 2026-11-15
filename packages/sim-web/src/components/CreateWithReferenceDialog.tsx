@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Dialog, Icon, MessageStrip } from '@ui5/webcomponents-react';
-import type { SalesDocument } from '@sap-sim/shared';
+import type { SalesDocument } from '@cap/sim-shared';
 import SearchDialog, { type SearchItem } from './SearchDialog';
 
 const TABS = ['Inquiry', 'Quotation', 'Order', 'Contract', 'SchedAgree', 'BillDoc'] as const;

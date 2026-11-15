@@ -6,11 +6,11 @@ import type {
   FlowProgress,
   SalesDocument,
   SalesDocumentItem,
-} from '@sap-sim/shared';
-import { PILOT_ASSIGNMENT, resolveVariant, formatPoNumber, priceDocument, getMaterial } from '@sap-sim/engine';
+} from '@cap/sim-shared';
+import { PILOT_ASSIGNMENT, resolveVariant, formatPoNumber, priceDocument, getMaterial } from '@cap/sim-engine';
 
 /**
- * A client-side stand-in for packages/server, used for the shared/deployed build where there's no
+ * A client-side stand-in for packages/sim-server, used for the shared/deployed build where there's no
  * backend to host (Amplify Hosting is static-only) — see docs/decisions for the 2026-11-02 call to
  * keep the demo zero-infrastructure rather than stand up a separate API. Mirrors api.ts's function
  * signatures exactly, backed by localStorage instead of SQLite. Each browser gets its own data;

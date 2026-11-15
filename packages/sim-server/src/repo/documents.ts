@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { SalesDocument, DocType } from '@sap-sim/shared';
+import type { SalesDocument, DocType } from '@cap/sim-shared';
 import { db } from '../db';
 
 interface Row {

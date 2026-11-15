@@ -1,4 +1,4 @@
-import type { Assignment, ScenarioParams, AppliedCondition } from '@sap-sim/shared';
+import type { Assignment, ScenarioParams, AppliedCondition } from '@cap/sim-shared';
 import { Rng } from './rng';
 import { priceDocument } from './pricing';
 import { getMaterial } from './seed/materials';
@@ -14,7 +14,7 @@ export interface ResolvedVariant {
 /**
  * Resolve one student's variant for an assignment — docs/architecture-proposal.md §3a/§3b.
  * Deterministic from `studentKey + assignmentId`: calling this twice for the same pair always
- * returns the same result, so the caller (packages/server) can safely call it again on resume
+ * returns the same result, so the caller (packages/sim-server) can safely call it again on resume
  * without re-rolling, though in practice the server persists the result after the first call.
  */
 export function resolveVariant(assignment: Assignment, studentKey: string): ResolvedVariant {

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { AppEvent, EventType } from '@sap-sim/shared';
+import type { AppEvent, EventType } from '@cap/sim-shared';
 import { db } from '../db';
 
 const sessionStartByStudentAssignment = new Map<string, number>();

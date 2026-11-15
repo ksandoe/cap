@@ -1,8 +1,8 @@
 import FooterActions from './FooterActions';
 import { useState } from 'react';
 import { Button } from '@ui5/webcomponents-react';
-import type { AppliedCondition, ConditionTypeDef } from '@sap-sim/shared';
-import { getMaterial } from '@sap-sim/engine';
+import type { AppliedCondition, ConditionTypeDef } from '@cap/sim-shared';
+import { getMaterial } from '@cap/sim-engine';
 import SapChrome from './SapChrome';
 import PricingElementsTable from './PricingElementsTable';
 import { todayIso } from '../dateUtils';

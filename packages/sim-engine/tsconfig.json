@@ -8,7 +8,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "paths": { "@sap-sim/shared": ["../shared/src/index.ts"] }
+    "paths": { "@cap/sim-shared": ["../sim-shared/src/index.ts"] }
   },
   "include": ["src"]
 }

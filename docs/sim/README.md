@@ -2,7 +2,7 @@
 
 A thin, end-to-end slice of the Sales Process PoC described in `CLAUDE.md`: create an inquiry,
 create a quotation with reference to it, create a sales order with reference to that, then view
-the document flow. Design docs: `docs/architecture-proposal.md` and `docs/lead-in-content.md`.
+the document flow. Design docs: `docs/sim/architecture-proposal.md` and `docs/sim/lead-in-content.md`.
 
 ## Running it locally
 
@@ -11,13 +11,13 @@ API keys — everything (including the database) runs on your machine.
 
 ```bash
 npm install
-npm run dev
+npm run dev:sim
 ```
 
 This starts the API server on `http://localhost:4100` and the web app on `http://localhost:5173`
 together. Open `http://localhost:5173` in a browser.
 
-A local SQLite file (`packages/server/sap-sim.db`) holds your progress — delete it to start over
+A local SQLite file (`packages/sim-server/sap-sim.db`) holds your progress — delete it to start over
 as a brand-new student. Each browser (technically, each browser's `localStorage`) gets its own
 anonymous student identity and its own randomly-assigned scenario, so reloading the page resumes
 exactly where you left off, and opening it in a different browser gets you a different customer,
@@ -37,7 +37,7 @@ materials, and discount amounts.
   warning + info dialogs, RA00's "enter it, then Activate it" behavior, the post-save "a blank tab
   may have opened" notice, status-bar-only document numbers, and search-by-name instead of
   search-by-ID.
-- The pricing engine (`packages/engine`) is pure and tested (`npm run test -w packages/engine`),
+- The pricing engine (`packages/sim-engine`) is pure and tested (`npm run test:sim`),
   and is the single source of truth for both the live UI recalculation and the server-side
   verification check — they can never disagree.
 - The CAP integration contract from §7: `GET /api/verify?studentKey=...` returns existence,
@@ -67,9 +67,9 @@ This is deliberately a thin slice, not a polished product:
 ## Repo layout
 
 ```
-apps/web/            React + Vite + UI5 Web Components — the student-facing app
-packages/shared/      TypeScript types shared across the stack (mirrors the architecture doc)
-packages/engine/      Pure logic: pricing, variant resolution, seed data, transaction configs
-packages/server/      Express + SQLite API
-docs/                 Design docs (architecture proposal, lead-in content)
+packages/sim-web/    React + Vite + UI5 Web Components — the student-facing app
+packages/sim-shared/ TypeScript types shared across the stack (mirrors the architecture doc)
+packages/sim-engine/ Pure logic: pricing, variant resolution, seed data, transaction configs
+packages/sim-server/ Express + SQLite API
+docs/sim/             Design docs (architecture proposal, lead-in content)
 ```

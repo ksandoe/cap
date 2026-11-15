@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { AssignmentInstance, Assignment } from '@sap-sim/shared';
-import { resolveVariant, formatPoNumber } from '@sap-sim/engine';
+import type { AssignmentInstance, Assignment } from '@cap/sim-shared';
+import { resolveVariant, formatPoNumber } from '@cap/sim-engine';
 import { db } from '../db';
 
 interface Row {

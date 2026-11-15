@@ -1,4 +1,4 @@
-import type { Assignment } from '@sap-sim/shared';
+import type { Assignment } from '@cap/sim-shared';
 import { CUSTOMERS } from './customers';
 import { DELUXE_COLOR_POOL, MATERIALS, PROFESSIONAL_COLOR_POOL } from './materials';
 

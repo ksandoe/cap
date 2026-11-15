@@ -1,4 +1,4 @@
-import type { AppEvent, AssignmentInstance, DocType, EventType, FlowProgress, SalesDocument } from '@sap-sim/shared';
+import type { AppEvent, AssignmentInstance, DocType, EventType, FlowProgress, SalesDocument } from '@cap/sim-shared';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Dialog, Bar, Tab, TabContainer } from '@ui5/webcomponents-react';
-import type { AssignmentInstance } from '@sap-sim/shared';
-import { CUSTOMERS, getMaterial } from '@sap-sim/engine';
+import type { AssignmentInstance } from '@cap/sim-shared';
+import { CUSTOMERS, getMaterial } from '@cap/sim-engine';
 import { todayIso } from '../dateUtils';
 
 /**

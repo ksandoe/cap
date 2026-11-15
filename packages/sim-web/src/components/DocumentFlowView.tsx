@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { SalesDocument } from '@sap-sim/shared';
+import type { SalesDocument } from '@cap/sim-shared';
 import { getDocumentFlow } from '../api';
-import { CUSTOMERS, getMaterial } from '@sap-sim/engine';
+import { CUSTOMERS, getMaterial } from '@cap/sim-engine';
 
 export default function DocumentFlowView({ orderId }: { orderId: string }) {
   const [chain, setChain] = useState<SalesDocument[] | null>(null);

@@ -1,4 +1,4 @@
-import type { AppEvent, AssignmentInstance, DocType, EventType, FlowProgress, SalesDocument } from '@sap-sim/shared';
+import type { AppEvent, AssignmentInstance, DocType, EventType, FlowProgress, SalesDocument } from '@cap/sim-shared';
 import * as networkApi from './networkApi';
 import * as localApi from './localApi';
 

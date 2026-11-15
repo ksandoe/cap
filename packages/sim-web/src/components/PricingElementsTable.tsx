@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Icon, MessageStrip } from '@ui5/webcomponents-react';
-import type { AppliedCondition, ConditionTypeDef } from '@sap-sim/shared';
+import type { AppliedCondition, ConditionTypeDef } from '@cap/sim-shared';
 
 // SAP prints numbers with the minus sign after them ("160.00-"), grouped with commas.
 function num(n: number, decimals = 2): string {

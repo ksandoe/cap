@@ -6,18 +6,25 @@
     "packages/frontend-student",
     "packages/frontend-admin",
     "packages/backend",
-    "packages/shared"
+    "packages/shared",
+    "packages/sim-shared",
+    "packages/sim-engine",
+    "packages/sim-server",
+    "packages/sim-web"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w packages/frontend-student\" \"npm run dev -w packages/frontend-admin\" \"npm run dev -w packages/backend\"",
     "dev:student": "concurrently \"npm run dev -w packages/frontend-student\" \"npm run dev -w packages/backend\"",
-    "dev:admin":   "concurrently \"npm run dev -w packages/frontend-admin\"  \"npm run dev -w packages/backend\"",
-    "build":       "npm run build -w packages/shared --if-present && npm run build -w packages/backend && npm run build -w packages/frontend-student && npm run build -w packages/frontend-admin",
-    "build:student":"npm run build -w packages/shared --if-present && npm run build -w packages/frontend-student",
-    "build:admin":  "npm run build -w packages/shared --if-present && npm run build -w packages/frontend-admin",
-    "test":  "npm run test --workspaces --if-present",
-    "lint":  "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "dev:admin": "concurrently \"npm run dev -w packages/frontend-admin\"  \"npm run dev -w packages/backend\"",
+    "build": "npm run build -w packages/shared --if-present && npm run build -w packages/backend && npm run build -w packages/frontend-student && npm run build -w packages/frontend-admin",
+    "build:student": "npm run build -w packages/shared --if-present && npm run build -w packages/frontend-student",
+    "build:admin": "npm run build -w packages/shared --if-present && npm run build -w packages/frontend-admin",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:sim": "concurrently \"npm run dev -w packages/sim-server\" \"npm run dev -w packages/sim-web\"",
+    "build:sim": "npm run build -w packages/sim-shared && npm run build -w packages/sim-engine && npm run build -w packages/sim-web",
+    "test:sim": "npm run test -w packages/sim-engine"
   },
   "devDependencies": {
     "concurrently": "^8.0.0"

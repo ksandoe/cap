@@ -1,4 +1,4 @@
-import type { AppliedCondition, Material } from '@sap-sim/shared';
+import type { AppliedCondition, Material } from '@cap/sim-shared';
 import { getConditionType } from './seed/conditionTypes';
 
 function round2(n: number): number {

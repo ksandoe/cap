@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Icon } from '@ui5/webcomponents-react';
-import type { InitialScreenField } from '@sap-sim/shared';
+import type { InitialScreenField } from '@cap/sim-shared';
 
 /**
  * The type field (Inquiry/Quotation/Order Type) plus the "Organizational Data" box real SAP shows

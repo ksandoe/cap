@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Title } from '@ui5/webcomponents-react';
-import type { AssignmentInstance } from '@sap-sim/shared';
-import { CUSTOMERS } from '@sap-sim/engine';
+import type { AssignmentInstance } from '@cap/sim-shared';
+import { CUSTOMERS } from '@cap/sim-engine';
 import DocumentFlowView from '../components/DocumentFlowView';
 
 /**

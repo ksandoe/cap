@@ -1,6 +1,6 @@
 import FooterActions from './FooterActions';
 import { Button } from '@ui5/webcomponents-react';
-import type { AppliedCondition, ConditionTypeDef } from '@sap-sim/shared';
+import type { AppliedCondition, ConditionTypeDef } from '@cap/sim-shared';
 import SapChrome from './SapChrome';
 import DocumentTabStrip from './DocumentTabStrip';
 import PricingElementsTable from './PricingElementsTable';

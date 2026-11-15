@@ -1,8 +1,8 @@
 import FooterActions from './FooterActions';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Icon } from '@ui5/webcomponents-react';
-import type { SalesDocumentItem } from '@sap-sim/shared';
-import { getMaterial } from '@sap-sim/engine';
+import type { SalesDocumentItem } from '@cap/sim-shared';
+import { getMaterial } from '@cap/sim-engine';
 import SapChrome, { OVERVIEW_TOOLBAR_ICONS, type MenuItem } from './SapChrome';
 import DocumentTabStrip from './DocumentTabStrip';
 import ItemsGrid from './ItemsGrid';

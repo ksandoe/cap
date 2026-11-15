@@ -1,4 +1,4 @@
-import type { Material } from '@sap-sim/shared';
+import type { Material } from '@cap/sim-shared';
 
 // Pilot material pool — docs/architecture-proposal.md §3b.
 // Six materials: one Deluxe + one Professional Touring Bike per student, color (and therefore

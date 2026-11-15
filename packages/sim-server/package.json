@@ -1,5 +1,5 @@
 {
-  "name": "@sap-sim/server",
+  "name": "@cap/sim-server",
   "version": "0.1.0",
   "scripts": {
     "dev": "tsx watch src/app.ts",
@@ -7,9 +7,8 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@sap-sim/engine": "*",
-    "@sap-sim/shared": "*",
-    "better-sqlite3": "^11.3.0",
+    "@cap/sim-engine": "*",
+    "@cap/sim-shared": "*",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "uuid": "^9.0.1"
@@ -22,5 +21,8 @@
     "@types/uuid": "^9.0.8",
     "tsx": "^4.19.0",
     "typescript": "^5.4.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.3.0"
   }
 }

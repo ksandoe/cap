@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Title } from '@ui5/webcomponents-react';
-import type { AssignmentInstance, SalesDocument } from '@sap-sim/shared';
+import type { AssignmentInstance, SalesDocument } from '@cap/sim-shared';
 import { getStudentKey } from './studentKey';
 import { getAssignmentInstance, getFlowProgress, listDocuments, saveFlowProgress, logEvent } from './api';
 import { inquiryLeadIn, orderLeadIn, quotationLeadIn, assignedProductsSentence } from './content/leadIn';

@@ -1,4 +1,4 @@
-import type { ConditionTypeDef } from '@sap-sim/shared';
+import type { ConditionTypeDef } from '@cap/sim-shared';
 
 export const CONDITION_TYPES: ConditionTypeDef[] = [
   { code: 'K004', name: 'Material Discount', level: 'item', calcType: 'amount', requiresActivation: false },

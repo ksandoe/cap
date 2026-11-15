@@ -1,9 +1,9 @@
-import type { TransactionConfig } from '@sap-sim/shared';
+import type { TransactionConfig } from '@cap/sim-shared';
 
 // Data-driven transaction config — docs/architecture-proposal.md §5.
 // Each step's `instructions` is Parand's step-by-step text (§10b); `fields[].required` drives
 // the asterisk + validation quirk. The actual item/pricing widgets are hand-built components in
-// the web app (not generically rendered from FieldConfig) — see the README note in apps/web.
+// the web app (not generically rendered from FieldConfig) — see the README note in packages/sim-web.
 
 export const VA11_CONFIG: TransactionConfig = {
   id: 'VA11',

@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import type { SalesDocument, SimVerificationResult } from '@sap-sim/shared';
-import { PILOT_ASSIGNMENT, getMaterial, priceDocument } from '@sap-sim/engine';
+import type { SalesDocument, SimVerificationResult } from '@cap/sim-shared';
+import { PILOT_ASSIGNMENT, getMaterial, priceDocument } from '@cap/sim-engine';
 import { getOrCreateAssignmentInstance } from './repo/assignmentInstances';
 import { createDocument, findByCustReference, findDocuments, getDocument, getDocumentChain, updateDocument } from './repo/documents';
 import { logEvent } from './repo/events';

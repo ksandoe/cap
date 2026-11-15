@@ -1,4 +1,4 @@
-import type { FlowProgress } from '@sap-sim/shared';
+import type { FlowProgress } from '@cap/sim-shared';
 import { db } from '../db';
 
 export function getFlowProgress(studentKey: string, assignmentId: string): FlowProgress {

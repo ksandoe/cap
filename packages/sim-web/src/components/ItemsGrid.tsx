@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Icon } from '@ui5/webcomponents-react';
-import { getMaterial } from '@sap-sim/engine';
+import { getMaterial } from '@cap/sim-engine';
 
 export interface GridItem {
   lineNumber: number;

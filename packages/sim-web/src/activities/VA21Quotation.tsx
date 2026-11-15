@@ -1,8 +1,8 @@
 import FooterActions from '../components/FooterActions';
 import { useState } from 'react';
 import { Button, Dialog, Icon, MessageStrip, Title } from '@ui5/webcomponents-react';
-import type { AppliedCondition, AssignmentInstance, SalesDocument, SalesDocumentItem } from '@sap-sim/shared';
-import { VA21_CONFIG, priceDocument, getMaterial, getConditionType, getCustomer } from '@sap-sim/engine';
+import type { AppliedCondition, AssignmentInstance, SalesDocument, SalesDocumentItem } from '@cap/sim-shared';
+import { VA21_CONFIG, priceDocument, getMaterial, getConditionType, getCustomer } from '@cap/sim-engine';
 import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
 import SapChrome, { OVERVIEW_TOOLBAR_ICONS, type MenuItem } from '../components/SapChrome';
