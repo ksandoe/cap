@@ -6,7 +6,7 @@ This PoC exists to **inform a decision, not to implement one.** Kent will show i
 
 ## Context
 
-- **Parent project:** CAP (Conversational Assessment Platform), a sibling repo at `../cap`. Students do a hands-on SAP task, then have a reflective AI conversation about it. CAP is funded by a CSU LIFT award; the pilot runs in MINS 301 (Chico State, fully online, 300–500 students per semester) in **Spring 2027**. `../cap/CLAUDE.md` has the full project context, team and constraints. Read it when you need background, but this repo is deliberately independent of it.
+- **Parent project:** CAP (Conversational Assessment Platform), the monorepo this package now lives in (merged in from the separate sap-sim repo on 2026-11-15). Students do a hands-on SAP task, then have a reflective AI conversation about it. CAP is funded by a CSU LIFT award; the pilot runs in MINS 301 (Chico State, fully online, 300–500 students per semester) in **Spring 2027**. The root `CLAUDE.md` has the full project context, team and constraints. Keep the sim packages free of imports from CAP's backend and frontends; integration goes through the interface described below.
 - **Learning goal:** exposure to enterprise software, comfort with it, and seeing the **business process and its information flows**. Not SAP mastery. Teaching the flow matters more than pixel-perfect fidelity. The simulation can show things real SAP hides, such as how data carries forward from document to document.
 - **Precedent:** simulation-based teaching is accepted in the SAP academic community (ERPsim, HEC Montréal). It is unconfirmed whether ERPsim simulates the SAP screens themselves or only the business environment around real SAP, so don't cite it as precedent for simulated screens.
 - **People:**
@@ -38,7 +38,7 @@ Requirements from Parand's interviews:
 - **Data-driven transactions:** define screens, fields, validations and quirks as data, so the Shipping, Billing and other modules can be added later mostly through configuration.
 - **A document model with explicit document flow:** customers, materials, pricing conditions, and documents linked to their predecessors.
 - **Instrument everything:** an append-only event log per student session.
-- **CAP integration contract:** design an API that answers CAP's verification question: given a student key and an activity, do the required documents exist, who owns them, and what is the net value? CAP can then add this simulator as `SAP_MODE=sim` next to its `stub` and `live` modes without a rewrite. CAP's existing contract (`VerificationResult` in `../cap/packages/backend/src/services/sap/sapConnector.ts`) only checks that documents exist and will need extending for owner and net value.
+- **CAP integration contract:** design an API that answers CAP's verification question: given a student key and an activity, do the required documents exist, who owns them, and what is the net value? CAP can then add this simulator as `SAP_MODE=sim` next to its `stub` and `live` modes without a rewrite. CAP's existing contract (`VerificationResult` in `packages/backend/src/services/sap/sapConnector.ts`) only checks that documents exist and will need extending for owner and net value.
 - **Keep the stack familiar:** TypeScript, React and Vite, like CAP, unless there's a good reason to differ. Local dev should run with zero external services.
 
 ## Constraints (Kent's CSU Claude pilot license terms)
@@ -50,5 +50,6 @@ Requirements from Parand's interviews:
 
 ## Status
 
-- **2026-10-31:** repo created; architecture and data model agreed (`docs/architecture-proposal.md`, `docs/lead-in-content.md`); thin end-to-end slice built and working locally — inquiry → quotation → sales order → document flow, with per-student randomized pricing, the main quirks, and the CAP `/api/verify` contract. See `README.md` for what's built vs. simplified. Next step: have Parand try it and react.
+- **2026-10-31:** repo created; architecture and data model agreed (`docs/sim/architecture-proposal.md`, `docs/sim/lead-in-content.md`); thin end-to-end slice built and working locally — inquiry → quotation → sales order → document flow, with per-student randomized pricing, the main quirks, and the CAP `/api/verify` contract. See `docs/sim/README.md` for what's built vs. simplified. Next step: have Parand try it and react.
+- **2026-11-15:** merged into the CAP monorepo as `packages/sim-web`, `sim-engine`, `sim-shared` and `sim-server` (package names `@cap/sim-*`). See `docs/decisions/2026-11-one-repo.md` and `docs/merge-plan.md`. Run it with `npm run dev:sim`; test the engine with `npm run test:sim`.
 - Record design decisions in `docs/decisions/`, one short note per decision: what was decided, why, and alternatives rejected.

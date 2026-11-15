@@ -72,6 +72,10 @@ The application commits to the following, and they bind how Claude works in this
   - Technical design and prototype code
 - **Students can't use the license.** That includes Aliyah. Her work reaches Claude only through Kent.
 
+## SAP simulator packages
+
+`packages/sim-web`, `sim-engine`, `sim-shared` and `sim-server` are the SAP Sales Process simulator, merged in from the separate sap-sim repo (history kept) on 2026-11-15. Read `packages/sim-web/CLAUDE.md` before working in them: it holds the simulator's own design rules and requirements; working conventions are in `docs/sim/working-conventions.md`. Its other docs are in `docs/sim/`, and the decision to merge is `docs/decisions/2026-11-one-repo.md`. Run it with `npm run dev:sim`.
+
 ## Constraints
 
 - **FERPA-first.** No student PII persisted. Don't add absolute timestamps or other re-identifying fields to research or eval records without flagging it. Student text goes to the LLM, so keep identifiers out of prompts. Campus policy forbids FERPA data and PII in AI prompts.
