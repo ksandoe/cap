@@ -11,3 +11,9 @@ cap_scaffold*.zip
 cdk.out/
 .serverless/
 cap-deploy.zip
+
+# SAP simulator local dev database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
