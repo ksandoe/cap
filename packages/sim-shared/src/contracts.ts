@@ -20,6 +20,7 @@ import type {
   DocType,
   EventType,
   SalesDocument,
+  TransactionId,
 } from './index';
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,34 @@ export interface SimScope {
   learnerKey: string;
   activityId: string;
 }
+
+// ---------------------------------------------------------------------------
+// Activity definition: how a CAP module resolves to a simulator assignment
+// ---------------------------------------------------------------------------
+
+/** A document the activity requires, and the SAP transaction that creates it (VA11, VA21, VA01 today). */
+export interface SimRequiredDocument {
+  docType: DocType;
+  transactionId: TransactionId;
+}
+
+/**
+ * Everything the engine needs to run and check one simulator activity. This replaces the hard-coded
+ * `['VA11', 'VA21', 'VA01']` in CAP's `runSapVerification`.
+ */
+export interface SimActivityDefinition {
+  assignment: Assignment;
+  requiredDocuments: SimRequiredDocument[];
+}
+
+/**
+ * Implemented in the engine (task S1): looks up a definition by assignment id.
+ *
+ * The link from a CAP module to a definition is `simAssignmentId` in CAP's module config, next to the
+ * activity kind. `SimScope.activityId` stays the CAP module id (it keys the learner's state); the
+ * assignment id only says which definition that module uses. Two ids, on purpose.
+ */
+export type SimActivityRegistry = (simAssignmentId: string) => SimActivityDefinition | undefined;
 
 // ---------------------------------------------------------------------------
 // What the browser may see
@@ -110,7 +139,8 @@ export interface SimStore {
 
   /**
    * `doc` arrives already priced. The store assigns the id (unique within the scope), the creation
-   * time and the learner key, and sets `assignmentId` from the stored instance.
+   * time and the learner key, and sets `assignmentId` from the stored instance. The route that calls
+   * this must get-or-create the instance first: a student can post a document before any read.
    */
   createDocument(scope: SimScope, doc: NewSalesDocumentInput & { netValue: number }): Promise<SalesDocument>;
   /** `null` if the id is unknown in this scope. `patch` arrives already repriced. */
@@ -159,11 +189,15 @@ export interface ActivityVerification {
   items: VerificationItem[];
 }
 
-/** Implemented in the engine (task S1). Reads only from `store`, for `scope`. */
+/**
+ * Implemented in the engine (task S1). Reads only from `store`, for `scope`. Callers decide pass or
+ * fail from `passed`, never from `allPresent`: a document that exists with the wrong net value is
+ * present but not passed.
+ */
 export type VerifyActivity = (
   store: SimStore,
   scope: SimScope,
-  assignment: Assignment,
+  activity: SimActivityDefinition,
 ) => Promise<ActivityVerification>;
 
 // ---------------------------------------------------------------------------
@@ -201,7 +235,8 @@ export type SimRecipeParameters = Record<SimParameterKey, string>;
 
 /**
  * Mounted in `app.ts` behind `authMiddleware`, like `/session`. Responses use the `Public*` types.
- * Unknown ids, and ids owned by another learner, answer 404 with the same body.
+ * Unknown ids, and ids owned by another learner, answer 404 with the same body. A token with no
+ * learner key or module (admin and dev tokens) gets 403, and a module with no `simAssignmentId` gets 404.
  *
  * Register `searchByReference` before `document`, or Express will treat "search-by-reference" as an id.
  */

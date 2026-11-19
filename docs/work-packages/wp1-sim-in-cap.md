@@ -49,6 +49,7 @@ Done means all of these are true on a developer's machine with `USE_LOCAL_DB=tru
 - Events carry `relativeMs` only. The PoC's absolute `occurredAt` does not leave the store.
 - Document ids need only be unique within a learner's scope.
 - `purge(scope)` is part of `SimStore`, for the retention rule and semester-end cleanup.
+- A CAP module resolves to a simulator assignment through `simAssignmentId` in module config and the engine's `SimActivityRegistry` (found in Devin's review). `SimScope.activityId` stays the CAP module id. `requiredDocuments` (document type plus transaction) replaces the hard-coded `['VA11','VA21','VA01']`.
 - The parameter keys for recipe placeholders are listed in `SIM_PARAMETER_KEYS`. Parand can use them when she edits the recipe text.
 - Register `GET /sim/documents/search-by-reference` before `GET /sim/documents/:id`, or Express reads it as an id.
 - `frontend-student` has no `typecheck` script, so the root `npm run typecheck` does not cover it. Add one when PR 4 starts.
@@ -93,7 +94,7 @@ Student-safe messages, for example: missing: "You have not saved a quotation yet
 
 | # | Task | Files |
 |---|---|---|
-| S1 | Define `SimStore`; add async `verifyActivity(store, learnerKey, activityId)` to the engine, returning §4.4; add `toPublicInstance` and `toRecipeParameters(instance)`; unit tests, including "public instance and messages never contain the expected value". | `sim-shared/src`, `sim-engine/src` |
+| S1 | Define `SimStore`; add the activity registry (`SimActivityRegistry`: the assignment plus its required documents, with the transaction mapping) and async `verifyActivity(store, scope, activity)` to the engine, returning §4.4; add `toPublicInstance` and `toRecipeParameters(instance)`; unit tests, including "public instance and messages never contain the expected value". | `sim-shared/src`, `sim-engine/src` |
 | S2 | `SimApi` interface and provider; adapt the network and local implementations; pass nothing student-identifying from the browser in CAP mode. | `sim-web/src/api.ts`, `networkApi.ts`, `localApi.ts`, `App.tsx`, activity components |
 | S3 | Export `SimWorkspace` from `sim-web`: Easy Access menu, VA11, VA21, VA01, Document Flow in any order, no intro, background or conclusion, no instruction pane of its own. Keep the standalone app working. | `sim-web/src` |
 | S4 | **Style-scoping spike, first.** Render `SimWorkspace` inside a CAP page and look for clashes in both directions. The sim's `index.css` is 960 lines of global rules. Result: scope everything under one root class, or fall back to an iframe of the standalone app. Decide before S3 is finished. | `sim-web/src/index.css` |
@@ -103,9 +104,9 @@ Student-safe messages, for example: missing: "You have not saved a quotation yet
 | # | Task | Files |
 |---|---|---|
 | B1 | `db/simDb.ts` implementing `SimStore`: the JSON store for `USE_LOCAL_DB`, and DynamoDB (new table, with TTL). Document the table in `infra/dynamodb.md`; Kent creates it. | `db/simDb.ts`, `db/localStore.ts`, `infra/dynamodb.md` |
-| B2 | `routes/sim.ts` per §4.3, mounted in `app.ts` under `authMiddleware`. Key derived from `req.session`. | `routes/sim.ts`, `app.ts` |
-| B3 | `SAP_MODE=sim` in the connector; extend `VerificationResult` per §4.4; `runSapVerification` branches on the activity kind and no longer hard-codes the document list for sim. | `services/sap/sapConnector.ts`, `config/env.ts`, `orchestratorService.ts` |
-| B4 | Activity kind per module (`sim` or `live`, defaulting from `SAP_MODE`); in `createSession` and `createRetry` skip the pool for `sim`, and take `parameters` from the simulator instance. A retry keeps the documents (decision in §7). | `orchestratorService.ts`, `db/moduleConfigDb.ts` |
+| B2 | `routes/sim.ts` per §4.3, mounted in `app.ts` under `authMiddleware`. Key derived from `req.session`. Get-or-create the instance on first write (a student can post a document before any read). 403 when the token has no learner key or module (admin and dev tokens); 404 when the module has no `simAssignmentId`. | `routes/sim.ts`, `app.ts` |
+| B3 | `SAP_MODE=sim` in the connector; extend `VerificationResult` per §4.4; `runSapVerification` branches on the activity kind and no longer hard-codes the document list for sim. Decide pass or fail from `passed`, not `allPresent`, or a wrong net value would pass. For a failed sim check, `sapVerificationError` carries the student-safe `items`, so F2 can show them. | `services/sap/sapConnector.ts`, `config/env.ts`, `orchestratorService.ts` |
+| B4 | Activity kind per module (`sim` or `live`, defaulting from `SAP_MODE`) plus `simAssignmentId` (which simulator assignment the module uses); in `createSession` and `createRetry` skip the pool for `sim`, and take `parameters` from the simulator instance. A retry keeps the documents (decision in §7). | `orchestratorService.ts`, `db/moduleConfigDb.ts` |
 | B5 | Seed a sim version of the Sales recipe: a `guided_tool` block with `tool: 'sap_sim'` and instructions converted from `packages/sim-web/src/content/leadIn.ts` and `docs/sim/lead-in-content.md`. Parand owns the final wording. | seed data in `db/localStore.ts` |
 | B6 | Test that no `/sim/*` or `/session/*` response contains an expected net value, and that verification passes and fails correctly. CAP has no test setup, so this includes setting one up (the backend's `jest` script is broken today; use vitest like the other packages). | `packages/backend` |
 
@@ -131,7 +132,7 @@ Each pull request goes to David for review only where it touches identity or dat
 
 1. **Retention of simulator state:** **one semester (120 days), purged at semester end.** Parand wants students to revisit documents, which rules out purging at completion. David should confirm. The state includes document `createdAt` timestamps (SAP shows dates in Document Flow). They are never exported to research or evaluation records, which follows CAP's "no absolute timestamps" rule. Flag this to David.
 2. **Retry:** **keep the documents** so a student can fix what was wrong. The alternative is a clean slate.
-3. **Where the activity kind lives:** **module config, defaulting from `SAP_MODE`.**
+3. **Where the activity kind lives:** **module config, defaulting from `SAP_MODE`.** The same record holds `simAssignmentId`.
 4. **Who converts the instructions into recipe text:** I draft, **Parand edits.**
 
 ## 8. Risks
