@@ -12,13 +12,16 @@ import os   from 'os';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Recipe, CheckinResponse, RecipeDraft } from '@cap/shared';
+import { SIM_STATE_TTL_DAYS } from '../config/env';
+import type { ModuleConfig } from './moduleConfigDb';
 
 // In Lambda the deployment dir is read-only — use /tmp (per-container,
 // still ephemeral; acceptable for demo use per USE_LOCAL_DB semantics).
 const DATA_DIR  = process.env.AWS_LAMBDA_FUNCTION_NAME
   ? path.join(os.tmpdir(), 'cap-dev-data')
   : path.resolve(__dirname, '../../.dev-data');
-const DATA_FILE = path.join(DATA_DIR, 'local-db.json');
+// Overridable so tests can point at a throwaway file instead of dev data.
+const DATA_FILE = process.env.CAP_LOCAL_DB_FILE ?? path.join(DATA_DIR, 'local-db.json');
 
 type Item = Record<string, any>;
 type Table = Item[];
@@ -49,6 +52,10 @@ function table(name: string): Table {
 // ── Seeds ────────────────────────────────────────────────────────────────────
 
 const DEMO_MODULE_ID = 'demo-sales-process';
+// Simulator variant of the Sales module (work package 1). activityKind/sim
+// link live in its cap-module-config row (seeded below); the recipe carries
+// guided_tool blocks with tool: 'sap_sim' and SIM_PARAMETER_KEYS params.
+const SIM_MODULE_ID = 'sim-sales-process';
 
 function seedSapPool(): void {
   const pool = table('cap-sap-pool');
@@ -324,10 +331,247 @@ function seedAdminUsers(): void {
   );
 }
 
+// Sim variant of the Sales recipe. Instructions are the "assignment brief"
+// layer — the sim screens carry their own per-step text (transactionConfigs),
+// so these focus on the student's specific values and the business framing.
+// Drafted from packages/sim-web/src/content/leadIn.ts and
+// docs/sim/lead-in-content.md; Parand owns the final wording (§7.4).
+function seedSimRecipe(): void {
+  const recipes = table('cap-recipes');
+  if (recipes.some(r => r.moduleId === SIM_MODULE_ID)) return;
+  const now = new Date().toISOString();
+  recipes.push({
+    recipeId:          uuidv4(),
+    version:           1,
+    moduleId:          SIM_MODULE_ID,
+    moduleTitle:       'The Sales Process (Simulation)',
+    moduleDescription:
+      'A prospective customer wants pricing on two bicycle models. Students work ' +
+      'the sales document flow in the simulated SAP environment — Inquiry, ' +
+      'Quotation, and Sales Order — and learn why each document exists and how ' +
+      'data carries forward.',
+    learningOutcomes: [
+      'Describe how inquiries, quotations, and sales orders are connected within the SAP sales process.',
+      'Complete the inquiry-to-sales-order process in SAP using appropriate customer, product, pricing, and transaction information.',
+      'Interpret selected sales information, including order probability, expected order value, and pricing conditions.',
+      'Explain how SAP carries information across related documents to support an integrated business process.',
+      'Reflect on their experience using SAP and identify ways their understanding, confidence, or approach to enterprise systems developed during the activity.',
+    ],
+    keyConcepts: [
+      { term: 'Inquiry',      definition: 'A non-binding request from a customer for pricing/availability. Not a commitment to purchase.' },
+      { term: 'Quotation',    definition: 'A binding offer to the customer with defined prices, quantities, and validity dates.' },
+      { term: 'Sales Order',  definition: 'A confirmed agreement to deliver; typically references a quotation or inquiry.' },
+      { term: 'Document flow', definition: 'The linked chain of documents (inquiry → quotation → order) that carries data forward automatically.' },
+      { term: 'Master data',  definition: 'Reusable records (customer, material) that populate sales documents rather than being re-entered.' },
+      { term: 'Expected order value', definition: 'Net value × order probability — an estimate of likely revenue used for pipeline reporting.' },
+      { term: 'Condition types', definition: 'Pricing building blocks (e.g. K004 item discount, RA00 net discount) that combine to calculate the final price.' },
+    ],
+    probingRules: [
+      { trigger: 'Student describes a step without explaining its purpose',
+        followUp: 'Ask why that document exists in the process — what would be lost without it.' },
+      { trigger: 'Student names codes (IN/QT/OR, K004/RA00, VA11) without saying what they mean',
+        followUp: 'Ask what the business gets from that document or discount — meaning over memorization.' },
+      { trigger: 'Student says they "just followed the instructions" or clicked through',
+        followUp: 'Ask what would have been different if they had re-typed everything by hand — i.e., what "Create with Reference" actually did for them.' },
+      { trigger: 'Student glosses over order probability or expected order value',
+        followUp: 'Ask them to explain the calculation in their own words using their assigned probability and quantities.' },
+      { trigger: 'Student mentions an SAP message, warning, or something unexpected',
+        followUp: 'Ask what the message was telling them and how they decided what to do next.' },
+      { trigger: 'Student says data "just appeared" or carried over without reflection',
+        followUp: 'Ask which fields they entered themselves versus which arrived from the earlier document.' },
+      { trigger: 'Student mentions both discounts but not the difference between them',
+        followUp: 'Ask which discount applied to a single bike versus the whole order, and why a company would use each.' },
+    ],
+    // Placeholders resolve from the learner's simulator instance at launch
+    // (SIM_PARAMETER_KEYS in sim-shared/contracts.ts) — not the SAP pool's
+    // param table. These keys are fixed by the contract; keep them in sync.
+    parameters: [
+      { key: 'customerId',             label: 'Customer ID' },
+      { key: 'customerName',           label: 'Customer name' },
+      { key: 'poNumber',               label: 'Customer PO number (Cust. Reference)' },
+      { key: 'item1MaterialId',        label: 'First material (Deluxe) — ID' },
+      { key: 'item1Description',       label: 'First material (Deluxe) — description' },
+      { key: 'item1Quantity',          label: 'First material — quantity' },
+      { key: 'item2MaterialId',        label: 'Second material (Professional) — ID' },
+      { key: 'item2Description',       label: 'Second material (Professional) — description' },
+      { key: 'item2Quantity',          label: 'Second material — quantity' },
+      { key: 'itemDiscountMaterialId', label: 'Material receiving the K004 discount' },
+      { key: 'itemDiscountAmount',     label: 'K004 item discount ($ per unit)' },
+      { key: 'headerDiscountPercent',  label: 'RA00 header discount (%)' },
+      { key: 'orderProbability',       label: 'Order probability (%)' },
+    ],
+    steps: [
+      { stepId: 'st-intro', stepNumber: 1,
+        title: 'Introduction',
+        description: 'Read the background on the sales document flow and check your understanding.',
+        outcomeTagIndices: [0, 3],
+        understandingNote:
+          'Listen for: the three documents named in sequence and framed as one connected ' +
+          'flow rather than three isolated forms — ideally with a sense of who commits whom ' +
+          'at each hop (customer interest → seller’s offer → confirmed agreement).',
+        blocks: [
+          { blockId: 'cb-concept-1', type: 'rich_text',
+            title: 'Scenario',
+            body: '<p><strong>{customerName}</strong>, a prospective customer, wants prices on ' +
+              'two bicycle models: <em>{item1Description}</em> and <em>{item2Description}</em>. ' +
+              'You will create three linked documents to answer them, working in a simulated ' +
+              'SAP system — the transactions and screens behave like real SAP.</p><p>SAP tracks ' +
+              'the sales process as a chain: <strong>Inquiry → Quotation → Sales Order</strong>. ' +
+              'Each document references its predecessor, so customer and material data carry ' +
+              'forward without re-keying. Understanding <em>why</em> each document exists matters ' +
+              'more than memorizing transaction codes.</p><p>Your task values — the customer PO ' +
+              'number, quantities, discounts, and order probability — are highlighted in the ' +
+              'instructions. They are specific to you.</p>' },
+          { blockId: 'cb-kc-1', type: 'knowledge_check',
+            title: 'Quick self-check',
+            questions: [
+              { questionId: 'q1', type: 'multiple_choice',
+                prompt: 'Which document commits the selling company to a price?',
+                options: ['Inquiry', 'Quotation', 'Sales Order'],
+                correctAnswer: 'Quotation',
+                feedback: 'The quotation is the binding offer; the inquiry carries no commitment.' },
+              { questionId: 'q2', type: 'true_false',
+                prompt: 'An inquiry is a commitment to purchase.',
+                correctAnswer: 'false',
+                feedback: 'An inquiry is non-binding — it only signals customer interest.' },
+            ] },
+        ] },
+      { stepId: 'st-inquiry', stepNumber: 2,
+        title: 'Inquiry',
+        description: 'Create an Inquiry for your customer — a non-binding record of what they asked for.',
+        outcomeTagIndices: [1, 2],
+        understandingNote:
+          'Listen for: the inquiry as a record of customer interest that binds nobody; ' +
+          'order probability driving expected order value (can the student explain net value ' +
+          '× their assigned probability, ideally with their own numbers?); customer and ' +
+          'material master data being found and reused rather than re-keyed; and why the ' +
+          'customer PO number made their documents findable later.',
+        blocks: [
+          { blockId: 'cb-gt-inq', type: 'guided_tool',
+            title: 'Create the inquiry (VA11)',
+            tool: 'sap_sim',
+            layout: 'side_by_side',
+            isGate: true,
+            instructions: [
+              { instructionId: 'gi-1', text: 'In the SAP Easy Access menu, open the inquiry transaction: Logistics → Sales and Distribution → Sales → Inquiry → Create (VA11). Enter inquiry type <strong>IN</strong>, sales organization <strong>UE00</strong>, distribution channel <strong>WH</strong>, division <strong>BI</strong>, then continue.' },
+              { instructionId: 'gi-2', text: 'Search for your customer by name — <strong>{customerName}</strong> — and select it as the Sold-To Party. Real sales reps search customers by name every day.',
+                branches: [
+                  { branchId: 'gb-1', condition: 'Why search by name?',
+                    text: 'Master data is found, not typed. The search is how SAP connects your document to the customer record everyone else in the company already uses.' },
+                ] },
+              { instructionId: 'gi-3', text: 'Enter <strong>{poNumber}</strong> as Cust. Reference — this is the customer’s own PO number, assigned by their purchasing system, not by SAP. It is your handle for finding this request again later. Reference date and Valid From: today; Valid To: one month from today; Req. Deliv. Date: today.' },
+              { instructionId: 'gi-4', text: 'Add the two products the customer asked about — search each by description: <strong>{item1Description}</strong>, quantity <strong>{item1Quantity}</strong>, and <strong>{item2Description}</strong>, quantity <strong>{item2Quantity}</strong>. Check the net value shown.' },
+              { instructionId: 'gi-5', text: 'Set the order probability to <strong>{orderProbability}%</strong> for each item — SAP never guesses your confidence for you. Confirm the expected order value recalculates.',
+                branches: [
+                  { branchId: 'gb-2', condition: 'What is expected order value?',
+                    text: 'Net value × order probability — a 30% probability on a $21,400 inquiry shows 6,420. It estimates likely revenue, not a price the customer sees.' },
+                ] },
+              { instructionId: 'gi-6', text: 'Review and Save. Watch the status bar at the bottom of the screen — your new inquiry number appears there, not in a popup. Write it down.' },
+            ] },
+          { blockId: 'cb-cl-inq', type: 'checklist',
+            title: 'Before you continue',
+            items: [
+              { itemId: 'i1', label: 'I saved the Inquiry and noted its document number.' },
+            ] },
+        ] },
+      { stepId: 'st-quotation', stepNumber: 3,
+        title: 'Quotation',
+        description: 'Create a Quotation that references your inquiry — the binding offer — and apply your authorized discounts.',
+        outcomeTagIndices: [1, 2],
+        understandingNote:
+          'Listen for: the quotation as the seller’s binding offer; "Create with Reference" ' +
+          'carrying sold-to, materials, and quantities forward instead of re-keying; the ' +
+          'difference between an item-level condition (K004 — one bike) and an order-level ' +
+          'condition (RA00 — the whole order); and why a business would want both knobs.',
+        blocks: [
+          { blockId: 'cb-gt-quot', type: 'guided_tool',
+            title: 'Create the quotation (VA21)',
+            tool: 'sap_sim',
+            layout: 'side_by_side',
+            isGate: true,
+            instructions: [
+              { instructionId: 'gi-1', text: 'Open Create Quotation (VA21), quotation type <strong>QT</strong>, then click <strong>Create with Reference</strong> — do not type the data into a blank form.',
+                branches: [
+                  { branchId: 'gb-1', condition: 'Why "Create with Reference"?',
+                    text: 'Referencing is what links your documents in the flow — the customer, materials, and quantities copy forward from your inquiry instead of being re-keyed.' },
+                ] },
+              { instructionId: 'gi-2', text: 'On the Inquiry tab, search by your Cust. Reference <strong>{poNumber}</strong>, select the inquiry you just created, and click <strong>Copy</strong>.' },
+              { instructionId: 'gi-3', text: 'Enter <strong>{poNumber}</strong> again for Cust. Reference, today for the reference date, and one month from today for Valid To and Req. Deliv. Date. Press Enter and acknowledge the warning and info messages — both are expected.' },
+              { instructionId: 'gi-4', text: 'Your sales manager authorized a per-unit discount on one product: open the item conditions for material <strong>{itemDiscountMaterialId}</strong> and add condition type <strong>K004</strong> with amount <strong>{itemDiscountAmount}</strong>.' },
+              { instructionId: 'gi-5', text: 'For the order-level discount: open the header conditions, add condition type <strong>RA00</strong> with amount <strong>{headerDiscountPercent}</strong>, press Enter, then click the activate icon — the discount does nothing until you activate it.',
+                branches: [
+                  { branchId: 'gb-2', condition: 'Discount not showing in the price?',
+                    text: 'The header condition only takes effect after you click the activate icon — an easy step to miss.' },
+                ] },
+              { instructionId: 'gi-6', text: 'Review and Save. The discounted price you land on here is the price that carries forward into the sales order. Note the quotation number in the status bar.' },
+            ] },
+          { blockId: 'cb-cl-quot', type: 'checklist',
+            title: 'Before you continue',
+            items: [
+              { itemId: 'i1', label: 'I saved the Quotation and noted its document number.' },
+            ] },
+        ] },
+      { stepId: 'st-order', stepNumber: 4,
+        title: 'Sales Order',
+        description: 'The customer accepted your quotation — create the Sales Order by reference and confirm the document flow links all three documents.',
+        outcomeTagIndices: [1, 3],
+        understandingNote:
+          'Listen for: the order as the confirmed agreement that completes the chain; ' +
+          'ability to trace the document flow backward (order ← quotation ← inquiry) and ' +
+          'name what traveled in each hop; awareness of what they still had to enter ' +
+          'versus what arrived automatically.',
+        blocks: [
+          { blockId: 'cb-gt-ord', type: 'guided_tool',
+            title: 'Create the sales order (VA01)',
+            tool: 'sap_sim',
+            layout: 'side_by_side',
+            isGate: true,
+            instructions: [
+              { instructionId: 'gi-1', text: 'Open Create Sales Order (VA01), order type <strong>OR</strong>, then click <strong>Create with Reference</strong> — same as the quotation.' },
+              { instructionId: 'gi-2', text: 'Search by Cust. Reference <strong>{poNumber}</strong>, select your quotation, and click <strong>Copy</strong>. Almost everything is pre-filled, pricing included — you are confirming, not re-entering.' },
+              { instructionId: 'gi-3', text: 'Enter <strong>{poNumber}</strong> for Cust. Reference if asked, review the order, and Save. Note the sales order number in the confirmation.' },
+              { instructionId: 'gi-4', text: 'Open the Document Flow view and confirm your Inquiry, Quotation, and Sales Order are linked — one customer request, three linked documents.' },
+            ] },
+          { blockId: 'cb-cl-ord', type: 'checklist',
+            title: 'Before you continue',
+            items: [
+              { itemId: 'i1', label: 'I saved the Sales Order and confirmed the document flow links all three documents.' },
+            ] },
+        ] },
+    ],
+    vagueAnswerTriggers: [
+      'Student describes a step without explaining its purpose.',
+      'Student uses vocabulary without demonstrating what it means.',
+      'Student repeats instruction text ("I entered the values") instead of describing their own experience.',
+      '"It worked" or "it just did it" without saying what actually happened.',
+      'Student says data "copied over" without identifying which document supplied it.',
+      'Student cites a document number or code as if it demonstrates understanding.',
+    ],
+    toneGuidance:
+      'Most students have no prior ERP experience. Be especially patient and scaffolding ' +
+      'early in the conversation; affirm effort before probing deeper.',
+    isActive:  true,
+    createdAt: now,
+    updatedAt: now,
+  } as Recipe);
+}
+
+// The sim module's activity link: kind 'sim' + which simulator assignment.
+function seedSimModuleConfig(): void {
+  const t = table('cap-module-config');
+  if (t.some(c => c.moduleId === SIM_MODULE_ID)) return;
+  t.push({
+    moduleId: SIM_MODULE_ID, overallMin: 60, dimensionFloor: 40,
+    activityKind: 'sim', simAssignmentId: 'pilot-sales-process',
+  });
+}
+
 export function seedLocalStore(): void {
   seedSapPool();
   seedParams();
   seedRecipe();
+  seedSimRecipe();
+  seedSimModuleConfig();
   seedAdminUsers();
   save();
 }
@@ -419,14 +663,16 @@ export const localRecipeDb = {
   },
 };
 
-/** Demo seed data (recipe + SAP pool + params) — used by scripts/seed-demo.ts
- *  to push the same content into DynamoDB when running against live tables. */
+/** Demo seed data (recipe + SAP pool + params + module config) — used by
+ *  scripts/seed-demo.ts to push the same content into DynamoDB when running
+ *  against live tables. */
 export function demoSeedData() {
   seedLocalStore();
   return {
-    recipes: [...table('cap-recipes')],
-    sapPool: [...table('cap-sap-pool')],
-    params:  [...table('cap-params')],
+    recipes:       [...table('cap-recipes')],
+    sapPool:       [...table('cap-sap-pool')],
+    params:        [...table('cap-params')],
+    moduleConfigs: [...table('cap-module-config')],
   };
 }
 
@@ -457,9 +703,9 @@ export const localSapPool = {
 // ── moduleConfigDb ──────────────────────────────────────────────────────────
 
 export const localModuleConfigDb = {
-  async getConfig(moduleId: string) {
+  async getConfig(moduleId: string): Promise<ModuleConfig> {
     const row = table('cap-module-config').find(c => c.moduleId === moduleId);
-    return { moduleId, overallMin: 60, dimensionFloor: 40, ...(row ?? {}) };
+    return { moduleId, overallMin: 60, dimensionFloor: 40, ...(row ?? {}) } as ModuleConfig;
   },
   async saveConfig(cfg: Record<string, any>) {
     const t = table('cap-module-config');
@@ -526,6 +772,43 @@ export const localParamDb = {
     const row = table('cap-params')
       .find(p => p.moduleId === moduleId && p.sapUsername === sapUsername);
     return { ...(row?.values ?? {}) };
+  },
+};
+
+// ── simDb ────────────────────────────────────────────────────────────────────
+// Local adapter behind db/simDb.ts's SimItemTable seam. Simulator state is
+// {pk: learnerKey, sk: '<activityId>#<entity>'} items — same shape as the
+// cap-sim-state DynamoDB table (see simDb.ts header).
+
+export const localSimDb = {
+  async get(pk: string, sk: string) {
+    return table('cap-sim-state').find(i => i.pk === pk && i.sk === sk);
+  },
+  async query(pk: string, skPrefix?: string) {
+    return table('cap-sim-state').filter(i =>
+      i.pk === pk && (!skPrefix || String(i.sk).startsWith(skPrefix)));
+  },
+  async put(item: Item) {
+    const t = table('cap-sim-state');
+    const i = t.findIndex(x => x.pk === item.pk && x.sk === item.sk);
+    if (i >= 0) t[i] = item; else t.push(item);
+    save();
+  },
+  async nextSeq(pk: string, sk: string) {
+    const t = table('cap-sim-state');
+    let ctr = t.find(x => x.pk === pk && x.sk === sk);
+    if (!ctr) { ctr = { pk, sk, n: 0 }; t.push(ctr); }
+    ctr.n += 1;
+    ctr.ttl = Math.floor(Date.now() / 1000) + SIM_STATE_TTL_DAYS * 24 * 3600;
+    save();
+    return ctr.n;
+  },
+  async deleteMany(keys: { pk: string; sk: string }[]) {
+    const t = table('cap-sim-state');
+    const drop = new Set(keys.map(k => `${k.pk}${k.sk}`));
+    for (let i = t.length - 1; i >= 0; i--)
+      if (drop.has(`${t[i].pk}${t[i].sk}`)) t.splice(i, 1);
+    save();
   },
 };
 

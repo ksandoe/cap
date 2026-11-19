@@ -10,7 +10,8 @@
  *
  *   USE_LOCAL_DB=true   persistence: JSON-file store instead of DynamoDB
  *   LLM_MODE=mock|openai           checkout conversation + evaluation
- *   SAP_MODE=stub|live             SAP OData document verification
+ *   SAP_MODE=stub|live|sim         SAP verification (stub, OData, or
+ *                                  embedded simulator)
  *   CANVAS_MODE=stub|live          AGS grade posting (LTI launch is always
  *                                  real code; /dev/launch simulates it in dev)
  *   CREDLY_MODE=stub|live          badge issuance
@@ -37,7 +38,11 @@ function mode(envVar: string, fallback: Mode): Mode {
 // Integration switches. In local dev everything defaults to stub so the
 // app runs with zero external credentials; each flips to 'live' independently.
 const devFallback: Mode = USE_LOCAL_DB ? 'stub' : 'live';
-export const SAP_MODE    = mode('SAP_MODE',    devFallback);
+// 'sim' is a third SAP_MODE: activities run against the embedded simulator
+// (packages/sim-*) instead of stub or live SAP verification. Per-module
+// override comes from moduleConfig.activityKind; this is the default.
+export const SAP_MODE: Mode | 'sim' =
+  (process.env.SAP_MODE ?? '').toLowerCase() === 'sim' ? 'sim' : mode('SAP_MODE', devFallback);
 export const CANVAS_MODE = mode('CANVAS_MODE', devFallback);
 export const CREDLY_MODE = mode('CREDLY_MODE', devFallback);
 
@@ -49,3 +54,8 @@ export const LLM_MODE: 'mock' | 'openai' =
   : 'mock';
 
 export const MOCK_AI = LLM_MODE === 'mock';
+
+// Simulator state retention — provisional one semester (~120 days, §7.1 of
+// docs/work-packages/wp1-sim-in-cap.md; pending David's confirmation).
+// Simulator documents must outlive the session so students can revisit them.
+export const SIM_STATE_TTL_DAYS = parseInt(process.env.SIM_STATE_TTL_DAYS ?? '120', 10);

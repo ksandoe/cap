@@ -22,6 +22,7 @@ const RECIPES  = process.env.DYNAMODB_TABLE_RECIPES  ?? 'cap-recipes';
 const SAP_POOL = process.env.DYNAMODB_TABLE_SAP_POOL ?? 'cap-sap-pool';
 const PARAMS   = process.env.DYNAMODB_TABLE_PARAMS   ?? 'cap-params';
 const ASSETS   = process.env.DYNAMODB_TABLE_ASSETS   ?? 'cap-assets';
+const MODULE_CONFIG = process.env.DYNAMODB_TABLE_MODULE_CONFIG ?? 'cap-module-config';
 
 // Demo screenshots extracted from the sales-process assignment PDF. The
 // filename (minus extension) is the assetId, so the seed recipe can
@@ -33,7 +34,7 @@ const IMAGE_TYPES: Record<string, string> = {
 };
 
 async function main() {
-  const { recipes, sapPool, params } = demoSeedData();
+  const { recipes, sapPool, params, moduleConfigs } = demoSeedData();
 
   for (const r of recipes) {
     await ddb.send(new PutCommand({ TableName: RECIPES, Item: r }));
@@ -46,6 +47,10 @@ async function main() {
   for (const p of params) {
     await ddb.send(new PutCommand({ TableName: PARAMS, Item: p }));
     console.log(`params  ${p.sapUsername} → ${JSON.stringify(p.values)}`);
+  }
+  for (const c of moduleConfigs) {
+    await ddb.send(new PutCommand({ TableName: MODULE_CONFIG, Item: c }));
+    console.log(`config  ${c.moduleId}`);
   }
   if (fs.existsSync(ASSET_DIR)) {
     for (const file of fs.readdirSync(ASSET_DIR)) {

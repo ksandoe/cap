@@ -35,6 +35,9 @@ import { paramDb }            from '../../db/paramDb';
 import { moduleConfigDb, DEFAULT_THRESHOLDS } from '../../db/moduleConfigDb';
 import { evalDb }             from '../../db/evalDb';
 import { logger }             from '../eventLogger';
+import {
+  getOrCreateSimInstance, resolveActivity, toRecipeParameters, verifySimActivity,
+} from '../sim/simService';
 import { EVENTS, PHASES }     from '@cap/shared';
 
 const SESSION_TTL_HOURS   = parseInt(process.env.SESSION_TTL_HOURS ?? '8', 10);
@@ -114,13 +117,27 @@ export async function createSession(ltiContext: {
   // Reclaim accounts held by dead sessions before taking a fresh one
   await sweepStaleSessions();
 
-  // Assign a SAP account from the pool + bind its parameter row
+  // Activity kind decides where this student's parameters come from:
+  // sim activities take them from the learner's scoped simulator instance
+  // (no pool account); live/stub activities take a pooled SAP account's
+  // param row (§4, B4 — keep this branch small; LTI work shares the file).
   const sessionId  = uuidv4();
   const tempUserId = generateTempUserId();
-  const sapUsername = await acquireSapAccount(sessionId);
-  const parameters  = await paramDb.getParams(ltiContext.moduleId, sapUsername);
-  if (!Object.keys(parameters).length)
-    logger.warn(EVENTS.PARAMS_MISSING, { moduleId: ltiContext.moduleId, sapUsername });
+  const { kind: activityKind, definition } = await resolveActivity(ltiContext.moduleId);
+
+  let sapUsername: string | undefined;
+  let parameters:  Record<string, string>;
+  if (activityKind === 'sim') {
+    if (!definition) throw new Error('SIM_NOT_CONFIGURED');
+    const instance = await getOrCreateSimInstance(
+      { learnerKey: ltiContext.canvasUuid, activityId: ltiContext.moduleId }, definition);
+    parameters = toRecipeParameters(instance);
+  } else {
+    sapUsername = await acquireSapAccount(sessionId);
+    parameters  = await paramDb.getParams(ltiContext.moduleId, sapUsername);
+    if (!Object.keys(parameters).length)
+      logger.warn(EVENTS.PARAMS_MISSING, { moduleId: ltiContext.moduleId, sapUsername });
+  }
   const started     = now();
 
   // Resolve the active recipe for this module (module config lookup TODO: cap-modules table)
@@ -146,7 +163,9 @@ export async function createSession(ltiContext: {
     ltiResourceLinkId:  ltiContext.ltiResourceLinkId,
     agsEndpoint:        ltiContext.agsEndpoint,
     lisResultSourcedId: ltiContext.lisResultSourcedId,
-    sapUsername,          // server-side only — never sent to browser
+    // server-side only — never sent to browser; sim activities take no pool account
+    ...(sapUsername ? { sapUsername } : {}),
+    activityKind,         // 'sim' runs the embedded simulator; 'live' the SAP pool
     parameters,           // this student's assigned values ({key} placeholders)
     startedAt: started,
     lastActivityAt: started,
@@ -155,7 +174,7 @@ export async function createSession(ltiContext: {
 
   await sessionDb.putSession(session);
   logger.info(EVENTS.SESSION_CREATED, { sessionId, moduleId: ltiContext.moduleId });
-  logger.info(EVENTS.SAP_USER_ASSIGNED, { sessionId, sapUsername });
+  if (sapUsername) logger.info(EVENTS.SAP_USER_ASSIGNED, { sessionId, sapUsername });
 
   const token = await issueSessionToken({
     sessionId, tempUserId, moduleId: ltiContext.moduleId,
@@ -229,18 +248,51 @@ export async function initiateSapVerification(req: Request, res: Response): Prom
   logger.info(EVENTS.SAP_VERIFICATION_START, { sessionId: req.params.id });
 
   // Fire-and-forget — client polls verify-status
-  runSapVerification(req.params.id, session.sapUsername!, session.moduleId).catch(console.error);
+  runSapVerification(session).catch(console.error);
 
   res.json({ ok: true, status: 'SAP_PENDING' });
 }
 
-async function runSapVerification(sessionId: string, sapUsername: string, moduleId: string) {
+async function runSapVerification(session: any) {
+  const sessionId = session.sessionId;
   try {
+    // Activity kind decides the check: sim activities verify the learner's
+    // scoped sim documents; live/stub activities query SAP for the pooled
+    // account's documents. Either way pass/fail comes from `passed` —
+    // allPresent alone would let a wrong net value slip through.
+    const { kind, definition } = await resolveActivity(session.moduleId);
+
+    if (kind === 'sim') {
+      if (!definition) throw new Error('SIM_NOT_CONFIGURED');
+      const result = await verifySimActivity(
+        { learnerKey: session.canvasUuid, activityId: session.moduleId }, definition);
+
+      if (result.passed) {
+        await sessionDb.updateSession(sessionId, {
+          state: 'SAP_VERIFIED', phaseReached: PHASES.CHECKOUT,
+          sapVerifiedAt: now(), sapDocRefs: result.foundDocs,
+          lastActivityAt: now(),
+        });
+        logger.info(EVENTS.SAP_VERIFICATION_PASS, { sessionId, docs: result.foundDocs, via: 'sim' });
+      } else {
+        // `items` are student-safe messages for the retry UI (F2); they name
+        // what to recheck, never the expected value.
+        await sessionDb.updateSession(sessionId, {
+          state: 'LEARNING',
+          sapVerificationError: { items: result.items, missingTypes: result.missingTypes },
+          lastActivityAt: now(),
+        });
+        logger.warn(EVENTS.SAP_VERIFICATION_FAIL, { sessionId, missingTypes: result.missingTypes, via: 'sim' });
+      }
+      return;
+    }
+
     // TODO: load requiredDocTypes from module config
     const requiredDocTypes = ['VA11', 'VA21', 'VA01'];
-    const result = await verifySapDocuments(sapUsername, requiredDocTypes);
+    const result = await verifySapDocuments(session.sapUsername, requiredDocTypes);
+    const passed = result.passed ?? result.allPresent;
 
-    if (result.allPresent) {
+    if (passed) {
       await sessionDb.updateSession(sessionId, {
         state: 'SAP_VERIFIED', phaseReached: PHASES.CHECKOUT,
         sapVerifiedAt: now(), sapDocRefs: result.foundDocs,
@@ -248,7 +300,7 @@ async function runSapVerification(sessionId: string, sapUsername: string, module
       });
       logger.info(EVENTS.SAP_VERIFICATION_PASS, { sessionId, docs: result.foundDocs });
     } else {
-      await sessionDb.updateSession(sessionId, { state: 'LEARNING', sapVerificationError: { missingTypes: result.missingTypes }, lastActivityAt: now() });
+      await sessionDb.updateSession(sessionId, { state: 'LEARNING', sapVerificationError: { missingTypes: result.missingTypes, items: result.items }, lastActivityAt: now() });
       logger.warn(EVENTS.SAP_VERIFICATION_FAIL, { sessionId, missingTypes: result.missingTypes });
     }
   } catch (err) {
@@ -379,8 +431,24 @@ export async function createRetry(req: Request, res: Response): Promise<void> {
 
   // TODO: enforce retry limit from module config
   const newSessionId = uuidv4();
-  const sapUsername  = await acquireSapAccount(newSessionId);
-  const parameters   = await paramDb.getParams(moduleId, sapUsername);
+  const learnerKey   = parent?.canvasUuid ?? claims.canvasUuid;
+
+  // Sim activities take no pool account; parameters come from the learner's
+  // sim instance, which persists under the learner+activity scope — so a
+  // retry KEEPS the student's documents (§7.2) and re-resolves the same
+  // per-learner assignment.
+  const { kind: activityKind, definition } = await resolveActivity(moduleId);
+  let sapUsername: string | undefined;
+  let parameters:  Record<string, string>;
+  if (activityKind === 'sim') {
+    if (!definition || !learnerKey) throw new Error('SIM_NOT_CONFIGURED');
+    const instance = await getOrCreateSimInstance(
+      { learnerKey, activityId: moduleId }, definition);
+    parameters = toRecipeParameters(instance);
+  } else {
+    sapUsername = await acquireSapAccount(newSessionId);
+    parameters  = await paramDb.getParams(moduleId, sapUsername);
+  }
 
   const retrySession = {
     ...(parent ?? {}),
@@ -393,7 +461,8 @@ export async function createRetry(req: Request, res: Response): Promise<void> {
     phaseReached:      toPhase,
     attemptNumber:     (parent?.attemptNumber ?? req.body.attemptNumber ?? 1) + 1,
     priorSessionId:    req.params.id,
-    sapUsername,
+    ...(sapUsername ? { sapUsername } : {}),
+    activityKind,
     parameters,
     completedBlockIds: toPhase === PHASES.CHECKOUT ? (parent?.completedBlockIds ?? []) : [],
     startedAt:         now(),
