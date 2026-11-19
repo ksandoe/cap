@@ -134,6 +134,8 @@ Each pull request goes to David for review only where it touches identity or dat
 2. **Retry:** **keep the documents** so a student can fix what was wrong. The alternative is a clean slate.
 3. **Where the activity kind lives:** **module config, defaulting from `SAP_MODE`.** The same record holds `simAssignmentId`.
 4. **Who converts the instructions into recipe text:** I draft, **Parand edits.**
+5. **Does verification require Create with Reference?** **Yes for the pilot:** the quotation must have been created from the inquiry, and the order from the quotation, so a net value reached by typing everything in by hand fails with a hint to use Create with Reference. Added in S1 (2026-11-19, `mustReference` in `packages/sim-engine/src/activities.ts`); delete the two `mustReference` entries to stop checking it. Parand should confirm.
+6. **Several documents of one type:** a type passes if **any** complete document of that type is correct, so saving a corrected document fixes an earlier mistake (S1).
 
 ## 8. Risks
 

@@ -7,3 +7,8 @@ export * from './seed/customers';
 export * from './seed/materials';
 export * from './seed/conditionTypes';
 export * from './seed/assignment';
+export * from './activities';
+export * from './documents';
+export * from './instance';
+export * from './verify';
+export * from './memoryStore';
