@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@ui5/webcomponents-react';
 
 // Initial screens and Overview screens both show just a single "Menu" dropdown plus a transaction-
@@ -83,6 +83,19 @@ export default function SapChrome({
   onBack?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+
+  // A click anywhere else closes the menu. This listens on the document, not on a full-screen layer,
+  // so it works inside a page that is bigger than the simulator.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: PointerEvent) => {
+      if (!triggerRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [menuOpen]);
+
   return (
     <div className="sap-chrome">
       <div className="sap-chrome-bar">
@@ -95,11 +108,10 @@ export default function SapChrome({
         <span className="sap-chrome-exit">Exit</span>
       </div>
       <div className="sap-chrome-minimal-row">
-        <span className={menuItems ? 'sap-menu-trigger' : undefined} onClick={() => menuItems && setMenuOpen((o) => !o)}>
+        <span ref={triggerRef} className={menuItems ? 'sap-menu-trigger' : undefined} onClick={() => menuItems && setMenuOpen((o) => !o)}>
           Menu ⌄
           {menuItems && menuOpen && (
             <>
-              <div className="sap-menu-backdrop" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
               <MenuList items={menuItems} onPick={() => setMenuOpen(false)} />
             </>
           )}

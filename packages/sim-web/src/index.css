@@ -23,11 +23,20 @@ body {
   font-size: 13px;
 }
 
+/* The simulator is laid out against its container, never the browser window: it is embedded in
+   CAP's page as well as running standalone. .sim-root is that container. */
+.sim-root {
+  position: relative;
+}
+/* The standalone app is the whole page, so it fills the window. Embedded, the host decides the size. */
+.sim-root--page {
+  min-height: 100vh;
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  padding-bottom: 40px; /* leave room for the fixed status bar */
+  min-height: inherit;
 }
 
 .progress-bar {
@@ -78,10 +87,10 @@ body {
 }
 
 .status-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
+  /* Sticks to the bottom of the simulator's own container (the bar belongs to the SAP screen). */
+  position: sticky;
   bottom: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -822,11 +831,6 @@ body {
   position: relative;
   cursor: pointer;
 }
-.sap-menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-}
 .sap-menu-list {
   position: absolute;
   top: 100%;
@@ -893,7 +897,7 @@ body {
    already scrolled to the tab bar, so the Cust. Reference fields above it are out of sight. */
 .order-scroll {
   position: relative;
-  max-height: min(560px, calc(100vh - 300px));
+  max-height: 560px;
   min-height: 360px;
   overflow-y: auto;
 }
@@ -957,4 +961,35 @@ input.sap-field-error {
 }
 .order-body .field-row-inline span {
   white-space: nowrap;
+}
+
+
+/* --- Shield: CAP's own global element rules (h2, h3, button ...) must not restyle the simulator. ---
+   Higher specificity than a bare element selector, and it reverts only what CAP is known to set.
+   When CAP adds a bare element rule, add the properties it sets here. */
+.sim-root h1,
+.sim-root h2,
+.sim-root h3,
+.sim-root h4 {
+  color: revert;
+  margin: revert;
+  font-size: revert;
+}
+.sim-root button {
+  font: revert;
+  cursor: revert;
+}
+
+/* --- Workspace: the embedded simulator (SimWorkspace) --- */
+.sim-root.sim-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.sim-workspace-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
 }

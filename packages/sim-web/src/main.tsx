@@ -8,10 +8,14 @@ import '@ui5/webcomponents-icons/dist/AllIcons.js';
 import App from './App';
 import './index.css';
 
+// The standalone app is the whole page. `.sim-root` is the same wrapper the embedded workspace uses,
+// so the stylesheet behaves identically in both; `.sim-root--page` makes it fill the window.
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <div className="sim-root sim-root--page">
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </div>
   </React.StrictMode>,
 );
