@@ -142,21 +142,25 @@ export interface SalesDocument {
 // Event log (§6)
 // ---------------------------------------------------------------------------
 
-export type EventType =
-  | 'assignment_started'
-  | 'step_viewed'
-  | 'field_error_shown'
-  | 'warning_shown'
-  | 'warning_acknowledged'
-  | 'document_saved'
-  | 'document_save_blocked'
-  | 'document_resumed'
-  | 'search_dialog_opened'
-  | 'search_dialog_selected'
-  | 'create_with_reference_used'
-  | 'document_flow_viewed'
-  | 'block_entered'
-  | 'menu_navigated';
+/** Every event type the simulator logs. A runtime list so servers can validate against it. */
+export const SIM_EVENT_TYPES = [
+  'assignment_started',
+  'step_viewed',
+  'field_error_shown',
+  'warning_shown',
+  'warning_acknowledged',
+  'document_saved',
+  'document_save_blocked',
+  'document_resumed',
+  'search_dialog_opened',
+  'search_dialog_selected',
+  'create_with_reference_used',
+  'document_flow_viewed',
+  'block_entered',
+  'menu_navigated',
+] as const;
+
+export type EventType = (typeof SIM_EVENT_TYPES)[number];
 
 export interface AppEvent {
   id: string;

@@ -46,6 +46,11 @@ export interface SimScope {
 export interface SimRequiredDocument {
   docType: DocType;
   transactionId: TransactionId;
+  /**
+   * The earlier document this one must have been created with reference to (Create with Reference).
+   * Verification fails the item if the link is missing. Leave it out to stop checking the link.
+   */
+  mustReference?: DocType;
 }
 
 /**
@@ -128,6 +133,7 @@ export interface NewSimEvent {
 export interface SimStore {
   /** The full instance, including server-only fields. `null` if none has been stored yet. */
   getInstance(scope: SimScope): Promise<AssignmentInstance | null>;
+  /** Does not overwrite: if an instance is already stored for the scope, the first one wins. Callers re-read with `getInstance`. */
   putInstance(scope: SimScope, instance: AssignmentInstance): Promise<void>;
 
   listDocuments(scope: SimScope, filter?: { docType?: DocType }): Promise<SalesDocument[]>;

@@ -29,6 +29,7 @@ import type {
   NewSimEvent, SalesDocument, SalesDocumentItem, SalesDocumentPatch,
   SimActivityDefinition, SimScope,
 } from '@cap/sim-shared';
+import { SIM_EVENT_TYPES } from '@cap/sim-shared';
 import { MATERIALS } from '@cap/sim-engine';
 import { simStore } from '../db/simDb';
 import {
@@ -42,13 +43,7 @@ const DOC_TYPES: DocType[]       = ['inquiry', 'quotation', 'order'];
 const DOC_ORDER                  = new Map(DOC_TYPES.map((t, i) => [t, i]));
 const CONDITION_CODES: ConditionCode[] = ['K004', 'RA00'];
 const MATERIAL_IDS               = new Set(MATERIALS.map(m => m.id));
-const EVENT_TYPES = new Set<EventType>([
-  'assignment_started', 'step_viewed', 'field_error_shown', 'warning_shown',
-  'warning_acknowledged', 'document_saved', 'document_save_blocked',
-  'document_resumed', 'search_dialog_opened', 'search_dialog_selected',
-  'create_with_reference_used', 'document_flow_viewed', 'block_entered',
-  'menu_navigated',
-]);
+const EVENT_TYPES = new Set<EventType>(SIM_EVENT_TYPES);
 const MAX_ITEMS              = 20;
 const MAX_CONDITIONS         = 10;
 const MAX_EVENT_PAYLOAD_BYTES = 2048;
