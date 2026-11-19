@@ -24,7 +24,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:sim": "concurrently \"npm run dev -w packages/sim-server\" \"npm run dev -w packages/sim-web\"",
     "build:sim": "npm run build -w packages/sim-shared && npm run build -w packages/sim-engine && npm run build -w packages/sim-web",
-    "test:sim": "npm run test -w packages/sim-engine"
+    "test:sim": "npm run test -w packages/sim-engine && npm run test -w packages/sim-web"
   },
   "devDependencies": {
     "concurrently": "^8.0.0"

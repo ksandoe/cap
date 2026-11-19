@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import type { SalesDocument } from '@cap/sim-shared';
-import { getDocumentFlow } from '../api';
+import type { PublicSalesDocument } from '@cap/sim-shared';
+import { useSimApi } from '../simApi';
 import { CUSTOMERS, getMaterial } from '@cap/sim-engine';
 
 export default function DocumentFlowView({ orderId }: { orderId: string }) {
-  const [chain, setChain] = useState<SalesDocument[] | null>(null);
+  const api = useSimApi();
+  const [chain, setChain] = useState<PublicSalesDocument[] | null>(null);
 
   useEffect(() => {
-    getDocumentFlow(orderId).then(setChain);
-  }, [orderId]);
+    api.getDocumentFlow(orderId).then(setChain);
+  }, [api, orderId]);
 
   if (!chain) return <p>Loading document flow…</p>;
 

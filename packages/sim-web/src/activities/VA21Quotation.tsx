@@ -1,7 +1,7 @@
 import FooterActions from '../components/FooterActions';
 import { useState } from 'react';
 import { Button, Dialog, Icon, MessageStrip, Title } from '@ui5/webcomponents-react';
-import type { AppliedCondition, AssignmentInstance, SalesDocument, SalesDocumentItem } from '@cap/sim-shared';
+import type { AppliedCondition, PublicAssignmentInstance, PublicSalesDocument, SalesDocumentItem } from '@cap/sim-shared';
 import { VA21_CONFIG, priceDocument, getMaterial, getConditionType, getCustomer } from '@cap/sim-engine';
 import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
@@ -14,7 +14,7 @@ import EasyAccessMenu from '../components/EasyAccessMenu';
 import InitialScreenFields from '../components/InitialScreenFields';
 import DocumentTabStrip from '../components/DocumentTabStrip';
 import CreateWithReferenceDialog from '../components/CreateWithReferenceDialog';
-import { createDocument, listDocuments, logEvent, updateDocument } from '../api';
+import { useSimApi } from '../simApi';
 import { todayIso } from '../dateUtils';
 import { addressLine, formatCurrency } from '../formatUtils';
 import type { StatusMessage } from '../components/StatusBar';
@@ -29,26 +29,25 @@ const SAVE_WARNINGS = VA21_CONFIG.steps.find((s) => s.id === 'reference')?.warni
 
 export default function VA21Quotation({
   instance,
-  studentKey,
   onStatus,
   onDocumentSaved,
   onSaved,
 }: {
-  instance: AssignmentInstance;
-  studentKey: string;
+  instance: PublicAssignmentInstance;
   /** Pushes a message into the shell's status bar (e.g. "Select one or more items"). */
   onStatus: (message: StatusMessage | null) => void;
   /** Fired immediately on save, while still showing the in-screen confirmation — drives the status bar. */
-  onDocumentSaved: (doc: SalesDocument) => void;
-  onSaved: (doc: SalesDocument) => void;
+  onDocumentSaved: (doc: PublicSalesDocument) => void;
+  onSaved: (doc: PublicSalesDocument) => void;
 }) {
+  const api = useSimApi();
   const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>('menu');
   const [continueNotice, setContinueNotice] = useState(false);
   const [initialValues, setInitialValues] = useState<Record<string, string>>({});
   const [initialError, setInitialError] = useState<string | null>(null);
   const [createRefOpen, setCreateRefOpen] = useState(false);
-  const [inquiryDocs, setInquiryDocs] = useState<SalesDocument[]>([]);
-  const [inquiry, setInquiry] = useState<SalesDocument | null>(null);
+  const [inquiryDocs, setInquiryDocs] = useState<PublicSalesDocument[]>([]);
+  const [inquiry, setInquiry] = useState<PublicSalesDocument | null>(null);
 
   // Real SAP copies the dates and items from the inquiry but not Cust. Reference, Cust. Ref. Date
   // or Valid To — the student fills those in (Kent's 2026-11-02 screenshot of the Overview).
@@ -62,8 +61,8 @@ export default function VA21Quotation({
   // Real SAP lets you save an incomplete document and come back to finish it (Kent's 2026-11-02
   // screenshot of "Save Incomplete Document"); draftDoc is that half-saved document.
   const [incompleteOpen, setIncompleteOpen] = useState(false);
-  const [draftDoc, setDraftDoc] = useState<SalesDocument | null>(null);
-  const [savedIncomplete, setSavedIncomplete] = useState<SalesDocument | null>(null);
+  const [draftDoc, setDraftDoc] = useState<PublicSalesDocument | null>(null);
+  const [savedIncomplete, setSavedIncomplete] = useState<PublicSalesDocument | null>(null);
 
   const [items, setItems] = useState<SalesDocumentItem[]>([]);
   const [headerConditions, setHeaderConditions] = useState<AppliedCondition[]>([]);
@@ -75,7 +74,7 @@ export default function VA21Quotation({
   const [itemDetailInitialTab, setItemDetailInitialTab] = useState<'Sales A' | 'Conditions'>('Sales A');
   const [headerDialogOpen, setHeaderDialogOpen] = useState(false);
 
-  const [saved, setSaved] = useState<SalesDocument | null>(null);
+  const [saved, setSaved] = useState<PublicSalesDocument | null>(null);
 
   const selectedItem = items.find((i) => i.lineNumber === selectedLine) ?? null;
 
@@ -94,9 +93,9 @@ export default function VA21Quotation({
   async function handleCreateWithReference() {
     if (!initialEntriesValid()) return;
     setContinueNotice(false);
-    const docs = await listDocuments(studentKey, 'inquiry');
+    const docs = await api.listDocuments('inquiry');
     setInquiryDocs(docs.filter((d) => d.status === 'complete'));
-    logEvent(studentKey, 'search_dialog_opened', { for: 'create-with-reference', docType: 'inquiry' });
+    api.logEvent('search_dialog_opened', { for: 'create-with-reference', docType: 'inquiry' });
     setCreateRefOpen(true);
   }
 
@@ -105,12 +104,12 @@ export default function VA21Quotation({
     setContinueNotice(true);
   }
 
-  function copyFromInquiry(doc: SalesDocument) {
+  function copyFromInquiry(doc: PublicSalesDocument) {
     setInquiry(doc);
     setValidFrom(doc.validFrom ?? todayIso());
     setRequestedDeliveryDate(doc.requestedDeliveryDate ?? todayIso());
     setItems(doc.items.map((i) => ({ ...i, itemConditions: [] })));
-    logEvent(studentKey, 'create_with_reference_used', { predecessorId: doc.id }, doc.id);
+    api.logEvent('create_with_reference_used', { predecessorId: doc.id }, doc.id);
     setCreateRefOpen(false);
     setPhase('steps');
   }
@@ -160,8 +159,6 @@ export default function VA21Quotation({
     const docItems = items.map((item, idx) => ({ ...item, itemNetValue: pricing.itemNetValues[idx] }));
     const fields = {
       docType: 'quotation' as const,
-      assignmentId: instance.assignmentId,
-      studentKey,
       predecessorId: inquiry!.id,
       customerId: inquiry!.customerId,
       custReference,
@@ -174,8 +171,8 @@ export default function VA21Quotation({
       status: complete ? ('complete' as const) : ('in_progress' as const),
       savedAt: new Date().toISOString(),
     };
-    const doc = draftDoc ? await updateDocument(draftDoc.id, fields) : await createDocument(fields);
-    logEvent(studentKey, 'document_saved', { docId: doc.id, docType: 'quotation', status: fields.status }, doc.id);
+    const doc = draftDoc ? await api.updateDocument(draftDoc.id, fields) : await api.createDocument(fields);
+    api.logEvent('document_saved', { docId: doc.id, docType: 'quotation', status: fields.status }, doc.id);
     onDocumentSaved(doc);
     if (complete) {
       setDraftDoc(null);
@@ -250,7 +247,7 @@ export default function VA21Quotation({
             <EasyAccessMenu
               targetPath={VA21_CONFIG.menuPath}
               onNavigate={() => {
-                logEvent(studentKey, 'menu_navigated', { transaction: 'VA21' });
+                api.logEvent('menu_navigated', { transaction: 'VA21' });
                 setPhase('initial');
               }}
             />
@@ -402,7 +399,7 @@ export default function VA21Quotation({
     // Dates are what SAP treats as required here; a blank Cust. Reference saves without complaint and
     // only surfaces later, when nothing can find the quotation by PO number.
     if (!custReferenceDate || !validTo || !requestedDeliveryDate) {
-      logEvent(studentKey, 'document_save_blocked', { reason: 'incomplete' });
+      api.logEvent('document_save_blocked', { reason: 'incomplete' });
       setIncompleteOpen(true);
       return;
     }

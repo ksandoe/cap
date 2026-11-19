@@ -1,7 +1,7 @@
 import FooterActions from '../components/FooterActions';
 import { useState } from 'react';
 import { Button, Dialog, Icon, MessageStrip, Title } from '@ui5/webcomponents-react';
-import type { AssignmentInstance, SalesDocument } from '@cap/sim-shared';
+import type { PublicAssignmentInstance, PublicSalesDocument } from '@cap/sim-shared';
 import { VA01_CONFIG, getConditionType, getCustomer, getMaterial } from '@cap/sim-engine';
 import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
@@ -13,7 +13,7 @@ import HeaderDataPanel from '../components/HeaderDataPanel';
 import EasyAccessMenu from '../components/EasyAccessMenu';
 import InitialScreenFields from '../components/InitialScreenFields';
 import CreateWithReferenceDialog from '../components/CreateWithReferenceDialog';
-import { createDocument, listDocuments, logEvent, updateDocument } from '../api';
+import { useSimApi } from '../simApi';
 
 // Real SAP titles the screen after the order type once it is known: "Create Standard Order: Overview".
 const SCREEN_TITLE = 'Create Standard Order';
@@ -23,26 +23,25 @@ const RA00 = getConditionType('RA00');
 
 export default function VA01Order({
   instance,
-  studentKey,
   onStatus,
   onDocumentSaved,
   onSaved,
 }: {
-  instance: AssignmentInstance;
-  studentKey: string;
+  instance: PublicAssignmentInstance;
   /** Pushes a message into the shell's status bar (e.g. "Enter Customer Reference"). */
   onStatus: (message: StatusMessage | null) => void;
   /** Fired immediately on save, while still showing the in-screen confirmation — drives the status bar. */
-  onDocumentSaved: (doc: SalesDocument) => void;
-  onSaved: (doc: SalesDocument) => void;
+  onDocumentSaved: (doc: PublicSalesDocument) => void;
+  onSaved: (doc: PublicSalesDocument) => void;
 }) {
+  const api = useSimApi();
   const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>('menu');
   const [continueNotice, setContinueNotice] = useState(false);
   const [initialValues, setInitialValues] = useState<Record<string, string>>({});
   const [initialError, setInitialError] = useState<string | null>(null);
   const [createRefOpen, setCreateRefOpen] = useState(false);
-  const [quotationDocs, setQuotationDocs] = useState<SalesDocument[]>([]);
-  const [quotation, setQuotation] = useState<SalesDocument | null>(null);
+  const [quotationDocs, setQuotationDocs] = useState<PublicSalesDocument[]>([]);
+  const [quotation, setQuotation] = useState<PublicSalesDocument | null>(null);
 
   // Provisional until Kent shares the real Order Overview: Cust. Reference and its date are
   // re-entered like on the quotation; the delivery date, items and pricing are copied.
@@ -53,15 +52,15 @@ export default function VA01Order({
   const [incompleteOpen, setIncompleteOpen] = useState(false);
   // The first required field still empty when Save was pressed; "Edit" in the popup jumps back to it.
   const [missingField, setMissingField] = useState<OrderFocusRequest['field']>('custReference');
-  const [draftDoc, setDraftDoc] = useState<SalesDocument | null>(null);
-  const [savedIncomplete, setSavedIncomplete] = useState<SalesDocument | null>(null);
+  const [draftDoc, setDraftDoc] = useState<PublicSalesDocument | null>(null);
+  const [savedIncomplete, setSavedIncomplete] = useState<PublicSalesDocument | null>(null);
 
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [itemDetailOpen, setItemDetailOpen] = useState(false);
   const [itemDetailInitialTab, setItemDetailInitialTab] = useState<'Sales A' | 'Conditions'>('Sales A');
   const [headerDialogOpen, setHeaderDialogOpen] = useState(false);
 
-  const [saved, setSaved] = useState<SalesDocument | null>(null);
+  const [saved, setSaved] = useState<PublicSalesDocument | null>(null);
 
   const items = quotation?.items ?? [];
   const selectedItem = items.find((i) => i.lineNumber === selectedLine) ?? null;
@@ -81,9 +80,9 @@ export default function VA01Order({
   async function handleCreateWithReference() {
     if (!initialEntriesValid()) return;
     setContinueNotice(false);
-    const docs = await listDocuments(studentKey, 'quotation');
+    const docs = await api.listDocuments('quotation');
     setQuotationDocs(docs.filter((d) => d.status === 'complete'));
-    logEvent(studentKey, 'search_dialog_opened', { for: 'create-with-reference', docType: 'quotation' });
+    api.logEvent('search_dialog_opened', { for: 'create-with-reference', docType: 'quotation' });
     setCreateRefOpen(true);
   }
 
@@ -92,10 +91,10 @@ export default function VA01Order({
     setContinueNotice(true);
   }
 
-  function copyFromQuotation(doc: SalesDocument) {
+  function copyFromQuotation(doc: PublicSalesDocument) {
     setQuotation(doc);
     setRequestedDeliveryDate(doc.requestedDeliveryDate ?? '');
-    logEvent(studentKey, 'create_with_reference_used', { predecessorId: doc.id }, doc.id);
+    api.logEvent('create_with_reference_used', { predecessorId: doc.id }, doc.id);
     setCreateRefOpen(false);
     setPhase('steps');
   }
@@ -118,8 +117,6 @@ export default function VA01Order({
     if (!quotation) return;
     const fields = {
       docType: 'order' as const,
-      assignmentId: instance.assignmentId,
-      studentKey,
       predecessorId: quotation.id,
       customerId: quotation.customerId,
       custReference,
@@ -132,8 +129,8 @@ export default function VA01Order({
       status: complete ? ('complete' as const) : ('in_progress' as const),
       savedAt: new Date().toISOString(),
     };
-    const doc = draftDoc ? await updateDocument(draftDoc.id, fields) : await createDocument(fields);
-    logEvent(studentKey, 'document_saved', { docId: doc.id, docType: 'order', status: fields.status }, doc.id);
+    const doc = draftDoc ? await api.updateDocument(draftDoc.id, fields) : await api.createDocument(fields);
+    api.logEvent('document_saved', { docId: doc.id, docType: 'order', status: fields.status }, doc.id);
     onDocumentSaved(doc);
     if (complete) {
       setDraftDoc(null);
@@ -164,7 +161,7 @@ export default function VA01Order({
       handleSave();
       return;
     }
-    logEvent(studentKey, 'document_save_blocked', { reason: 'incomplete', missing });
+    api.logEvent('document_save_blocked', { reason: 'incomplete', missing });
     if (missing === 'custReference') onStatus({ text: 'Enter Customer Reference', kind: 'warning' });
     if (missing === 'custReferenceDate') onStatus({ text: 'Enter Customer Reference Date', kind: 'warning' });
     setMissingField(missing);
@@ -229,7 +226,7 @@ export default function VA01Order({
             <EasyAccessMenu
               targetPath={VA01_CONFIG.menuPath}
               onNavigate={() => {
-                logEvent(studentKey, 'menu_navigated', { transaction: 'VA01' });
+                api.logEvent('menu_navigated', { transaction: 'VA01' });
                 setPhase('initial');
               }}
             />
