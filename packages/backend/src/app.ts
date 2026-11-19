@@ -23,6 +23,7 @@ import { sessionRouter }    from './routes/session';
 import { recipeRouter }     from './routes/recipe';
 import { assessmentRouter } from './routes/assessment';
 import { adminRouter }      from './routes/admin';
+import { simRouter }        from './routes/sim';
 import { errorHandler }     from './middleware/errorHandler';
 import { requestLogger }    from './middleware/requestLogger';
 import { authMiddleware }   from './middleware/auth';
@@ -83,6 +84,7 @@ if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_DEV_ROUTES === '
 app.use('/session',    authMiddleware, sessionRouter);
 app.use('/assessment', authMiddleware, assessmentRouter);
 app.use('/recipe',     authMiddleware, recipeRouter);
+app.use('/sim',        authMiddleware, simRouter);
 
 // ── Admin App routes (login is public; authMiddleware applied inside router) ──
 app.use('/admin',      adminRouter);

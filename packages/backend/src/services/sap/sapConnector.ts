@@ -36,10 +36,26 @@ async function getAccessToken(): Promise<string> {
   return _accessToken!;
 }
 
+/**
+ * One checked document in a verification result (contract §4.4). The
+ * message is student-safe: it says what to look at, never the expected
+ * value.
+ */
+export interface VerificationItem {
+  key:            string;
+  status:         'ok' | 'missing' | 'mismatch';
+  studentMessage: string;
+}
+
 export interface VerificationResult {
   allPresent:   boolean;
   foundDocs:    string[];
   missingTypes: string[];
+  /** Authoritative pass/fail — a wrong net value must fail even when every
+   *  document exists, so callers branch on this, not allPresent. */
+  passed?:      boolean;
+  /** Student-safe per-document messages, shown when the check fails. */
+  items?:       VerificationItem[];
 }
 
 /**
@@ -59,6 +75,10 @@ export async function verifySapDocuments(
       allPresent:   true,
       foundDocs:    requiredDocTypes.map((t, i) => `SIM-${t}-0000${i + 1}`),
       missingTypes: [],
+      passed:       true,
+      items:        requiredDocTypes.map(t => ({
+        key: t, status: 'ok' as const, studentMessage: `${t} verified.`,
+      })),
     };
   }
 
@@ -70,5 +90,10 @@ export async function verifySapDocuments(
   console.log(`[SAP] Verifying docs for ${sapUsername}`, { token: '[REDACTED]' });
 
   // Placeholder — replace with real query
-  return { allPresent: false, foundDocs: [], missingTypes: requiredDocTypes };
+  return {
+    allPresent: false, foundDocs: [], missingTypes: requiredDocTypes, passed: false,
+    items: requiredDocTypes.map(t => ({
+      key: t, status: 'missing' as const, studentMessage: `We could not find ${t} in your account.`,
+    })),
+  };
 }

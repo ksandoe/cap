@@ -24,6 +24,13 @@ export interface ModuleConfig {
   moduleId:       string;
   overallMin:     number;   // default 60
   dimensionFloor: number;   // default 40
+  // Activity kind (work package 1): 'sim' runs the embedded simulator and
+  // takes session parameters from the learner's sim instance; 'live' uses
+  // the SAP account pool. Defaults from SAP_MODE when unset.
+  activityKind?:   'sim' | 'live';
+  // Which simulator assignment this module resolves to (registry key —
+  // 'pilot-sales-process' today). Required when activityKind is 'sim'.
+  simAssignmentId?: string;
   updatedAt?:     string;
   updatedBy?:     string;
 }
