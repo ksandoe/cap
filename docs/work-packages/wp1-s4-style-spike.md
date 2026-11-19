@@ -1,6 +1,6 @@
 # S4 spike: can the simulator's styles live inside a CAP page?
 
-**Status:** findings, 2026-11-20. Task S4 of `docs/work-packages/wp1-sim-in-cap.md`.
+**Status:** findings, 2026-11-18. Task S4 of `docs/work-packages/wp1-sim-in-cap.md`.
 **Answer:** yes, as a component, with three changes: scope the simulator's stylesheet, add a small shield for CAP's global element rules, and replace the simulator's window-based sizing with container-based sizing. The iframe fallback is not needed for styling.
 
 ## What I tested

@@ -1,7 +1,7 @@
 # Canvas dev instance meeting: preparation
 
 **For:** Kent and Aliyah, meeting with the Canvas administrator on 2026-11-20. David can read it too.
-**Basis:** a read of CAP's LTI code on `main` (`packages/backend/src/services/lti/ltiService.ts`, `routes/lti.ts`, `services/grade/gradeService.ts`), the agreed decision in `docs/decisions/2026-10-canvas-lti-atec.md`, and a check of Canvas's public documentation. Revised 2026-11-19. I have not seen the real Canvas instance. Canvas details are from search summaries, not the full documentation, so confirm them with the administrator.
+**Basis:** a read of CAP's LTI code on `main` (`packages/backend/src/services/lti/ltiService.ts`, `routes/lti.ts`, `services/grade/gradeService.ts`), the agreed decision in `docs/decisions/2026-10-canvas-lti-atec.md`, and a check of Canvas's public documentation. Revised 2026-11-18. I have not seen the real Canvas instance. Canvas details are from search summaries, not the full documentation, so confirm them with the administrator.
 
 ## 1. Goal for the meeting
 
