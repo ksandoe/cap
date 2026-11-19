@@ -19,8 +19,8 @@ export default function DocumentFlowView({ orderId }: { orderId: string }) {
     <div>
       <h3>Document Flow</h3>
       <p>
-        One customer request from <strong>{customerName}</strong>, three linked documents, one dollar value — in
-        one view.
+        One customer request from <strong>{customerName}</strong>, {chain.length} linked{' '}
+        {chain.length === 1 ? 'document' : 'documents'}, each with its own net value — in one view.
       </p>
       <table className="item-table">
         <thead>

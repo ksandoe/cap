@@ -160,7 +160,25 @@ function TreeRow({
  * always returns you to after Exit. Only one path through this tree does anything; everything
  * else is here so the tree looks (and gets lost in) like the real one.
  */
-export default function EasyAccessMenu({ targetPath, onNavigate }: { targetPath: string[]; onNavigate: () => void }) {
+/** A transaction the menu can open: the leaf's path and what happens when it is executed. */
+export interface MenuDestination {
+  path: string[];
+  onOpen: () => void;
+}
+
+/**
+ * Give it either one `targetPath` and `onNavigate` (the guided exercise, where anything else is "not part
+ * of today's exercise"), or several `destinations` (the workspace, where any of them opens).
+ */
+export default function EasyAccessMenu({
+  targetPath = [],
+  onNavigate,
+  destinations,
+}: {
+  targetPath?: string[];
+  onNavigate?: () => void;
+  destinations?: MenuDestination[];
+}) {
   // Starts fully collapsed — per Kent's 2026-11-01 note, students should have to find the
   // transaction themselves by following the instructions, not find it already drilled open.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -183,7 +201,11 @@ export default function EasyAccessMenu({ targetPath, onNavigate }: { targetPath:
   }
 
   function executeLeaf(path: string[]) {
-    if (path.join('/') === targetPath.join('/')) {
+    const key = path.join('/');
+    const destination = destinations?.find((d) => d.path.join('/') === key);
+    if (destination) {
+      destination.onOpen();
+    } else if (!destinations && onNavigate && key === targetPath.join('/')) {
       onNavigate();
     } else {
       setMissedClick(true);
@@ -199,7 +221,9 @@ export default function EasyAccessMenu({ targetPath, onNavigate }: { targetPath:
         <span className="easy-access-exit">Exit</span>
       </div>
       {missedClick && (
-        <div className="easy-access-hint">Not part of today's exercise — follow {targetPath.join(' ▸ ')}.</div>
+        <div className="easy-access-hint">
+          {destinations ? 'That transaction is not available in this exercise.' : `Not part of today's exercise — follow ${targetPath.join(' ▸ ')}.`}
+        </div>
       )}
       <div className="easy-access-tree">
         <div className="easy-access-row" style={{ paddingLeft: 12 }}>

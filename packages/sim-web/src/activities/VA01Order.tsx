@@ -26,7 +26,13 @@ export default function VA01Order({
   onStatus,
   onDocumentSaved,
   onSaved,
+  skipMenu = false,
+  onExit,
 }: {
+  /** In the workspace the Easy Access menu is the workspace's own, so the transaction opens on its initial screen. */
+  skipMenu?: boolean;
+  /** Where the back arrow on the initial screen goes when the menu is not this component's. */
+  onExit?: () => void;
   instance: PublicAssignmentInstance;
   /** Pushes a message into the shell's status bar (e.g. "Enter Customer Reference"). */
   onStatus: (message: StatusMessage | null) => void;
@@ -35,7 +41,7 @@ export default function VA01Order({
   onSaved: (doc: PublicSalesDocument) => void;
 }) {
   const api = useSimApi();
-  const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>('menu');
+  const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>(skipMenu ? 'initial' : 'menu');
   const [continueNotice, setContinueNotice] = useState(false);
   const [initialValues, setInitialValues] = useState<Record<string, string>>({});
   const [initialError, setInitialError] = useState<string | null>(null);
@@ -253,7 +259,7 @@ export default function VA01Order({
           }
           screen={
             <div>
-              <SapChrome title={VA01_CONFIG.initialScreen.title} code={VA01_CONFIG.id} onBack={() => setPhase('menu')} />
+              <SapChrome title={VA01_CONFIG.initialScreen.title} code={VA01_CONFIG.id} onBack={() => (onExit ? onExit() : setPhase('menu'))} />
               <div className="sap-screen-body">
                 {initialError && (
                   <MessageStrip design="Negative" style={{ marginBottom: 12 }}>

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@ui5/webcomponents-react';
 import type { ActivityLayoutMode } from '@cap/sim-shared';
+import { useEmbedded } from '../embedded';
 
 const BREAKPOINT_PX = 1024; // §10b — placeholder, open question in §8
 const STORAGE_KEY = 'sap-sim-layout-mode';
@@ -26,6 +27,7 @@ export default function ActivityLayout({
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'instructions' | 'screen'>('instructions');
+  const embedded = useEmbedded();
 
   useEffect(() => {
     const onResize = () => {
@@ -40,6 +42,9 @@ export default function ActivityLayout({
     setMode(next);
     localStorage.setItem(STORAGE_KEY, next);
   }
+
+  // Embedded in CAP: the instructions live in CAP's own pane, so only the simulated screen is drawn.
+  if (embedded) return <div>{screen}</div>;
 
   return (
     <div>
