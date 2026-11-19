@@ -357,6 +357,47 @@ describe('sim routes — input validation', () => {
     }
   });
 
+  it('accepts in-progress saves with blank reference fields; complete requires them', async () => {
+    const sc5 = { learnerKey: 'test-learner-5', activityId: SIM_MODULE };
+    const token5 = await api.issueSessionToken({
+      sessionId: 'sess-5', tempUserId: 'tu-5', moduleId: SIM_MODULE,
+      currentPhase: 2, canvasUuid: sc5.learnerKey });
+    // exactly what VA01Order.handleSave(false) posts on "save incomplete"
+    const inProgress = {
+      docType: 'order', predecessorId: null, customerId: '129999',
+      custReference: '', custReferenceDate: '',
+      validFrom: null, validTo: null, requestedDeliveryDate: null,
+      items: [], headerConditions: [], status: 'in_progress', savedAt: null,
+    };
+    const created = await fetchJson('/sim/documents', token5,
+      { method: 'POST', body: JSON.stringify(inProgress) });
+    expect(created.status).toBe(201);
+    expectNoServerOnlyFields(created.body, 'in-progress order');
+
+    // a PATCH that keeps it in_progress with blanks is fine
+    const stillDraft = await fetchJson(`/sim/documents/${created.body.id}`, token5,
+      { method: 'PATCH', body: JSON.stringify({ custReference: '', custReferenceDate: '' }) });
+    expect(stillDraft.status).toBe(200);
+
+    // finishing it while the reference fields are still blank is a client error
+    const badPatch = await fetchJson(`/sim/documents/${created.body.id}`, token5,
+      { method: 'PATCH', body: JSON.stringify({ status: 'complete' }) });
+    expect(badPatch.status).toBe(400);
+    expect(badPatch.body.error).toBe('INVALID_INPUT');
+
+    const instance = await api.simService.getOrCreateSimInstance(sc5, definition());
+    // same rule on POST: complete + blank refs → 400 even with valid items
+    const badPost = await fetchJson('/sim/documents', token5, { method: 'POST',
+      body: JSON.stringify({ ...inProgress, status: 'complete',
+        items: [correctDocs(instance)[2].items[0]] }) });
+    expect(badPost.status).toBe(400);
+    // and complete with references but no items → 400
+    const noItems = await fetchJson('/sim/documents', token5, { method: 'POST',
+      body: JSON.stringify({ ...inProgress, status: 'complete',
+        custReference: 'PO-1', custReferenceDate: '2026-11-19' }) });
+    expect(noItems.status).toBe(400);
+  });
+
   it('drops non-whitelisted fields — server-owned values win', async () => {
     const token = await token3();
     const instance = await api.simService.getOrCreateSimInstance(sc3, definition());

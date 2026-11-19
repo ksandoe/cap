@@ -14,7 +14,9 @@
  *   400 INVALID_*        — malformed document/event bodies: only whitelisted
  *      fields are accepted, values are validated, and predecessor links
  *      must point at an existing in-scope document of an earlier type
- *      (inquiry < quotation < order).
+ *      (inquiry < quotation < order). A document may only be 'complete' once
+ *      it has a PO reference and at least one item; in-progress saves may
+ *      leave them blank (the simulator's "save incomplete" path does).
  *   429 SIM_EVENT_LIMIT  — the scope's event cap is reached.
  *
  * Register search-by-reference before /documents/:id or Express reads
@@ -24,8 +26,8 @@ import { Request, Response, NextFunction } from 'express';
 import { asyncRouter } from '../middleware/asyncRouter';
 import type {
   AppliedCondition, ConditionCode, DocType, EventType, NewSalesDocumentInput,
-  NewSimEvent, SalesDocumentItem, SalesDocumentPatch, SimActivityDefinition,
-  SimScope,
+  NewSimEvent, SalesDocument, SalesDocumentItem, SalesDocumentPatch,
+  SimActivityDefinition, SimScope,
 } from '@cap/sim-shared';
 import { MATERIALS } from '@cap/sim-engine';
 import { simStore } from '../db/simDb';
@@ -67,6 +69,10 @@ const reqStr = (v: unknown, name: string, maxLen = 200): string => {
   return s;
 };
 
+/** String fields the simulator may leave blank on an in-progress save. */
+const blankableStr = (v: unknown, name: string, maxLen = 200): string =>
+  optStr(v, name, maxLen) ?? '';
+
 function parseCondition(raw: unknown, name: string): AppliedCondition {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw))
     throw bad(`${name}: condition must be an object`);
@@ -85,8 +91,8 @@ function parseConditions(raw: unknown, name: string): AppliedCondition[] {
 }
 
 function parseItems(raw: unknown): SalesDocumentItem[] {
-  if (!Array.isArray(raw) || raw.length < 1 || raw.length > MAX_ITEMS)
-    throw bad(`items must be an array of 1–${MAX_ITEMS} entries`);
+  if (!Array.isArray(raw) || raw.length > MAX_ITEMS)
+    throw bad(`items must be an array of at most ${MAX_ITEMS} entries`);
   return raw.map((it, i) => {
     if (typeof it !== 'object' || it === null || Array.isArray(it))
       throw bad(`items[${i}] must be an object`);
@@ -127,8 +133,8 @@ function parseNewDocument(body: unknown): NewSalesDocumentInput {
     docType:               b.docType as DocType,
     predecessorId:         optStr(b.predecessorId, 'predecessorId'),
     customerId:            reqStr(b.customerId, 'customerId'),
-    custReference:         reqStr(b.custReference, 'custReference'),
-    custReferenceDate:     reqStr(b.custReferenceDate, 'custReferenceDate'),
+    custReference:         blankableStr(b.custReference, 'custReference'),
+    custReferenceDate:     blankableStr(b.custReferenceDate, 'custReferenceDate'),
     validFrom:             optStr(b.validFrom, 'validFrom'),
     validTo:               optStr(b.validTo, 'validTo'),
     requestedDeliveryDate: optStr(b.requestedDeliveryDate, 'requestedDeliveryDate'),
@@ -155,6 +161,21 @@ async function checkPredecessor(
     throw bad('predecessorId must reference an earlier document type (inquiry < quotation < order)');
 }
 
+/**
+ * A document may only be marked 'complete' once it carries its PO reference
+ * and at least one item — in-progress saves (the simulator's "save
+ * incomplete" path) leave all three blank legally. For PATCH this runs on
+ * the merged document, not just the patch fields.
+ */
+function checkCompleteDoc(
+  doc: Pick<SalesDocument, 'status' | 'custReference' | 'custReferenceDate' | 'items'>,
+): void {
+  if (doc.status !== 'complete') return;
+  if (!doc.custReference.trim())     throw bad('custReference is required when status is complete');
+  if (!doc.custReferenceDate.trim()) throw bad('custReferenceDate is required when status is complete');
+  if (doc.items.length < 1)          throw bad('at least one item is required when status is complete');
+}
+
 /** Whitelist + validate a PATCH body into a SalesDocumentPatch. */
 async function parsePatch(
   body: unknown, scope: SimScope, docType: DocType,
@@ -173,8 +194,8 @@ async function parsePatch(
     await checkPredecessor(scope, docType, patch.predecessorId);
   }
   if ('customerId' in b)            patch.customerId = reqStr(b.customerId, 'customerId');
-  if ('custReference' in b)         patch.custReference = reqStr(b.custReference, 'custReference');
-  if ('custReferenceDate' in b)     patch.custReferenceDate = reqStr(b.custReferenceDate, 'custReferenceDate');
+  if ('custReference' in b)         patch.custReference = blankableStr(b.custReference, 'custReference');
+  if ('custReferenceDate' in b)     patch.custReferenceDate = blankableStr(b.custReferenceDate, 'custReferenceDate');
   if ('validFrom' in b)             patch.validFrom = optStr(b.validFrom, 'validFrom');
   if ('validTo' in b)               patch.validTo = optStr(b.validTo, 'validTo');
   if ('requestedDeliveryDate' in b) patch.requestedDeliveryDate = optStr(b.requestedDeliveryDate, 'requestedDeliveryDate');
@@ -280,6 +301,7 @@ simRouter.get('/document-flow/:id', wrap400(async (req, res) => {
 simRouter.post('/documents', wrap400(async (req, res) => {
   const { scope, definition } = locals(res);
   const input = parseNewDocument(req.body);
+  checkCompleteDoc(input);
   await checkPredecessor(scope, input.docType, input.predecessorId);
   // A student can post a document before any read — the instance must exist
   // so the store can bind assignmentId (contract §4 note).
@@ -297,6 +319,7 @@ simRouter.patch('/documents/:id', wrap400(async (req, res) => {
   if (!current) { res.status(404).json({ error: 'NOT_FOUND' }); return; }
   const patch  = await parsePatch(req.body, scope, current.docType);
   const merged = { ...current, ...patch };
+  checkCompleteDoc(merged);
   const priced = repriceDocument(merged);
   const doc = await simStore.updateDocument(scope, req.params.id, {
     ...patch, items: priced.items, netValue: priced.netValue,
