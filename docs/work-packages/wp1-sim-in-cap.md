@@ -41,6 +41,20 @@ Done means all of these are true on a developer's machine with `USE_LOCAL_DB=tru
 
 ## 4. Contracts (agree and write these first, in the first pull request)
 
+**Status: written as code in PR 1.** The contracts are in `packages/sim-shared/src/contracts.ts` (types, the `SimStore` and `SimApi` interfaces, the route table, the parameter keys), and the build fails if a server-only field leaks into a public type. That file is now the source of truth; the notes below explain the reasoning. Writing it changed the draft in these ways:
+
+- The public instance also omits `seed` (for the random strategy it is built from the learner key) and `studentKey`, not only the expected net values. Public documents omit `studentKey` too.
+- Searching by customer reference is scoped to the learner. In the PoC it searched every student's documents.
+- The browser no longer sends `assignmentId` when creating a document. The server sets it.
+- Events carry `relativeMs` only. The PoC's absolute `occurredAt` does not leave the store.
+- Document ids need only be unique within a learner's scope.
+- `purge(scope)` is part of `SimStore`, for the retention rule and semester-end cleanup.
+- The parameter keys for recipe placeholders are listed in `SIM_PARAMETER_KEYS`. Parand can use them when she edits the recipe text.
+- Register `GET /sim/documents/search-by-reference` before `GET /sim/documents/:id`, or Express reads it as an id.
+- `frontend-student` has no `typecheck` script, so the root `npm run typecheck` does not cover it. Add one when PR 4 starts.
+
+Everything below is the original reasoning. Where it differs from the code, the code wins.
+
 **4.1 `SimStore` (types in `packages/sim-shared`, async).** All simulator state goes through it, keyed by `learnerKey` and `activityId`:
 - `getOrCreateInstance(learnerKey, activityId)`: the assignment instance, including its expected net values (server side only).
 - `listDocuments`, `getDocument`, `searchByReference`, `getDocumentChain`
