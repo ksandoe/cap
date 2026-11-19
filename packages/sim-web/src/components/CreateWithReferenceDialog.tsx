@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Dialog, Icon, MessageStrip } from '@ui5/webcomponents-react';
-import type { SalesDocument } from '@cap/sim-shared';
+import type { PublicSalesDocument } from '@cap/sim-shared';
 import SearchDialog, { type SearchItem } from './SearchDialog';
 
 const TABS = ['Inquiry', 'Quotation', 'Order', 'Contract', 'SchedAgree', 'BillDoc'] as const;
@@ -67,8 +67,8 @@ export default function CreateWithReferenceDialog({
   /** Label for the document-number field, e.g. "Inquiry" or "Quot.". */
   docLabel: string;
   /** The student's own saved predecessor documents. */
-  documents: SalesDocument[];
-  onCopy: (doc: SalesDocument) => void;
+  documents: PublicSalesDocument[];
+  onCopy: (doc: PublicSalesDocument) => void;
   onClose: () => void;
 }) {
   const [docNumber, setDocNumber] = useState('');

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Dialog, Bar, Tab, TabContainer } from '@ui5/webcomponents-react';
-import type { AssignmentInstance } from '@cap/sim-shared';
+import type { PublicAssignmentInstance } from '@cap/sim-shared';
 import { CUSTOMERS, getMaterial } from '@cap/sim-engine';
 import { todayIso } from '../dateUtils';
 
@@ -11,7 +11,7 @@ import { todayIso } from '../dateUtils';
  * it. See docs/architecture-proposal.md §3c (the Customer PO Number is the customer's own
  * document, not something our system generated) and §10 (open question: surfacing this data).
  */
-export default function ReferenceDocumentsButton({ instance }: { instance: AssignmentInstance }) {
+export default function ReferenceDocumentsButton({ instance }: { instance: PublicAssignmentInstance }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'po' | 'pricing'>('po');
 

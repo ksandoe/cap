@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Title } from '@ui5/webcomponents-react';
-import type { AssignmentInstance } from '@cap/sim-shared';
+import type { PublicAssignmentInstance } from '@cap/sim-shared';
 import { CUSTOMERS } from '@cap/sim-engine';
 import DocumentFlowView from '../components/DocumentFlowView';
 
@@ -10,7 +10,7 @@ import DocumentFlowView from '../components/DocumentFlowView';
  * clear end-of-exercise action (the original exercise's "Exit to Easy Access" quirk — here,
  * Exit just ends the session cleanly rather than leaving the student on an open screen).
  */
-export default function ConclusionBlock({ instance, orderId }: { instance: AssignmentInstance; orderId: string }) {
+export default function ConclusionBlock({ instance, orderId }: { instance: PublicAssignmentInstance; orderId: string }) {
   const [exited, setExited] = useState(false);
   const customerName = CUSTOMERS.find((c) => c.id === instance.resolvedParams.customerId)?.name;
 

@@ -1,7 +1,7 @@
 import FooterActions from '../components/FooterActions';
 import { useState } from 'react';
 import { Button, Icon, MessageStrip, Title } from '@ui5/webcomponents-react';
-import type { AssignmentInstance, SalesDocument, SalesDocumentItem } from '@cap/sim-shared';
+import type { PublicAssignmentInstance, PublicSalesDocument, SalesDocumentItem } from '@cap/sim-shared';
 import { CUSTOMERS, MATERIALS, VA11_CONFIG, priceDocument, getMaterial } from '@cap/sim-engine';
 import ActivityLayout from '../components/ActivityLayout';
 import ReferenceDocumentsButton from '../components/ReferenceDocumentsModal';
@@ -14,7 +14,7 @@ import InitialScreenFields from '../components/InitialScreenFields';
 
 const OVERVIEW_TABS = ['Sales', 'Item Overview', 'Item detail', 'Ordering party', 'Procurement', 'Shipping', 'Reason for rejection'];
 import SearchDialog, { type SearchItem } from '../components/SearchDialog';
-import { createDocument, logEvent } from '../api';
+import { useSimApi } from '../simApi';
 import { todayIso, monthFromNowIso } from '../dateUtils';
 import { formatCurrency } from '../formatUtils';
 
@@ -52,16 +52,15 @@ function nextLineNumber(items: DraftItem[]): number {
 
 export default function VA11Inquiry({
   instance,
-  studentKey,
   onDocumentSaved,
   onSaved,
 }: {
-  instance: AssignmentInstance;
-  studentKey: string;
+  instance: PublicAssignmentInstance;
   /** Fired immediately on save, while still showing the in-screen confirmation — drives the status bar. */
-  onDocumentSaved: (doc: SalesDocument) => void;
-  onSaved: (doc: SalesDocument) => void;
+  onDocumentSaved: (doc: PublicSalesDocument) => void;
+  onSaved: (doc: PublicSalesDocument) => void;
 }) {
+  const api = useSimApi();
   const [phase, setPhase] = useState<'menu' | 'initial' | 'steps'>('menu');
   const [initialValues, setInitialValues] = useState<Record<string, string>>({});
   const [initialError, setInitialError] = useState<string | null>(null);
@@ -78,7 +77,7 @@ export default function VA11Inquiry({
   const [validTo, setValidTo] = useState(monthFromNowIso());
   const [requestedDeliveryDate, setRequestedDeliveryDate] = useState(todayIso());
   const [items, setItems] = useState<DraftItem[]>([]);
-  const [saved, setSaved] = useState<SalesDocument | null>(null);
+  const [saved, setSaved] = useState<PublicSalesDocument | null>(null);
   const [showBlankTabNotice, setShowBlankTabNotice] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   // Per Kent's 2026-11-01 note: the pink "required and empty" tint only appears after a failed
@@ -148,10 +147,8 @@ export default function VA11Inquiry({
       itemConditions: [],
       itemNetValue: pricing.itemNetValues[idx],
     }));
-    const doc = await createDocument({
+    const doc = await api.createDocument({
       docType: 'inquiry',
-      assignmentId: instance.assignmentId,
-      studentKey,
       predecessorId: null,
       customerId: soldToParty!.id,
       custReference,
@@ -164,7 +161,7 @@ export default function VA11Inquiry({
       status: 'complete',
       savedAt: new Date().toISOString(),
     });
-    logEvent(studentKey, 'document_saved', { docId: doc.id, docType: 'inquiry' }, doc.id);
+    api.logEvent('document_saved', { docId: doc.id, docType: 'inquiry' }, doc.id);
     setSaved(doc);
     onDocumentSaved(doc);
     setShowBlankTabNotice(VA11_CONFIG.postSaveBehavior === 'blank-tab');
@@ -207,7 +204,7 @@ export default function VA11Inquiry({
             <EasyAccessMenu
               targetPath={VA11_CONFIG.menuPath}
               onNavigate={() => {
-                logEvent(studentKey, 'menu_navigated', { transaction: 'VA11' });
+                api.logEvent('menu_navigated', { transaction: 'VA11' });
                 setPhase('initial');
               }}
             />

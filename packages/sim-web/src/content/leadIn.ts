@@ -1,4 +1,4 @@
-import type { AssignmentInstance } from '@cap/sim-shared';
+import type { PublicAssignmentInstance } from '@cap/sim-shared';
 import { CUSTOMERS, getMaterial } from '@cap/sim-engine';
 
 export interface LeadIn {
@@ -20,12 +20,12 @@ function materialLabel(materialId: string): string {
 /** The two assigned products, named by description — this is what makes the material search
  * dialogs unambiguous even though the underlying catalog has six colors across two models,
  * see docs/architecture-proposal.md §3c. */
-export function assignedProductsSentence(instance: AssignmentInstance): string {
+export function assignedProductsSentence(instance: PublicAssignmentInstance): string {
   const [first, second] = instance.resolvedParams.items;
   return `a ${materialLabel(first.materialId)} and a ${materialLabel(second.materialId)}`;
 }
 
-export function inquiryLeadIn(instance: AssignmentInstance): LeadIn {
+export function inquiryLeadIn(instance: PublicAssignmentInstance): LeadIn {
   const customer = customerName(instance.resolvedParams.customerId);
   return {
     title: 'Before: Create Inquiry',
@@ -59,7 +59,7 @@ export function inquiryLeadIn(instance: AssignmentInstance): LeadIn {
   };
 }
 
-export function quotationLeadIn(instance: AssignmentInstance): LeadIn {
+export function quotationLeadIn(instance: PublicAssignmentInstance): LeadIn {
   const deluxe = instance.resolvedParams.itemConditions[0];
   const header = instance.resolvedParams.headerConditions[0];
   return {
@@ -90,7 +90,7 @@ export function quotationLeadIn(instance: AssignmentInstance): LeadIn {
   };
 }
 
-export function orderLeadIn(instance: AssignmentInstance): LeadIn {
+export function orderLeadIn(instance: PublicAssignmentInstance): LeadIn {
   return {
     title: 'Before: Create Sales Order',
     whereThisSits:

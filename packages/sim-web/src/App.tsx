@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Title } from '@ui5/webcomponents-react';
-import type { AssignmentInstance, SalesDocument } from '@cap/sim-shared';
+import type { PublicAssignmentInstance, PublicSalesDocument } from '@cap/sim-shared';
 import { getStudentKey } from './studentKey';
-import { getAssignmentInstance, getFlowProgress, listDocuments, saveFlowProgress, logEvent } from './api';
+import { createStandaloneApi, type StandaloneApi } from './standaloneApi';
+import { SimApiProvider } from './simApi';
 import { inquiryLeadIn, orderLeadIn, quotationLeadIn, assignedProductsSentence } from './content/leadIn';
 import StatusBar, { type StatusMessage } from './components/StatusBar';
 import BackgroundBlock from './blocks/BackgroundBlock';
@@ -23,10 +24,19 @@ const BLOCK_LABELS = [
   'Conclusion',
 ];
 
+/** The standalone app: intro, background and conclusion around the three transactions. */
 export default function App() {
-  const [studentKey] = useState(getStudentKey);
-  const [instance, setInstance] = useState<AssignmentInstance | null>(null);
-  const [docs, setDocs] = useState<{ inquiry?: SalesDocument; quotation?: SalesDocument; order?: SalesDocument }>({});
+  const api = useMemo(() => createStandaloneApi(getStudentKey()), []);
+  return (
+    <SimApiProvider api={api}>
+      <StandaloneShell api={api} />
+    </SimApiProvider>
+  );
+}
+
+function StandaloneShell({ api }: { api: StandaloneApi }) {
+  const [instance, setInstance] = useState<PublicAssignmentInstance | null>(null);
+  const [docs, setDocs] = useState<{ inquiry?: PublicSalesDocument; quotation?: PublicSalesDocument; order?: PublicSalesDocument }>({});
   const [current, setCurrent] = useState(0);
   const [furthest, setFurthest] = useState(0);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
@@ -35,12 +45,12 @@ export default function App() {
   useEffect(() => {
     (async () => {
       const [inst, progress, allDocs] = await Promise.all([
-        getAssignmentInstance(studentKey),
-        getFlowProgress(studentKey),
-        listDocuments(studentKey),
+        api.getInstance(),
+        api.getFlowProgress(),
+        api.listDocuments(),
       ]);
       setInstance(inst);
-      logEvent(studentKey, 'assignment_started', { assignmentId: inst.assignmentId });
+      api.logEvent('assignment_started', { assignmentId: inst.assignmentId });
 
       const byType: typeof docs = {};
       for (const d of allDocs) {
@@ -60,21 +70,21 @@ export default function App() {
       setCurrent(Math.min(progress.currentBlockIndex, initialFurthest));
       setLoaded(true);
     })();
-  }, [studentKey]);
+  }, [api]);
 
   function goTo(index: number) {
     if (index > furthest) return;
     setCurrent(index);
-    saveFlowProgress({ studentKey, assignmentId: instance!.assignmentId, currentBlockIndex: index, furthestBlockIndex: furthest });
-    logEvent(studentKey, 'block_entered', { blockIndex: index });
+    api.saveFlowProgress({ assignmentId: instance!.assignmentId, currentBlockIndex: index, furthestBlockIndex: furthest });
+    api.logEvent('block_entered', { blockIndex: index });
   }
 
   function advance(nextIndex: number) {
     const newFurthest = Math.max(furthest, nextIndex);
     setFurthest(newFurthest);
     setCurrent(nextIndex);
-    saveFlowProgress({ studentKey, assignmentId: instance!.assignmentId, currentBlockIndex: nextIndex, furthestBlockIndex: newFurthest });
-    logEvent(studentKey, 'block_entered', { blockIndex: nextIndex });
+    api.saveFlowProgress({ assignmentId: instance!.assignmentId, currentBlockIndex: nextIndex, furthestBlockIndex: newFurthest });
+    api.logEvent('block_entered', { blockIndex: nextIndex });
   }
 
   if (!loaded || !instance) return <p style={{ padding: 24 }}>Loading…</p>;
@@ -103,7 +113,6 @@ export default function App() {
       content = (
         <VA11Inquiry
           instance={instance}
-          studentKey={studentKey}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, inquiry: doc }));
             setStatusMessage({ text: `Inquiry ${doc.id} has been saved.`, kind: 'success' });
@@ -119,7 +128,6 @@ export default function App() {
       content = (
         <VA21Quotation
           instance={instance}
-          studentKey={studentKey}
           onStatus={setStatusMessage}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, quotation: doc }));
@@ -136,7 +144,6 @@ export default function App() {
       content = (
         <VA01Order
           instance={instance}
-          studentKey={studentKey}
           onStatus={setStatusMessage}
           onDocumentSaved={(doc) => {
             setDocs((d) => ({ ...d, order: doc }));
@@ -144,7 +151,7 @@ export default function App() {
           }}
           onSaved={(doc) => {
             advance(7);
-            logEvent(studentKey, 'document_flow_viewed', {}, doc.id);
+            api.logEvent('document_flow_viewed', {}, doc.id);
           }}
         />
       );
