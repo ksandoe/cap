@@ -31,7 +31,7 @@
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
-  DynamoDBDocumentClient, QueryCommand, PutCommand, UpdateCommand,
+  DynamoDBDocumentClient, QueryCommand, GetCommand, PutCommand, UpdateCommand,
   BatchWriteCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
@@ -46,6 +46,11 @@ import { localSimDb } from './localStore';
 
 const scopePrefix = (scope: SimScope) => `${scope.activityId}#`;
 const DOC_PREFIX: Record<DocType, string> = { inquiry: 'INQ', quotation: 'QUO', order: 'ORD' };
+/** Hard caps — chain depth is a safety bound against corrupted predecessor
+ *  links; the event cap keeps a runaway client from growing a scope
+ *  without limit. */
+const MAX_CHAIN_DEPTH = 10;
+const MAX_EVENTS_PER_SCOPE = 5000;
 
 interface StoredEvent {
   id: string;
@@ -73,9 +78,16 @@ function unwrap<T>(item: Record<string, unknown> | undefined, field: string): T 
 interface SimItemTable {
   get(pk: string, sk: string): Promise<Record<string, unknown> | undefined>;
   query(pk: string, skPrefix?: string): Promise<Record<string, unknown>[]>;
-  put(item: Record<string, unknown>): Promise<void>;
-  /** Atomically returns the next value of a per-scope counter (1, 2, 3…). */
-  nextSeq(pk: string, sk: string): Promise<number>;
+  /** false when `ifAbsent` was requested and the item already existed. */
+  put(item: Record<string, unknown>, opts?: { ifAbsent?: boolean }): Promise<boolean>;
+  /**
+   * Atomically returns the next value of a per-scope counter (1, 2, 3…)
+   * plus the counter item's full attributes. `setIfAbsent` keys are set
+   * only when the counter item lacks them (DynamoDB `if_not_exists`).
+   */
+  nextSeq(
+    pk: string, sk: string, setIfAbsent?: Record<string, unknown>,
+  ): Promise<{ seq: number; attrs: Record<string, unknown> }>;
   deleteMany(keys: { pk: string; sk: string }[]): Promise<void>;
 }
 
@@ -87,9 +99,13 @@ function makeSimStore(items: SimItemTable): SimStore {
     },
 
     async putInstance(scope, instance) {
-      await items.put({
-        pk: scope.learnerKey, sk: `${scopePrefix(scope)}INSTANCE`, instance, ttl: ttl(),
-      });
+      // Conditional put — two concurrent first-touches must not let the
+      // second writer clobber the first. The stored (first) instance wins;
+      // getOrCreateSimInstance re-reads after this call.
+      await items.put(
+        { pk: scope.learnerKey, sk: `${scopePrefix(scope)}INSTANCE`, instance, ttl: ttl() },
+        { ifAbsent: true },
+      );
     },
 
     async listDocuments(scope, filter) {
@@ -113,12 +129,16 @@ function makeSimStore(items: SimItemTable): SimStore {
       const first = await this.getDocument(scope, id);
       if (!first) return [];
       const chain = [first];
-      let cursor = first;
-      // Walk predecessors back to the inquiry; cycles can't form because
-      // documents are created before they can be referenced.
-      while (cursor.predecessorId) {
+      const seen  = new Set([first.id]);
+      let cursor  = first;
+      // Walk predecessors back to the inquiry. The visited set and depth
+      // cap are defensive: route-level validation keeps predecessor links
+      // strictly earlier-type, so a cycle can only come from corrupted
+      // state — and must still terminate here.
+      while (cursor.predecessorId && chain.length < MAX_CHAIN_DEPTH) {
         const prev = await this.getDocument(scope, cursor.predecessorId);
-        if (!prev) break;
+        if (!prev || seen.has(prev.id)) break;
+        seen.add(prev.id);
         chain.unshift(prev);
         cursor = prev;
       }
@@ -131,10 +151,10 @@ function makeSimStore(items: SimItemTable): SimStore {
       // instance here is a bug, not a state to model.
       const instance = await this.getInstance(scope);
       if (!instance) throw new Error('SIM_INSTANCE_MISSING');
-      const n = await items.nextSeq(scope.learnerKey, `${scopePrefix(scope)}CTR#DOC#${doc.docType}`);
+      const { seq } = await items.nextSeq(scope.learnerKey, `${scopePrefix(scope)}CTR#DOC#${doc.docType}`);
       const created: SalesDocument = {
         ...doc,
-        id:           `${DOC_PREFIX[doc.docType]}-${String(n).padStart(6, '0')}`,
+        id:           `${DOC_PREFIX[doc.docType]}-${String(seq).padStart(6, '0')}`,
         assignmentId: instance.assignmentId,
         studentKey:   scope.learnerKey,
         createdAt:    new Date().toISOString(),
@@ -159,20 +179,14 @@ function makeSimStore(items: SimItemTable): SimStore {
     },
 
     async appendEvent(scope, event) {
-      const seq = await items.nextSeq(scope.learnerKey, `${scopePrefix(scope)}CTR#EVT`);
       const occurredAt = new Date().toISOString();
       // relativeMs is measured from the scope's first event — the counter
-      // item remembers it so nothing has to re-scan the event list.
-      let firstAt = occurredAt;
-      if (seq > 1) {
-        const ctr = await items.get(scope.learnerKey, `${scopePrefix(scope)}CTR#EVT`);
-        firstAt = (ctr?.firstAt as string) ?? occurredAt;
-      } else {
-        const ctr = await items.get(scope.learnerKey, `${scopePrefix(scope)}CTR#EVT`);
-        if (!ctr?.firstAt)
-          await items.put({ ...(ctr ?? {}), pk: scope.learnerKey,
-            sk: `${scopePrefix(scope)}CTR#EVT`, n: seq, firstAt: occurredAt, ttl: ttl() });
-      }
+      // item sets firstAt atomically on its first update (if_not_exists),
+      // so nothing has to re-scan the event list.
+      const { seq, attrs } = await items.nextSeq(
+        scope.learnerKey, `${scopePrefix(scope)}CTR#EVT`, { firstAt: occurredAt });
+      if (seq > MAX_EVENTS_PER_SCOPE) throw new Error('SIM_EVENT_LIMIT');
+      const firstAt = (attrs.firstAt as string) ?? occurredAt;
       const stored: StoredEvent = {
         id: uuidv4(), docId: event.docId ?? null, type: event.type,
         payload: event.payload ?? {}, occurredAt,
@@ -198,13 +212,11 @@ const TABLE = process.env.DYNAMODB_TABLE_SIM_STATE!;
 
 const ddbItems: SimItemTable = {
   async get(pk, sk) {
-    const r = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: 'pk = :pk AND sk = :sk',
-      ExpressionAttributeValues: { ':pk': pk, ':sk': sk },
-      Limit: 1,
+    // Strongly consistent — a read right after a save must not miss.
+    const r = await ddb.send(new GetCommand({
+      TableName: TABLE, Key: { pk, sk }, ConsistentRead: true,
     }));
-    return r.Items?.[0];
+    return r.Item;
   },
   async query(pk, skPrefix) {
     const out: Record<string, unknown>[] = [];
@@ -212,6 +224,7 @@ const ddbItems: SimItemTable = {
     do {
       const r = await ddb.send(new QueryCommand({
         TableName: TABLE,
+        ConsistentRead: true,
         KeyConditionExpression: skPrefix
           ? 'pk = :pk AND begins_with(sk, :pfx)' : 'pk = :pk',
         ExpressionAttributeValues: { ':pk': pk, ...(skPrefix ? { ':pfx': skPrefix } : {}) },
@@ -222,18 +235,38 @@ const ddbItems: SimItemTable = {
     } while (ExclusiveStartKey);
     return out;
   },
-  async put(item) {
-    await ddb.send(new PutCommand({ TableName: TABLE, Item: item }));
+  async put(item, opts) {
+    try {
+      await ddb.send(new PutCommand({
+        TableName: TABLE, Item: item,
+        ...(opts?.ifAbsent
+          ? { ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)' }
+          : {}),
+      }));
+      return true;
+    } catch (err: any) {
+      if (err?.name === 'ConditionalCheckFailedException') return false;
+      throw err;
+    }
   },
-  async nextSeq(pk, sk) {
+  async nextSeq(pk, sk, setIfAbsent) {
+    const extraKeys  = Object.keys(setIfAbsent ?? {});
+    const setExprs   = extraKeys.map(k => `#s_${k} = if_not_exists(#s_${k}, :s_${k})`);
     const r = await ddb.send(new UpdateCommand({
       TableName: TABLE, Key: { pk, sk },
-      UpdateExpression: 'ADD n :one SET #ttl = :ttl',
-      ExpressionAttributeNames: { '#ttl': 'ttl' },
-      ExpressionAttributeValues: { ':one': 1, ':ttl': ttl() },
+      UpdateExpression:
+        `ADD n :one SET #ttl = :ttl${setExprs.length ? ', ' + setExprs.join(', ') : ''}`,
+      ExpressionAttributeNames: {
+        '#ttl': 'ttl',
+        ...Object.fromEntries(extraKeys.map(k => [`#s_${k}`, k])),
+      },
+      ExpressionAttributeValues: {
+        ':one': 1, ':ttl': ttl(),
+        ...Object.fromEntries(extraKeys.map(k => [`:s_${k}`, setIfAbsent![k]])),
+      },
       ReturnValues: 'ALL_NEW',
     }));
-    return r.Attributes!.n as number;
+    return { seq: r.Attributes!.n as number, attrs: r.Attributes! };
   },
   async deleteMany(keys) {
     for (let i = 0; i < keys.length; i += 25) {

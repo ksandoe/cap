@@ -788,20 +788,26 @@ export const localSimDb = {
     return table('cap-sim-state').filter(i =>
       i.pk === pk && (!skPrefix || String(i.sk).startsWith(skPrefix)));
   },
-  async put(item: Item) {
+  async put(item: Item, opts?: { ifAbsent?: boolean }) {
     const t = table('cap-sim-state');
     const i = t.findIndex(x => x.pk === item.pk && x.sk === item.sk);
-    if (i >= 0) t[i] = item; else t.push(item);
+    if (i >= 0) {
+      if (opts?.ifAbsent) return false;
+      t[i] = item;
+    } else t.push(item);
     save();
+    return true;
   },
-  async nextSeq(pk: string, sk: string) {
+  async nextSeq(pk: string, sk: string, setIfAbsent?: Record<string, unknown>) {
     const t = table('cap-sim-state');
     let ctr = t.find(x => x.pk === pk && x.sk === sk);
     if (!ctr) { ctr = { pk, sk, n: 0 }; t.push(ctr); }
     ctr.n += 1;
     ctr.ttl = Math.floor(Date.now() / 1000) + SIM_STATE_TTL_DAYS * 24 * 3600;
+    for (const [k, v] of Object.entries(setIfAbsent ?? {}))
+      if (ctr[k] === undefined) ctr[k] = v;
     save();
-    return ctr.n;
+    return { seq: ctr.n, attrs: ctr };
   },
   async deleteMany(keys: { pk: string; sk: string }[]) {
     const t = table('cap-sim-state');

@@ -99,7 +99,9 @@ export async function getOrCreateSimInstance(
     createdAt: new Date().toISOString(),
   };
   await store.putInstance(scope, instance);
-  return instance;
+  // putInstance is a conditional put — if a concurrent first-touch won,
+  // return the canonical stored instance, not our local copy.
+  return (await store.getInstance(scope)) ?? instance;
 }
 
 // ── Public projections (the only shapes that may reach the browser) ──────────

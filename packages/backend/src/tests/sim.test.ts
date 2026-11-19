@@ -88,7 +88,7 @@ function correctDocs(instance: any) {
 
 beforeAll(async () => {
   const { app }                    = await import('../app');
-  const { seedLocalStore, localModuleConfigDb } = await import('../db/localStore');
+  const { seedLocalStore, localModuleConfigDb, localSimDb } = await import('../db/localStore');
   const { issueSessionToken }      = await import('../services/identity/sessionToken');
   const { simStore }               = await import('../db/simDb');
   const { resolveVariant, PILOT_ASSIGNMENT } = await import('@cap/sim-engine');
@@ -105,7 +105,7 @@ beforeAll(async () => {
   });
 
   api = { issueSessionToken, simStore, resolveVariant, PILOT_ASSIGNMENT,
-          simService, orchestrator, sessionDb };
+          simService, orchestrator, sessionDb, localSimDb };
   server = app.listen(0);
   base = `http://127.0.0.1:${(server.address() as any).port}`;
 });
@@ -267,6 +267,174 @@ describe('sim verification — pass/fail decided by `passed`', () => {
         expect(item.studentMessage).not.toContain(v);
     }
     expectNoServerOnlyFields(result, 'verification result');
+  });
+});
+
+describe('document chain — cycles and depth terminate', () => {
+  const sc = { learnerKey: 'cycle-learner', activityId: SIM_MODULE };
+  const mkDoc = async (docType: 'inquiry' | 'quotation' | 'order', predecessorId: string | null) => {
+    const instance = await api.simService.getOrCreateSimInstance(sc, definition());
+    const doc = {
+      docType, predecessorId, customerId: '129999',
+      custReference: instance.custPoNumber, custReferenceDate: '2026-11-20',
+      validFrom: null, validTo: null, requestedDeliveryDate: null,
+      items: [{ lineNumber: 10, materialId: 'DXTR1999', quantity: 1,
+                orderProbability: null, itemConditions: [], itemNetValue: 0 }],
+      headerConditions: [], netValue: 1, status: 'complete',
+      savedAt: null,
+    };
+    return api.simStore.createDocument(sc, doc);
+  };
+
+  it('a self-referential predecessor stops at one document', async () => {
+    const a = await mkDoc('order', null);
+    // Store-level corruption: route validation would never allow this.
+    await api.simStore.updateDocument(sc, a.id, { predecessorId: a.id });
+    const chain = await api.simStore.getDocumentChain(sc, a.id);
+    expect(chain.map((d: any) => d.id)).toEqual([a.id]);
+  });
+
+  it('a mutual cycle terminates', async () => {
+    const a = await mkDoc('order', null);
+    const b = await mkDoc('order', a.id);
+    await api.simStore.updateDocument(sc, a.id, { predecessorId: b.id });
+    const chain = await api.simStore.getDocumentChain(sc, b.id);
+    expect(chain.length).toBeLessThanOrEqual(2);
+    expect(chain.at(-1).id).toBe(b.id);
+  });
+
+  it('a deep chain is bounded', async () => {
+    const sc2 = { learnerKey: 'deep-learner', activityId: SIM_MODULE };
+    let prev: string | null = null;
+    let last: any;
+    const instance = await api.simService.getOrCreateSimInstance(sc2, definition());
+    for (let i = 0; i < 15; i++) {
+      const doc: any = await api.simStore.createDocument(sc2, {
+        docType: 'order', predecessorId: prev, customerId: '129999',
+        custReference: instance.custPoNumber, custReferenceDate: '2026-11-20',
+        validFrom: null, validTo: null, requestedDeliveryDate: null,
+        items: [{ lineNumber: 10, materialId: 'DXTR1999', quantity: 1,
+                  orderProbability: null, itemConditions: [], itemNetValue: 0 }],
+        headerConditions: [], netValue: 1, status: 'complete', savedAt: null,
+      });
+      prev = doc.id; last = doc;
+    }
+    const chain = await api.simStore.getDocumentChain(sc2, last.id);
+    expect(chain.length).toBe(10); // MAX_CHAIN_DEPTH
+    expect(chain.at(-1).id).toBe(last.id);
+  });
+});
+
+describe('sim routes — input validation', () => {
+  const LEARNER3 = 'test-learner-3';
+  const sc3 = { learnerKey: LEARNER3, activityId: SIM_MODULE };
+  const token3 = () => api.issueSessionToken({
+    sessionId: 'sess-3', tempUserId: 'tu-3', moduleId: SIM_MODULE,
+    currentPhase: 2, canvasUuid: LEARNER3 });
+
+  it('400s malformed document bodies', async () => {
+    const token = await token3();
+    const instance = await api.simService.getOrCreateSimInstance(sc3, definition());
+    const good = correctDocs(instance)[0];
+    const cases: [string, any][] = [
+      ['bad docType',        { ...good, docType: 'invoice' }],
+      ['no items',           { ...good, items: [] }],
+      ['too many items',     { ...good, items: Array(21).fill(good.items[0]) }],
+      ['unknown material',   { ...good, items: [{ ...good.items[0], materialId: 'NOPE-1' }] }],
+      ['quantity 0',         { ...good, items: [{ ...good.items[0], quantity: 0 }] }],
+      ['fractional qty',     { ...good, items: [{ ...good.items[0], quantity: 2.5 }] }],
+      ['quantity too big',   { ...good, items: [{ ...good.items[0], quantity: 10000 }] }],
+      ['bad condition code', { ...good, items: [{ ...good.items[0],
+        itemConditions: [{ conditionCode: 'X999', amount: 1, active: true }] }] }],
+      ['non-finite amount',  { ...good, headerConditions: [{ conditionCode: 'RA00', amount: 'abc', active: true }] }],
+      ['missing headerConds', { ...good, headerConditions: undefined }],
+    ];
+    for (const [label, body] of cases) {
+      const r = await fetchJson('/sim/documents', token,
+        { method: 'POST', body: JSON.stringify(body) });
+      expect(r.status, label).toBe(400);
+      expect(r.body.error, label).toBe('INVALID_INPUT');
+    }
+  });
+
+  it('drops non-whitelisted fields — server-owned values win', async () => {
+    const token = await token3();
+    const instance = await api.simService.getOrCreateSimInstance(sc3, definition());
+    const r = await fetchJson('/sim/documents', token, { method: 'POST',
+      body: JSON.stringify({ ...correctDocs(instance)[0],
+        studentKey: 'other-learner', assignmentId: 'forged', id: 'INQ-999999',
+        netValue: 0.01, createdAt: '1970-01-01' }) });
+    expect(r.status).toBe(201);
+    const stored = await api.simStore.getDocument(sc3, r.body.id);
+    expect(stored.studentKey).toBe(LEARNER3);
+    expect(stored.assignmentId).toBe(api.PILOT_ASSIGNMENT.id);
+    expect(stored.createdAt).not.toBe('1970-01-01');
+    // repriced server-side, not the client's 0.01
+    expect(stored.netValue).toBeGreaterThan(1);
+  });
+
+  it('400s predecessor links that are unknown, same-type, or backward', async () => {
+    const sc4 = { learnerKey: 'test-learner-4', activityId: SIM_MODULE };
+    const token4 = await api.issueSessionToken({
+      sessionId: 'sess-4', tempUserId: 'tu-4', moduleId: SIM_MODULE,
+      currentPhase: 2, canvasUuid: sc4.learnerKey });
+    const instance = await api.simService.getOrCreateSimInstance(sc4, definition());
+    const [inquiry, quotation, order] = correctDocs(instance);
+    const post = (body: any) => fetchJson('/sim/documents', token4,
+      { method: 'POST', body: JSON.stringify(body) });
+
+    const inq = await post(inquiry);
+    expect(inq.status).toBe(201);
+
+    const cases: [string, any][] = [
+      ['unknown predecessor',      { ...quotation, predecessorId: 'INQ-999999' }],
+      ['inquiry with predecessor', { ...inquiry,  predecessorId: inq.body.id }],
+    ];
+    for (const [label, body] of cases) {
+      const r = await post(body);
+      expect(r.status, label).toBe(400);
+      expect(r.body.error, label).toBe('INVALID_INPUT');
+    }
+
+    // create a real chain, then attempt order → order and backward links
+    const quo = await post(quotation);
+    const ord = await post(order);
+    expect(quo.status).toBe(201);
+    expect(ord.status).toBe(201);
+
+    const sameType = await post({ ...order, predecessorId: ord.body.id });
+    expect(sameType.status).toBe(400);
+    const selfRef = await fetchJson(`/sim/documents/${ord.body.id}`, token4,
+      { method: 'PATCH', body: JSON.stringify({ predecessorId: ord.body.id }) });
+    expect(selfRef.status).toBe(400);
+    const backward = await fetchJson(`/sim/documents/${quo.body.id}`, token4,
+      { method: 'PATCH', body: JSON.stringify({ predecessorId: ord.body.id }) });
+    expect(backward.status).toBe(400);
+    // order → inquiry directly is a valid earlier-type link
+    const direct = await post({ ...order, predecessorId: inq.body.id });
+    expect(direct.status).toBe(201);
+  });
+
+  it('400s malformed events and 429s at the event cap', async () => {
+    const token = await token3();
+    const bad = await fetchJson('/sim/events', token,
+      { method: 'POST', body: JSON.stringify({ type: 'not_an_event', docId: null, payload: {} }) });
+    expect(bad.status).toBe(400);
+    const fat = await fetchJson('/sim/events', token,
+      { method: 'POST', body: JSON.stringify({ type: 'step_viewed', docId: null, payload: { blob: 'x'.repeat(3000) } }) });
+    expect(fat.status).toBe(400);
+    const good = await fetchJson('/sim/events', token,
+      { method: 'POST', body: JSON.stringify({ type: 'step_viewed', docId: null, payload: { step: 1 } }) });
+    expect(good.status).toBe(201);
+
+    // Drive this scope's event counter to the cap, then expect 429.
+    await api.localSimDb.put({
+      pk: LEARNER3, sk: `${SIM_MODULE}#CTR#EVT`, n: 5000, firstAt: new Date().toISOString(),
+    });
+    const capped = await fetchJson('/sim/events', token,
+      { method: 'POST', body: JSON.stringify({ type: 'step_viewed', docId: null, payload: {} }) });
+    expect(capped.status).toBe(429);
+    expect(capped.body.error).toBe('SIM_EVENT_LIMIT');
   });
 });
 
