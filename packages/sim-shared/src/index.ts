@@ -275,3 +275,6 @@ export interface ActivityLayoutConfig {
   breakpointPx: number;
   studentOverride: boolean;
 }
+
+// Contracts between the simulator and CAP (work package 1).
+export * from "./contracts";
