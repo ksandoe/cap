@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAP framing test</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2733; --muted: #5b6776; --line: #d5dae1;
+    --accent: #0a5cb8; --warn-bg: #fff4d6; --warn-line: #e3c25a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14181d; --panel: #1d232a; --text: #e6eaf0; --muted: #9aa6b4; --line: #333c47;
+            --accent: #6aa9ee; --warn-bg: #3a3118; --warn-line: #8a7226; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  p { margin: 0 0 8px; }
+  .muted { color: var(--muted); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+            padding: 14px 16px; margin: 14px 0; }
+  .note { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 8px;
+          padding: 10px 14px; margin: 14px 0; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type=url], textarea, select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--text); font: inherit; }
+  input[type=url] { flex: 1 1 360px; width: auto; min-width: 0; }
+  textarea { min-height: 70px; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  button { padding: 8px 14px; border: 1px solid var(--accent); background: var(--accent); color: #fff;
+           border-radius: 6px; font: inherit; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; }
+  iframe { width: 100%; height: 560px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .q { margin: 12px 0; }
+  .q label.q-title { display: block; font-weight: 600; margin-bottom: 4px; }
+  .opts label { display: block; font-weight: 400; margin: 2px 0; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  #status { margin-top: 8px; }
+  @media (max-width: 600px) { iframe { height: 420px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Can the SAP web interface be shown inside another page?</h1>
+  <p class="muted">A test you run in your own browser. This page only loads the address you type into a frame on this page. It sends nothing anywhere, and it does not need or store any password.</p>
+
+  <div class="note">
+    <strong>Before you start.</strong> Use a normal, signed-out browser window. Do not paste a password, token or any address that contains a session key into this page or into the results.
+    Open the browser's developer tools (F12) first, on the <em>Network</em> tab, so you can read the response headers in step 3.
+  </div>
+
+  <section>
+    <h2>1. Load SAP inside a frame</h2>
+    <p>Paste the address of the SAP web login that students use, then press Load.</p>
+    <div class="row">
+      <input id="url" type="url" placeholder="https://… (the SAP web login address)" aria-label="SAP web address">
+      <button id="load">Load in frame</button>
+      <button id="popup" class="secondary">Open in a popup instead</button>
+    </div>
+    <label style="display:block;margin:10px 0 0;padding:8px 10px;border:1px solid var(--line);border-radius:6px">
+      <input type="checkbox" id="reply"> <strong>Reply to SAP's origin request.</strong> Tick this box <em>before</em> pressing Load in frame. Leave it empty for the first run.
+    </label>
+    <p id="status" class="muted" role="status"></p>
+    <iframe id="frame" title="SAP in a frame" referrerpolicy="no-referrer"></iframe>
+    <p class="muted" style="margin-top:8px">If the frame stays blank, or says it refused to connect, the server is blocking framing. That is a useful answer, not a failure of this page.</p>
+
+    <h2 style="margin-top:14px">Diagnostic: messages the frame sends to this page</h2>
+    <p class="muted">SAP's framing protection asks the page around it to identify itself. This log shows what it asks. The checkbox answers with the reply I believe SAP expects, which is a guess based on my memory of SAP's open-source UI5 code, so the log is the real evidence. SAP will probably still refuse until its administrators allow this page's address, but the message it shows may change.</p>
+    <textarea id="log" readonly aria-label="Messages from the frame" style="min-height:90px"></textarea>
+  </section>
+
+  <section>
+    <h2>2. What happened?</h2>
+
+    <div class="q">
+      <label class="q-title" for="a1">What does the frame show?</label>
+      <select id="a1">
+        <option value="">Choose…</option>
+        <option>The SAP login page</option>
+        <option>Blank, or "refused to connect"</option>
+        <option>A browser error or warning page</option>
+        <option>Something else</option>
+      </select>
+    </div>
+
+    <div class="q">
+      <label class="q-title" for="a2">If the login page showed: can you log in inside the frame?</label>
+      <select id="a2">
+        <option value="">Choose…</option>
+        <option>Yes, and the start screen appeared</option>
+        <option>I logged in but it sent me back to the login page (a loop)</option>
+        <option>I logged in but part of the screen is missing or broken</option>
+        <option>No, the login would not accept me</option>
+        <option>Not tried (the frame was blocked)</option>
+      </select>
+    </div>
+
+    <div class="q">
+      <label class="q-title" for="a3">After logging in: open any display-only screen inside the frame. Does it work?</label>
+      <select id="a3">
+        <option value="">Choose…</option>
+        <option>Yes, screens open normally</option>
+        <option>Some do, some do not</option>
+        <option>No, it breaks or logs me out</option>
+        <option>Not tried</option>
+      </select>
+    </div>
+
+    <div class="q">
+      <label class="q-title" for="a4">Popup: does the "Open in a popup instead" button open the login page in a separate window next to this one?</label>
+      <select id="a4">
+        <option value="">Choose…</option>
+        <option>Yes</option>
+        <option>The browser blocked the popup</option>
+        <option>It opened but the page was blocked</option>
+        <option>Not tried</option>
+      </select>
+    </div>
+
+    <div class="q">
+      <label class="q-title" for="a5">Browser and version used (for example Chrome 130, Edge, Safari, Firefox)</label>
+      <input id="a5" type="text" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit">
+    </div>
+  </section>
+
+  <section>
+    <h2>3. Read the headers (this is the most useful part)</h2>
+    <p>With the Network tab open, press Load again. Click the first request in the list (the one for the SAP address itself), open <em>Headers</em>, and find <em>Response Headers</em>. Copy the lines for these two headers if they exist, or write "none":</p>
+    <ul>
+      <li><code>X-Frame-Options</code></li>
+      <li><code>Content-Security-Policy</code> (only the part that says <code>frame-ancestors …</code>)</li>
+    </ul>
+    <p>Also look at the Console tab. A blocked frame prints a red message that starts with "Refused to display". Copy that line too.</p>
+    <textarea id="a6" placeholder="X-Frame-Options: …&#10;frame-ancestors: …&#10;Console message: …"></textarea>
+  </section>
+
+  <section>
+    <h2>4. Copy the results</h2>
+    <p>Press the button, then paste the text into the chat.</p>
+    <div class="row"><button id="copy">Copy results</button><span id="copied" class="muted" role="status"></span></div>
+    <textarea id="out" readonly aria-label="Results text" style="margin-top:8px"></textarea>
+  </section>
+</main>
+
+<script>
+(function () {
+  var frame = document.getElementById('frame');
+  var status = document.getElementById('status');
+  var urlInput = document.getElementById('url');
+  var started = 0;
+
+  function cleanUrl() {
+    var v = urlInput.value.trim();
+    if (!v) { status.textContent = 'Type or paste the SAP address first.'; return null; }
+    try {
+      var u = new URL(v);
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('bad protocol');
+      return u.href;
+    } catch (e) {
+      status.textContent = 'That does not look like a web address. It should start with https://';
+      return null;
+    }
+  }
+
+  document.getElementById('load').addEventListener('click', function () {
+    var u = cleanUrl();
+    if (!u) return;
+    started = Date.now();
+    status.textContent = 'Loading…';
+    frame.src = u;
+  });
+
+  // The load event fires even when a server refuses framing, so it proves nothing by itself.
+  frame.addEventListener('load', function () {
+    if (!started) return;
+    status.textContent = 'The frame finished loading after ' + (Date.now() - started) +
+      ' ms. Look at the frame: if it shows the login page it worked; if it is blank or says "refused to connect" it was blocked.';
+  });
+
+  // Show what the framed page posts to us (origin and a short text), and optionally answer
+  // SAP's request for the parent's origin. Only plain text is shown; nothing is sent anywhere
+  // except the reply, which goes back to the sender's own origin.
+  var logBox = document.getElementById('log');
+  window.addEventListener('message', function (e) {
+    if (e.source !== frame.contentWindow) return;
+    var d = (typeof e.data === 'string') ? e.data : '(' + typeof e.data + ') ' + (function () {
+      try { return JSON.stringify(e.data); } catch (x) { return '[unreadable]'; }
+    })();
+    var line = new Date().toLocaleTimeString() + '  from ' + e.origin + ':  ' + d.slice(0, 200);
+    var answered = false;
+    if (document.getElementById('reply').checked && typeof e.data === 'string' &&
+        e.data.indexOf('SAPFrameProtection*require-origin') === 0 && e.source) {
+      try {
+        // An opaque origin ("null") cannot be a target, so only the local self-test needs "*".
+        e.source.postMessage('SAPFrameProtection*parent-origin', e.origin === 'null' ? '*' : e.origin);
+        answered = true;
+      } catch (err) { line += '   [reply failed]'; }
+    }
+    logBox.value += line + (answered ? '   [answered]' : '') + '\n';
+  });
+
+  document.getElementById('popup').addEventListener('click', function () {
+    var u = cleanUrl();
+    if (!u) return;
+    var w = Math.round(window.screen.availWidth * 0.5);
+    var h = window.screen.availHeight;
+    var left = window.screen.availWidth - w;
+    var win = window.open(u, 'sap-popup', 'popup=yes,width=' + w + ',height=' + h + ',left=' + left + ',top=0');
+    status.textContent = win ? 'Popup opened on the right half of the screen.' : 'The browser blocked the popup. Allow popups for this page and try again.';
+  });
+
+  function val(id) { var el = document.getElementById(id); return el && el.value ? el.value : '(not answered)'; }
+
+  document.getElementById('copy').addEventListener('click', function () {
+    var host = '';
+    try { host = new URL(urlInput.value.trim()).origin; } catch (e) { host = '(none entered)'; }
+    var text = [
+      'SAP framing test results',
+      'Address origin tested: ' + host,
+      'This page was opened from: ' + (location.protocol === 'file:' ? 'a local file' : location.origin),
+      '1. Frame shows: ' + val('a1'),
+      '2. Login inside the frame: ' + val('a2'),
+      '3. Screens inside the frame: ' + val('a3'),
+      '4. Popup: ' + val('a4'),
+      '5. Browser: ' + val('a5'),
+      '6. Headers and console:',
+      val('a6'),
+      '7. Messages from the frame (reply box ' + (document.getElementById('reply').checked ? 'ticked' : 'not ticked') + '):',
+      logBox.value || '(none)'
+    ].join('\n');
+    var out = document.getElementById('out');
+    out.value = text;
+    var copied = document.getElementById('copied');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { copied.textContent = 'Copied. Paste it into the chat.'; },
+        function () { out.select(); copied.textContent = 'Select the text below and copy it.'; }
+      );
+    } else {
+      out.select();
+      copied.textContent = 'Select the text below and copy it.';
+    }
+  });
+})();
+</script>
+</body>
+</html>
