@@ -46,7 +46,7 @@ It is a working outline, not a secure implementation. It must not be reachable b
 - the **redirect addresses**, which are a separate field in the developer key form, not part of the JSON configuration
 - the tool's **public key**, pasted in or as a web address (`public_jwk` or `public_jwk_url`, one is required per the [configuration reference](https://canvas.ou.edu/doc/api/file.lti_dev_key_config.html))
 - if grade write-back is in scope now, the AGS scopes (the line item scope and the score scope) and the switch that turns AGS on for the key, per the [assignment tools doc](https://developerdocs.instructure.com/services/canvas/external-tools/lti/file.assignment_tools)
-- a custom parameter `activity_id` on each placement (for example `sales_process`)
+- a custom parameter `activity_id` (tool level or per placement). **Its value must equal the module id of a recipe in the backend**, for example `sim-sales-process` for the simulator module (or `demo-sales-process` for the older demo). A launch without it fails with "missing the activity_id custom parameter", and an unknown value fails when the session is created.
 
 ## 3A. New requirement: the student's email address at launch
 
@@ -152,7 +152,7 @@ console.log(JSON.stringify(jwk, null, 2));
 | Redirect URI (launch) | `https://<backend address>/lti/launch` |
 | Target link URI | `https://<backend address>/lti/launch` |
 | Public key | the public JWK above |
-| Custom field | `activity_id=sales_process` |
+| Custom field | `activity_id=sim-sales-process` (must match a recipe's module id) |
 
 **Which address is which** (checked against `routes/lti.ts` and the deployed backend on 2026-11-20):
 
