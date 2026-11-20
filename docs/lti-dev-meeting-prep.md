@@ -23,7 +23,7 @@ It is a working outline, not a secure implementation. It must not be reachable b
 | Grade write-back | A stub. The Canvas token fetch is a TODO. The score is posted to the line item address itself; AGS expects `<line item>/scores` with the score content type `application/vnd.ims.lis.v1.score+json`. |
 | Tool's own keys | Not present. Grade write-back needs CAP to hold a key pair, and Canvas needs the public half in the key's configuration (pasted in, or as a web address CAP hosts). |
 
-**Do not register against the deployed backend yet.** Because the launch does not verify signatures, registering a real Canvas key against a public address would let someone forge launches. For the first test, use `localhost` if Canvas allows it, or a temporary tunnel address. Register the real address once the hardening in §7 is done.
+**Registering the deployed backend with Canvas Dev is acceptable, with limits.** The launch does not verify signatures, so anyone who finds a public address could forge a launch. But the deployed backend already has a public address and an open demo launchpad (§3B), so registering it with a Canvas **Dev** instance (test students, synthetic data) adds no exposure. Before any **real** student launches through it, the hardening in §7 must be done and the demo launchpad switched off. (Revised 2026-11-20; this paragraph used to say to wait.)
 
 ## 3. What to ask the administrator
 
@@ -128,19 +128,37 @@ console.log(JSON.stringify(jwk, null, 2));
 
 **Addresses.** The LTI addresses belong to the **backend** (API Gateway and Lambda in `infra/lambda.md`), not to Amplify. Amplify hosts only the static student app, and it cannot receive the form POST that Canvas sends at launch. The Amplify address matters only as `FRONTEND_URL`, where the backend sends the student after a launch. **Do not give Mir an Amplify address.** The older `sap-sim` Amplify site is a static demo and cannot take part in LTI at all.
 
-| Canvas field | Value for the first registration (backend run locally) | Later (deployed backend) |
-|---|---|---|
-| OpenID Connect initiation URL | `http://localhost:3001/lti/oidc/login` | `https://<backend address>/lti/oidc/login` |
-| Redirect URI (launch) | `http://localhost:3001/lti/launch` | `https://<backend address>/lti/launch` |
-| Target link URI | `http://localhost:3001/lti/launch` | `https://<backend address>/lti/launch` |
-| Public key | the public JWK above | the production public key |
-| Custom field | `activity_id=sales_process` | same |
+**What the deployed backend does today** (read-only GET requests on 2026-11-20; the address is Kent's and is deliberately not written here):
 
-- **Why localhost first.** The launch is a redirect and a form post made by the student's own browser, so `localhost` works on a developer's machine. The signature check is not written yet (§2), and the plan above says not to register a real public address until it is. Ask Mir whether Canvas accepts `http://localhost`.
-- **If Canvas insists on `https`,** the fallback is a short-lived tunnel address pointing at the local backend. Be careful: the local backend also serves `/dev/launch`, which creates sessions with no login. Use a tunnel only briefly, with synthetic data only, and shut it down afterward.
-- **CAP has no stable public address yet.** Raw API Gateway addresses change when the stack is rebuilt, so a custom domain is better. Pick it before the real registration. The framing request to UCC needs the same address.
-- Ask Mir **how addresses on a key get edited later** and who can do it, so the move from localhost to the real address is a small change, not a re-registration.
-- Canvas will give back a **client ID** and **deployment ID**. They go in `.env` only, never in chat or in the repository.
+- It is live, and it also serves the student app at its root.
+- `/lti/oidc/login` answers 500 "Invalid URL", because the `LTI_*` settings are not configured on it yet. Login initiation therefore fails closed.
+- `/dev/modules` answers 200, so the **demo launchpad is switched on** (`ENABLE_DEV_ROUTES`). Anyone with the address can start a session without logging in. That is by design for the demo (see `routes/dev.ts`), but it must be off before real students.
+- `/sim/instance` answers 404, so the deployed build is **older than the simulator work** and needs a redeploy before the simulator runs there.
+- `/lti/launch` was not tested. From the code it still accepts an unverified token (§2).
+
+**Recommendation: register the deployed backend for the first key.** It is live and `https`, and the deployment is already an open demo, so registering it with Canvas **Dev** (test students only, synthetic data) adds no exposure. Use these values, with the deployed address in place of the placeholder:
+
+| Canvas field | Value |
+|---|---|
+| OpenID Connect initiation URL | `https://<backend address>/lti/oidc/login` |
+| Redirect URI (launch) | `https://<backend address>/lti/launch` |
+| Target link URI | `https://<backend address>/lti/launch` |
+| Public key | the public JWK above |
+| Custom field | `activity_id=sales_process` |
+
+**Before any real student launches through it:**
+
+1. Turn the demo launchpad off (`ENABLE_DEV_ROUTES` unset, `NODE_ENV=production`).
+2. Finish the launch verification in §7.
+3. Replace `?token=` in the redirect.
+4. Redeploy the current `main`, so the simulator routes exist.
+
+**After Mir gives you the values,** set these on the backend and redeploy: `LTI_PLATFORM_URL`, `LTI_CLIENT_ID`, `LTI_DEPLOYMENT_ID`, `LTI_PLATFORM_JWKS_URL`, `LTI_OIDC_AUTH_URL`, and `LTI_REDIRECT_URI` (the launch address above). Until they are set, a Canvas launch will fail at login.
+
+- **Local testing for Aliyah.** A key has one initiation address, so launching from Canvas against `localhost` needs a second key or an edit to this one. Ask Mir which is easier. If Canvas insists on `https` for localhost, a short-lived tunnel works, but the local backend serves `/dev/launch` with no login, so use it briefly with synthetic data only.
+- **A custom domain is better than the raw API Gateway address** if the stack is ever rebuilt, and the UCC framing request needs a stable address too. Decide that before the production registration.
+- Ask Mir **how addresses on a key get edited later** and who can do it.
+- Canvas will give back a **client ID** and **deployment ID**. They go in `.env` or the backend's settings only, never in chat or in the repository.
 
 ## 4. Decisions to bring up (from the ATEC note)
 
