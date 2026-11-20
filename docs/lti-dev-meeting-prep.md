@@ -99,6 +99,49 @@ Open with: "Phase 1 was no email. A research requirement now needs one for infor
 
 Who may hold the email, how it reaches Qualtrics, whether the IRB needs an amendment, and the research-ID design belong to Arash, David and the IRB. Write "to confirm with Arash/David/IRB" and move on.
 
+## 3B. Privacy level, keys and addresses: what to say and bring
+
+**Privacy level.** Ask for `anonymous` on CAP's key. Suggested words: "We only need the pseudonymous user ID, so please set the privacy level to anonymous. We'll talk separately about a second key for a survey launcher." Do not raise name or email beyond that today. If asked whether it can change later, ask Mir how a key's settings are edited and by whom. One community thread says the privacy setting could not be reached again after the key was created, so plan on a **new key** for the survey, not on editing this one.
+
+**The tool's key pair.** Canvas's key form asks for the tool's **public** key (`public_jwk`, or `public_jwk_url` if we host it), even though Phase 1 only launches. CAP will use the private half later, to sign grade write-back requests. Generate a throwaway **dev** pair before the meeting. This command writes the private key to `%USERPROFILE%\cap-keys` (outside OneDrive and outside any repository) and prints only the public key:
+
+```powershell
+@'
+const { generateKeyPairSync, randomUUID } = require('crypto');
+const fs = require('fs'), path = require('path'), os = require('os');
+const dir = process.env.CAP_KEYS_DIR || path.join(os.homedir(), 'cap-keys');
+fs.mkdirSync(dir, { recursive: true });
+const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+fs.writeFileSync(path.join(dir, 'cap-lti-dev-private.pem'), privateKey.export({ type: 'pkcs8', format: 'pem' }));
+const jwk = { ...publicKey.export({ format: 'jwk' }), kid: randomUUID(), alg: 'RS256', use: 'sig' };
+fs.writeFileSync(path.join(dir, 'cap-lti-dev-public.jwk.json'), JSON.stringify(jwk, null, 2));
+console.log('Private key saved to: ' + path.join(dir, 'cap-lti-dev-private.pem') + '  (keep it; never share or commit it)');
+console.log('Public key (safe to share):');
+console.log(JSON.stringify(jwk, null, 2));
+'@ | node -
+```
+
+- Give Mir the **public** JSON (the `.jwk.json` file). Never share, paste or commit the private `.pem`, and never paste it into chat with Claude.
+- The dev pair is disposable. If it leaks or Mir needs a new one, generate another and have the key's public half replaced.
+- **Production needs a different pair**, stored in Secrets Manager (`cap/prod/lti-private-key`, see `infra/secrets.md`), ideally published as a hosted key-set address so it can rotate without re-registering. Do not reuse the dev pair.
+- The field names (`public_jwk` / `public_jwk_url`) come from the configuration reference; check them against the real form.
+
+**Addresses.** The LTI addresses belong to the **backend** (API Gateway and Lambda in `infra/lambda.md`), not to Amplify. Amplify hosts only the static student app, and it cannot receive the form POST that Canvas sends at launch. The Amplify address matters only as `FRONTEND_URL`, where the backend sends the student after a launch. **Do not give Mir an Amplify address.** The older `sap-sim` Amplify site is a static demo and cannot take part in LTI at all.
+
+| Canvas field | Value for the first registration (backend run locally) | Later (deployed backend) |
+|---|---|---|
+| OpenID Connect initiation URL | `http://localhost:3001/lti/oidc/login` | `https://<backend address>/lti/oidc/login` |
+| Redirect URI (launch) | `http://localhost:3001/lti/launch` | `https://<backend address>/lti/launch` |
+| Target link URI | `http://localhost:3001/lti/launch` | `https://<backend address>/lti/launch` |
+| Public key | the public JWK above | the production public key |
+| Custom field | `activity_id=sales_process` | same |
+
+- **Why localhost first.** The launch is a redirect and a form post made by the student's own browser, so `localhost` works on a developer's machine. The signature check is not written yet (§2), and the plan above says not to register a real public address until it is. Ask Mir whether Canvas accepts `http://localhost`.
+- **If Canvas insists on `https`,** the fallback is a short-lived tunnel address pointing at the local backend. Be careful: the local backend also serves `/dev/launch`, which creates sessions with no login. Use a tunnel only briefly, with synthetic data only, and shut it down afterward.
+- **CAP has no stable public address yet.** Raw API Gateway addresses change when the stack is rebuilt, so a custom domain is better. Pick it before the real registration. The framing request to UCC needs the same address.
+- Ask Mir **how addresses on a key get edited later** and who can do it, so the move from localhost to the real address is a small change, not a re-registration.
+- Canvas will give back a **client ID** and **deployment ID**. They go in `.env` only, never in chat or in the repository.
+
 ## 4. Decisions to bring up (from the ATEC note)
 
 1. Grade write-back: AGS or a narrowly scoped Canvas API. Open. Kent proposed AGS, and ATEC has more experience with the API route.
