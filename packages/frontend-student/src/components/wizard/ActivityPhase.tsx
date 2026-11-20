@@ -30,6 +30,10 @@ export function ActivityPhase() {
   const [confirming, setConfirming] = useState(false);
   const [verifying,  setVerifying]  = useState(false);
   const [error,      setError]      = useState<string | null>(null);
+  // Student-safe per-document findings from a failed check (sim activities).
+  const [verifyItems, setVerifyItems] = useState<
+    { status: 'ok' | 'missing' | 'mismatch'; studentMessage: string }[]
+  >([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const steps = recipe?.steps ?? [];
@@ -48,6 +52,7 @@ export function ActivityPhase() {
     setConfirming(false);
     setVerifying(true);
     setError(null);
+    setVerifyItems([]);
     try {
       await api.session.verifySap(sessionId);
     } catch (e: any) {
@@ -65,11 +70,20 @@ export function ActivityPhase() {
           setPhase(3);
         } else if ((status === 'LEARNING' || status === 'ACTIVITY') && sapVerificationError) {
           stopPolling();
-          const missing = sapVerificationError.missingTypes?.length
-            ? `The following items weren't found yet: ${sapVerificationError.missingTypes.join(', ')}. ` +
-              'Complete them and try again.'
-            : 'The system that checks your work is temporarily unavailable. Please try again in a few minutes.';
-          setError(missing);
+          // Sim activities return student-safe per-document findings; live
+          // SAP only reports which types weren't found.
+          const items = (sapVerificationError.items ?? []) as {
+            status: 'ok' | 'missing' | 'mismatch'; studentMessage: string;
+          }[];
+          if (items.length) {
+            setVerifyItems(items);
+          } else {
+            const missing = sapVerificationError.missingTypes?.length
+              ? `The following items weren't found yet: ${sapVerificationError.missingTypes.join(', ')}. ` +
+                'Complete them and try again.'
+              : 'The system that checks your work is temporarily unavailable. Please try again in a few minutes.';
+            setError(missing);
+          }
         } else if (Date.now() - started > POLL_TIMEOUT_MS) {
           stopPolling();
           setError('Verification is taking longer than expected. Please try again.');
@@ -99,6 +113,21 @@ export function ActivityPhase() {
       {step.blocks.map(b => <BlockView key={b.blockId} block={b} />)}
 
       {error && <div className="notice error" role="alert">{error}</div>}
+
+      {verifyItems.length > 0 && (
+        <div className="notice error" role="alert">
+          <p style={{ marginTop: 0, fontWeight: 600 }}>
+            Check your work — these need another look:
+          </p>
+          <ul className="verify-items">
+            {verifyItems.map((it, i) => (
+              <li key={i} className={it.status === 'ok' ? 'ok' : ''}>
+                {it.status === 'ok' ? '✓ ' : ''}{it.studentMessage}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {confirming && (
         <div className="notice">
