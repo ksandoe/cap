@@ -38,6 +38,7 @@ It is a working outline, not a secure implementation. It must not be reachable b
 7. **Which test accounts do we get?** A teacher and a student each, for Kent, Aliyah and David. Test students only, no real student data.
 8. **Does Canvas accept `http://localhost` as a redirect address** for the dev key? If not, what `https` address should we use?
 9. **What is the path from dev to test to production, and who approves it** (ITPR, HECVAT)?
+10. **For production, does ATEC or IT want a campus domain for LTI tools, and who provisions it?** A tool for students on a personally registered domain may raise ownership questions in review. Settle the production address before the production registration, because assignments in a real course store it. For the dev key, the deployed API Gateway address is enough.
 
 ### Settings we hand over
 
