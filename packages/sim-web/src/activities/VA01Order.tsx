@@ -192,22 +192,24 @@ export default function VA01Order({
   }
 
   if (saved) {
+    const savedPanel = (
+      <div>
+        <Title level="H5">Order saved</Title>
+        <p>
+          SAP confirmed the save in the status bar at the bottom of the screen — look there for your sales order
+          number, not in this panel. The screen itself just reset to a new, empty order.
+        </p>
+        <Button design="Emphasized" onClick={() => onSaved(saved)}>
+          Continue
+        </Button>
+      </div>
+    );
     return (
       <div>
         <ReferenceDocumentsButton instance={instance} />
         <ActivityLayout
-          instructions={
-            <div>
-              <Title level="H5">Order saved</Title>
-              <p>
-                SAP confirmed the save in the status bar at the bottom of the screen — look there for your sales order
-                number, not in this panel. The screen itself just reset to a new, empty order.
-              </p>
-              <Button design="Emphasized" onClick={() => onSaved(saved)}>
-                Continue
-              </Button>
-            </div>
-          }
+          instructions={savedPanel}
+          embeddedNotice={savedPanel}
           screen={<OrderOverview key="blank" mode="blank" title={`${SCREEN_TITLE}: Overview`} code={VA01_CONFIG.id} />}
         />
       </div>
