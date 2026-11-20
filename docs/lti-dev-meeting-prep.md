@@ -111,12 +111,19 @@ Who may hold the email, how it reaches Qualtrics, whether the IRB needs an amend
 const { generateKeyPairSync, randomUUID } = require('crypto');
 const fs = require('fs'), path = require('path'), os = require('os');
 const dir = process.env.CAP_KEYS_DIR || path.join(os.homedir(), 'cap-keys');
+const privPath = path.join(dir, 'cap-lti-dev-private.pem');
+if (fs.existsSync(privPath)) {
+  console.log('A private key already exists at ' + privPath + '. Nothing was changed.');
+  console.log('To make a new pair, move that file somewhere safe first.');
+  process.exit(1);
+}
 fs.mkdirSync(dir, { recursive: true });
 const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-fs.writeFileSync(path.join(dir, 'cap-lti-dev-private.pem'), privateKey.export({ type: 'pkcs8', format: 'pem' }));
+fs.writeFileSync(privPath, privateKey.export({ type: 'pkcs8', format: 'pem' }));
 const jwk = { ...publicKey.export({ format: 'jwk' }), kid: randomUUID(), alg: 'RS256', use: 'sig' };
 fs.writeFileSync(path.join(dir, 'cap-lti-dev-public.jwk.json'), JSON.stringify(jwk, null, 2));
-console.log('Private key saved to: ' + path.join(dir, 'cap-lti-dev-private.pem') + '  (keep it; never share or commit it)');
+console.log('Private key saved to: ' + privPath + '  (keep it; never share or commit it)');
+console.log('Public key saved to:  ' + path.join(dir, 'cap-lti-dev-public.jwk.json'));
 console.log('Public key (safe to share):');
 console.log(JSON.stringify(jwk, null, 2));
 '@ | node -
