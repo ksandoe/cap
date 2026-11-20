@@ -104,7 +104,7 @@ Who may hold the email, how it reaches Qualtrics, whether the IRB needs an amend
 
 **Privacy level.** Ask for `anonymous` on CAP's key. Suggested words: "We only need the pseudonymous user ID, so please set the privacy level to anonymous. We'll talk separately about a second key for a survey launcher." Do not raise name or email beyond that today. If asked whether it can change later, ask Mir how a key's settings are edited and by whom. One community thread says the privacy setting could not be reached again after the key was created, so plan on a **new key** for the survey, not on editing this one.
 
-**The tool's key pair.** Canvas's key form asks for the tool's **public** key (`public_jwk`, or `public_jwk_url` if we host it), even though Phase 1 only launches. CAP will use the private half later, to sign grade write-back requests. Generate a throwaway **dev** pair before the meeting. This command writes the private key to `%USERPROFILE%\cap-keys` (outside OneDrive and outside any repository) and prints only the public key:
+**The tool's key pair.** Canvas's key form asks for the tool's **public** key (`public_jwk`, or `public_jwk_url` if we host it), even though Phase 1 only launches. CAP will use the private half later, to sign grade write-back requests. Generate a throwaway **dev** pair before the meeting. This command writes the private key to `%USERPROFILE%\cap-keys` (outside OneDrive and outside any repository) and prints only the public key. It refuses to overwrite an existing private key, so running it twice cannot silently break a registered key:
 
 ```powershell
 @'
