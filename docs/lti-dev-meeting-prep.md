@@ -187,7 +187,7 @@ console.log(JSON.stringify(jwk, null, 2));
 
 ## 5. Capture sheet (for Aliyah's notes)
 
-Fill this in during the meeting. **Do not write or paste private keys or client secrets here, in chat, or in the repository.**
+Fill this in during the meeting. **Do not write or paste private keys, client secrets or passwords here, in chat, or in the repository.** The client ID, deployment ID and Canvas Dev addresses are not secrets, but under the license terms they go only into `.env` or the backend settings, never into chat with Claude. Write them in your own private copy and use placeholders in anything you send on.
 
 ```text
 Canvas environment (production / test / beta): ____
@@ -207,6 +207,9 @@ Email request (section 3A):
   Real launch payload seen for a test student (claim names only): ____
 Placement chosen: ____   Opens in new tab? ____
 Redirect addresses accepted (localhost OK?): ____
+How addresses on a key get edited later, and by whom: ____
+Login initiation sent as GET or POST (if known): ____
+Campus domain wanted for production LTI tools, and who provisions it: ____
 Test accounts provided (teacher / student / for whom): ____
 Dev course name and where the assignments are: ____
 Who registers production, and approval needed: ____
@@ -220,7 +223,7 @@ Follow-ups and who owns them: ____
 - Do not improvise credentials, and do not agree to anything that needs real student data.
 - Write "unknown" and move on. A missing answer is fine; a wrong one costs days.
 
-**Roles:** Kent leads on decisions and priorities. Aliyah takes the notes on the capture sheet. After the meeting, send the notes (no secrets) to Claude, who updates this document, turns the answers into configuration notes and writes the hardening tasks.
+**Roles:** Kent leads on decisions and priorities. Aliyah takes the notes on the capture sheet. After the meeting, send the notes to Claude, who updates this document, turns the answers into configuration notes and writes the hardening tasks. **Before sending, replace the client ID, the deployment ID and every Canvas Dev address with a placeholder** such as `<client id>`. Under the license terms those values go straight into `.env` or the backend settings and are never pasted to Claude. Never include passwords, keys or real student data.
 
 ## 7. After the meeting: a bounded job for Aliyah
 
