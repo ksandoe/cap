@@ -209,26 +209,28 @@ export default function VA21Quotation({
   // After a successful save real SAP drops you on a fresh, empty Overview and says "Quotation N has
   // been saved" only in the status bar — so the number is deliberately not repeated on this screen.
   if (saved) {
+    const savedPanel = (
+      <div>
+        <Title level="H5">Quotation saved</Title>
+        <p>
+          SAP confirmed the save in the status bar at the bottom of the screen — look there for your quotation
+          number, not in this panel. The screen itself just reset to a new, empty quotation.
+        </p>
+        <p>
+          A blank browser tab may also have opened just now. That is normal SAP behavior; close it and come back
+          here.
+        </p>
+        <Button design="Emphasized" onClick={() => onSaved(saved)}>
+          Continue
+        </Button>
+      </div>
+    );
     return (
       <div>
         <ReferenceDocumentsButton instance={instance} />
         <ActivityLayout
-          instructions={
-            <div>
-              <Title level="H5">Quotation saved</Title>
-              <p>
-                SAP confirmed the save in the status bar at the bottom of the screen — look there for your quotation
-                number, not in this panel. The screen itself just reset to a new, empty quotation.
-              </p>
-              <p>
-                A blank browser tab may also have opened just now. That is normal SAP behavior; close it and come back
-                here.
-              </p>
-              <Button design="Emphasized" onClick={() => onSaved(saved)}>
-                Continue
-              </Button>
-            </div>
-          }
+          instructions={savedPanel}
+          embeddedNotice={savedPanel}
           screen={<BlankOverviewScreen title={`${VA21_CONFIG.title}: Overview`} code={VA21_CONFIG.id} docLabel="Quotation" />}
         />
       </div>

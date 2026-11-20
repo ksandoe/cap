@@ -986,6 +986,11 @@ input.sap-field-error {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  /* The workspace takes its width from its container and never asks for more. Without this, a wide SAP
+     screen raises the minimum width of CAP's grid column and the whole page scrolls sideways; the screen
+     scrolls inside .sim-workspace-body instead. */
+  min-width: 0;
+  contain: inline-size;
 }
 .sim-workspace-body {
   flex: 1 1 auto;

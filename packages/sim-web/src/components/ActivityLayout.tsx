@@ -17,9 +17,15 @@ function defaultModeForWidth(width: number): ActivityLayoutMode {
 export default function ActivityLayout({
   instructions,
   screen,
+  embeddedNotice,
 }: {
   instructions: ReactNode;
   screen: ReactNode;
+  /**
+   * Shown above the screen when embedded, where the instructions pane is dropped. Use it for anything the
+   * student must be able to act on (a Continue button), not for teaching text, which is CAP's job there.
+   */
+  embeddedNotice?: ReactNode;
 }) {
   const [mode, setMode] = useState<ActivityLayoutMode>(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as ActivityLayoutMode | null;
@@ -43,8 +49,16 @@ export default function ActivityLayout({
     localStorage.setItem(STORAGE_KEY, next);
   }
 
-  // Embedded in CAP: the instructions live in CAP's own pane, so only the simulated screen is drawn.
-  if (embedded) return <div>{screen}</div>;
+  // Embedded in CAP: the instructions live in CAP's own pane, so only the simulated screen is drawn
+  // (plus any notice the student has to act on).
+  if (embedded) {
+    return (
+      <div>
+        {embeddedNotice}
+        {screen}
+      </div>
+    );
+  }
 
   return (
     <div>
