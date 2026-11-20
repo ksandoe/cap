@@ -1,11 +1,13 @@
 # Canvas dev instance meeting: preparation
 
-**For:** Kent and Aliyah, meeting with the Canvas administrator on 2026-11-20. David can read it too.
+**For:** Kent and Aliyah, meeting with Mir Lulic (campus Canvas lead, ATEC) on 2026-11-20. David can read it too. Section 3A was added the morning of the meeting for a new requirement: the student's email address at launch.
 **Basis:** a read of CAP's LTI code on `main` (`packages/backend/src/services/lti/ltiService.ts`, `routes/lti.ts`, `services/grade/gradeService.ts`), the agreed decision in `docs/decisions/2026-10-canvas-lti-atec.md`, and a check of Canvas's public documentation. Revised 2026-11-19. I have not seen the real Canvas instance. Canvas details are from search summaries, not the full documentation, so confirm them with the administrator.
 
 ## 1. Goal for the meeting
 
 Leave with a **registered developer key for CAP in the dev course**, **test teacher and student logins** for Kent, Aliyah and David, and a **written list of the values Canvas gives us** (the capture sheet in §5). Everything else is a bonus.
+
+The email requirement (§3A) is a **scoping conversation, not a setting to change today.** Register the key with the **anonymous** privacy level first, so the main goal is not held up. Raise email in the last ten minutes and leave with Mir's answers and an approval path.
 
 ## 2. Where CAP's LTI code actually stands
 
@@ -45,11 +47,56 @@ It is a working outline, not a secure implementation. It must not be reachable b
 - if grade write-back is in scope now, the AGS scopes (the line item scope and the score scope) and the switch that turns AGS on for the key, per the [assignment tools doc](https://developerdocs.instructure.com/services/canvas/external-tools/lti/file.assignment_tools)
 - a custom parameter `activity_id` on each placement (for example `sales_process`)
 
+## 3A. New requirement: the student's email address at launch
+
+**What was asked.** The research team wants the student's email at launch, at least the first launch, as part of the informed-consent process. The beginning-of-course survey opens through Canvas, hands off to Qualtrics, and ends by sending the student, with the Canvas pseudonymous ID, to a separate consent survey (research participation, FERPA authorization, optional teaching excerpts, typed name and student ID as the signature). Arash Negahban is the data custodian and the only person who can open the consent project. Instructors see completion only.
+
+**Why it needs care.** It reopens what ATEC agreed in October and what our own rules say:
+
+- The agreed Phase 1 is "no name, email or roster". Mir also called it "cleaner" that CAP never handles student email addresses for badges (`docs/decisions/2026-10-canvas-lti-atec.md`). Asking for email is a change to that agreement, and he may need to take it to ATEC or IT.
+- Our rules: "No student PII persisted" and "CAP never stores emails" (`CLAUDE.md`). The launch code reads only `iss`, `sub`, context, resource link, AGS endpoint, result id and `activity_id`.
+- **The privacy level belongs to the developer key, not to a launch.** Canvas documents four values: `anonymous`, `name_only`, `email_only` and `public`. `email_only` adds the email and nothing else; `public` adds name, username and more; `sub` is always sent ([config reference](https://developerdocs.instructure.com/services/canvas/external-tools/lti/file.lti_dev_key_config), [privacy summary](https://community.canvaslms.com/t5/Canvas-Resource-Documents/Privacy-implications-of-installing-an-LTI-1-3-tool-in-Canvas/ta-p/637141)). So with one key, **every student would send their email on every launch of every activity**, including the SAP simulation. "First launch only" can only be something CAP does after it receives the value. Sources disagree on details, and one community thread says the key form offered only Public or Private, so ask to see the real form.
+- **Email would arrive before consent.** Consent is the last step of the survey. Whatever receives the email before then may hold it only to run the consent process, and must not keep it for anyone who declines or skips. That is an IRB question (the existing IRB 2024-164 does not cover CAP).
+
+**Settle two things first, because they change the answer.**
+
+1. **What is the email for?** My guess is reaching the student with a copy of the consent and the withdrawal link in follow-up messages. Confirm with Arash. Also which address is meant: Canvas sends the user's primary email, which may not be the campus address (confirm with Mir).
+2. **Which tool launches the survey?** If it is CAP's launch, this document applies. If it is Qualtrics's own Canvas integration, the email question belongs to that tool's key and **CAP stays anonymous**.
+
+**Options, least personal data first.**
+
+| Option | How | Cost |
+|---|---|---|
+| 1. The student types it in the consent survey | No Canvas change. Email lives only in Arash's project. | Typos, and no proof it is their campus address. The form already asks for a typed name and ID. |
+| 2. Qualtrics gets it from Canvas directly | Qualtrics's own integration, with its own privacy level. CAP never sees it. | Only if the survey launches that way. |
+| 3. CAP receives it and passes it on | A **second developer key** for the survey placement only, set to `email_only`. The SAP activities keep the anonymous key. | CAP needs a secure channel to the consent project. A Qualtrics API credential for CAP widens access to Arash's project. A new data-handling review. |
+
+**My recommendation:** try Option 1 or 2 first. Choose Option 3 only if the research design needs an address Canvas has verified, and then only with a separate key.
+
+**Guardrails for any option.** The email must never be written to the session record, the session token, a redirect address, a log line, an AI prompt, a research or evaluation record, or an instructor view, and it must never be pasted into chat with Claude. It is held in memory for the launch request only. If it is forwarded, it goes server to server over HTTPS with a credential limited to that purpose. If the student declines, the research team does not keep it.
+
+**Also for later, not for Mir.** The consent survey receives "the Canvas pseudonymous ID". Our rule is that raw `sub` never goes to the browser. The clean choice is a **separate research ID**: a keyed hash with its own secret, so it matches neither `sub` nor CAP's learner key. Settle that with David and Arash.
+
+### What to ask Mir (after the main questions)
+
+1. Is a change from "no email" acceptable for one placement, and what approval does it need (ITPR, HECVAT, a data-sharing review)? Ask, do not assume.
+2. Can the survey placement use its **own developer key** with `email_only` while the CAP activities stay on `anonymous`?
+3. Exactly which address does Canvas put in the `email` claim? Can we see one real launch for a **test student** to confirm the claim name and value?
+4. How is the Qualtrics survey launched today (Qualtrics's own integration or another path), who set it up, and what does it receive?
+5. Does Canvas show students any notice about data released to a tool?
+
+Open with: "Phase 1 was no email. A research requirement now needs one for informed consent. We want the smallest change that meets it, and we are not asking you to change anything today."
+
+### Not decided in the room
+
+Who may hold the email, whether the IRB needs an amendment, and the research-ID design belong to Arash, David and the IRB. Write "to confirm with Arash/David/IRB" and move on.
+
 ## 4. Decisions to bring up (from the ATEC note)
 
 1. Grade write-back: AGS or a narrowly scoped Canvas API. Open. Kent proposed AGS, and ATEC has more experience with the API route.
 2. One tool registration or one per course, and who creates the placements.
 3. What has to pass formal review (ITPR, HECVAT) before real students launch it.
+4. Student email at launch (§3A): whether to ask for it at all, and through which of the three options. Decide after Arash, David and the IRB weigh in.
 
 ## 5. Capture sheet (for Aliyah's notes)
 
@@ -63,7 +110,13 @@ Key set (JWKS) address: ____
 Token endpoint: ____
 Client ID: ____
 Deployment ID: ____
-Privacy level set to: ____
+Privacy level set to: ____   Values the key form offers: ____
+Email request (section 3A):
+  Survey launched via (CAP LTI / Qualtrics LTI / other): ____
+  Email in the claim is the primary or the campus address: ____
+  Separate key for the survey placement possible: ____
+  Approval path for releasing email: ____
+  Real launch payload seen for a test student (claim names only): ____
 Placement chosen: ____   Opens in new tab? ____
 Redirect addresses accepted (localhost OK?): ____
 Test accounts provided (teacher / student / for whom): ____
