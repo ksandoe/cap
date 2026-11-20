@@ -7,9 +7,10 @@
  * interaction (checkboxes, answering) while preserving stored state —
  * ticks and check state still render from the session store.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import DOMPurify from 'dompurify';
-import { api } from '../../services/api';
+import { SimWorkspace, createCapSimApi } from '@cap/sim-web';
+import { api, API_BASE } from '../../services/api';
 import { useSessionStore } from '../../store/sessionStore';
 import type {
   ContentBlock, GuidedToolBlock, GuidedInstruction,
@@ -30,15 +31,16 @@ export function BlockView({ block, readOnly = false }: { block: ContentBlock; re
 
 function RichText({ b }: { b: Extract<ContentBlock, { type: 'rich_text' }> }) {
   // Bodies authored in the rich text editor are HTML; older plain-text /
-  // markdown drafts render as-is.
+  // markdown drafts render as-is. {key} placeholders substitute the same
+  // way instructions do — the sim recipe's scenario names them.
   const isHtml = /<\/?[a-z][^>]*>/i.test(b.body);
   return (
     <div className="block rich">
       {b.title && <h3>{b.title}</h3>}
       {isHtml
-        ? <div className="rich-body"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(b.body) }} />
-        : <p style={{ lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{b.body}</p>}
+        ? <InstructionText text={b.body} />
+        : <p style={{ lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>
+            <ParamText text={b.body} /></p>}
     </div>
   );
 }
@@ -102,6 +104,14 @@ function GuidedTool({ b, readOnly }: { b: GuidedToolBlock; readOnly: boolean }) 
   // session record and restore on resume — and show in the review modal.
   const doneIds  = useSessionStore(s => s.instructionDone[b.blockId] ?? []);
   const toggleItem = useSessionStore(s => s.toggleInstructionItem);
+  const sessionId = useSessionStore(s => s.sessionId);
+  // One SimApi per session. The token is read at call time so a refreshed
+  // token is picked up; the learner/activity/assignment are all derived
+  // server-side from it — nothing else is passed to the simulator.
+  const simApi = useMemo(() => createCapSimApi({
+    baseUrl: API_BASE,
+    getToken: () => useSessionStore.getState().token,
+  }), [sessionId]);
   const done = new Set(doneIds);
   const toggle = (id: string) => { toggleItem(b.blockId, id); postProgress(); };
   const total = b.instructions.length;
@@ -119,17 +129,27 @@ function GuidedTool({ b, readOnly }: { b: GuidedToolBlock; readOnly: boolean }) 
 
   const frame = b.url ? (
     <iframe src={b.url} title={b.title} className="tool-frame" />
+  ) : b.tool === 'sap_sim' && !readOnly ? (
+    // The parent must give the workspace its height — the SAP screen
+    // scrolls inside it and the status bar sticks to the bottom.
+    <div className="tool-frame" style={{ height: 620 }}>
+      <SimWorkspace api={simApi} />
+    </div>
   ) : (
     <div className="tool-frame tool-frame-placeholder">
       <strong>{b.tool}</strong> workspace
       <span className="muted" style={{ fontSize: 13 }}>
         {b.tool === 'sap'
           ? 'Your assigned SAP sandbox opens in a separate window — use your pool account credentials.'
-          : 'This tool opens in a separate window.'}
+          : b.tool === 'sap_sim'
+            ? 'The simulated SAP session is part of the activity.'
+            : 'This tool opens in a separate window.'}
       </span>
-      <span className="muted" style={{ fontSize: 12 }}>
-        (Framed embedding will appear here once the tool URL is configured)
-      </span>
+      {b.tool !== 'sap_sim' && (
+        <span className="muted" style={{ fontSize: 12 }}>
+          (Framed embedding will appear here once the tool URL is configured)
+        </span>
+      )}
     </div>
   );
 
