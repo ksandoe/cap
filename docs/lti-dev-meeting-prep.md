@@ -181,7 +181,7 @@ console.log(JSON.stringify(jwk, null, 2));
 ## 4. Decisions to bring up (from the ATEC note)
 
 1. Grade write-back: AGS or a narrowly scoped Canvas API. Open. Kent proposed AGS, and ATEC has more experience with the API route.
-2. One tool registration or one per course, and who creates the placements.
+2. One tool registration or one per course, and who creates the placements. Added 2026-11-20: Chico State has a **separate dev instance and a production instance**, so each needs its own developer key, client ID and deployment ID. The backend reads one client ID and one deployment ID from its settings, so a dev backend and a production backend should be separate deployments, unless we build a small registry of platforms and deployments (§2).
 3. What has to pass formal review (ITPR, HECVAT) before real students launch it.
 4. Student email at launch (§3A): a separate survey launcher with its own key, or a fallback. Decide after Arash, David and the IRB weigh in.
 
@@ -230,7 +230,7 @@ Follow-ups and who owns them: ____
 This is a clean subsystem for Aliyah, because it touches only a few files. The work, in order:
 
 0. Let the login initiation accept **POST** as well as GET, reading `login_hint`, `lti_message_hint` and the rest from the body as well as the query (§3B). Without it a Canvas launch may fail at the first step.
-1. Replace the unverified token decode with real verification against Canvas's published keys, including state, nonce and the claim checks.
+1. Replace the unverified token decode with real verification against Canvas's published keys, including state, nonce and the claim checks. **Check `aud` and `deployment_id` against our own values.** Instructure-hosted Canvas instances share one issuer and one set of signing keys, so those two claims are what stop a token from another school's Canvas from being accepted.
 2. Replace `?token=` in the redirect with a safer hand-off.
 3. Host the tool's public keys.
 4. Implement the AGS token fetch and the score post (to `<line item>/scores`), with retries.
