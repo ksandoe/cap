@@ -8,6 +8,11 @@
  *
  * Idempotent — PutCommand overwrites existing items.
  * Sessions are intentionally NOT seeded (they're runtime data).
+ *
+ * SEED_ONLY_MODULE=<moduleId> writes only that module's recipe + module-config
+ * row — for adding or refreshing one module (e.g. sim-sales-process) without
+ * touching other modules' rows. Shared infra (SAP pool, per-account params,
+ * image assets) is skipped in this mode; use a full run to seed those.
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
@@ -34,12 +39,20 @@ const IMAGE_TYPES: Record<string, string> = {
 };
 
 async function main() {
+  const only = process.env.SEED_ONLY_MODULE;
   const { recipes, sapPool, params, moduleConfigs } = demoSeedData();
 
   for (const r of recipes) {
+    if (only && r.moduleId !== only) continue;
     await ddb.send(new PutCommand({ TableName: RECIPES, Item: r }));
     console.log(`recipe  ${r.moduleId} v${r.version}`);
   }
+  for (const c of moduleConfigs) {
+    if (only && c.moduleId !== only) continue;
+    await ddb.send(new PutCommand({ TableName: MODULE_CONFIG, Item: c }));
+    console.log(`config  ${c.moduleId}`);
+  }
+  if (only) { console.log(`seed complete (module-only: ${only})`); return; }
   for (const a of sapPool) {
     await ddb.send(new PutCommand({ TableName: SAP_POOL, Item: a }));
     console.log(`sap acct ${a.sapUsername}`);
@@ -47,10 +60,6 @@ async function main() {
   for (const p of params) {
     await ddb.send(new PutCommand({ TableName: PARAMS, Item: p }));
     console.log(`params  ${p.sapUsername} → ${JSON.stringify(p.values)}`);
-  }
-  for (const c of moduleConfigs) {
-    await ddb.send(new PutCommand({ TableName: MODULE_CONFIG, Item: c }));
-    console.log(`config  ${c.moduleId}`);
   }
   if (fs.existsSync(ASSET_DIR)) {
     for (const file of fs.readdirSync(ASSET_DIR)) {
