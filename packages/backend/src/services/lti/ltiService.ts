@@ -5,7 +5,7 @@
  * Uses the `jose` library for JWT operations.
  *
  * Flow:
- *   1. Canvas GET /lti/oidc/login  → platform redirects back to Canvas OIDC auth URL
+ *   1. Canvas GET or POST /lti/oidc/login → platform redirects back to Canvas OIDC auth URL
  *   2. Canvas POST /lti/launch     → platform validates JWT, creates session, issues token
  *
  * TODO: implement state/nonce generation and validation (replay protection)
@@ -19,15 +19,34 @@ import { logger }            from '../eventLogger';
 import { EVENTS }            from '@cap/shared';
 
 export async function handleOidcLogin(req: Request, res: Response): Promise<void> {
-  logger.info(EVENTS.LTI_LAUNCH_RECEIVED, { query: req.query });
+  // The LTI standard lets a platform start login with a GET or a POST (Canvas is reported to
+  // send a POST), so read the parameters from the query and the form body. A repeated
+  // parameter arrives as an array and is ignored rather than guessed at.
+  const received = { ...(req.query as Record<string, unknown>), ...((req.body as Record<string, unknown>) ?? {}) };
+  const param = (name: string): string | undefined =>
+    typeof received[name] === 'string' ? (received[name] as string) : undefined;
 
-  const { iss, login_hint, target_link_uri, lti_message_hint } = req.query as Record<string,string>;
+  // Log which parameters arrived, never their values: login_hint identifies the user, and
+  // log payloads can reach the audit table.
+  logger.info(EVENTS.LTI_LAUNCH_RECEIVED, { method: req.method, params: Object.keys(received).sort() });
+
+  const login_hint       = param('login_hint');
+  const lti_message_hint = param('lti_message_hint');
+  if (!login_hint) {
+    throw Object.assign(new Error('LTI login request is missing login_hint.'),
+      { statusCode: 400, code: 'LTI_BAD_LOGIN_REQUEST' });
+  }
+  const authBase = process.env.LTI_OIDC_AUTH_URL;
+  if (!authBase || !process.env.LTI_CLIENT_ID || !process.env.LTI_REDIRECT_URI) {
+    throw Object.assign(new Error('LTI is not configured on this server.'),
+      { statusCode: 500, code: 'LTI_NOT_CONFIGURED' });
+  }
 
   // TODO: generate state + nonce, store in short-lived DynamoDB record
   const state = 'TODO_generate_state';
   const nonce = 'TODO_generate_nonce';
 
-  const authUrl = new URL(process.env.LTI_OIDC_AUTH_URL!);
+  const authUrl = new URL(authBase);
   authUrl.searchParams.set('scope',          'openid');
   authUrl.searchParams.set('response_type',  'id_token');
   authUrl.searchParams.set('response_mode',  'form_post');
@@ -35,7 +54,7 @@ export async function handleOidcLogin(req: Request, res: Response): Promise<void
   authUrl.searchParams.set('client_id',      process.env.LTI_CLIENT_ID!);
   authUrl.searchParams.set('redirect_uri',   process.env.LTI_REDIRECT_URI!);
   authUrl.searchParams.set('login_hint',     login_hint);
-  authUrl.searchParams.set('lti_message_hint', lti_message_hint);
+  if (lti_message_hint) authUrl.searchParams.set('lti_message_hint', lti_message_hint);
   authUrl.searchParams.set('state',          state);
   authUrl.searchParams.set('nonce',          nonce);
 
