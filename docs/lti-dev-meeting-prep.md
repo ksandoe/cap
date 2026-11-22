@@ -162,7 +162,7 @@ console.log(JSON.stringify(jwk, null, 2));
 | `https://<backend>/lti/launch` | **Redirect URI** and **Target link URI** | Step 2. Canvas posts the signed launch token here. The backend creates the session and redirects the student into the app. It accepts **POST only**, so opening it in a browser shows "Cannot GET". That is normal. |
 | `https://<backend>/` | None of the Canvas fields | The student app's home. It is where the backend sends the student after launch (`FRONTEND_URL`). Do not give Mir this one. |
 
-**Known gap: the login route accepts GET only.** `GET /lti/oidc/login` is the only method the code handles, and a POST to the deployed address answers 404. The LTI standard lets a platform send the login request either way, and Canvas is reported to send a POST, so a real launch may fail at the first step. Registration does not depend on this. Add it to Aliyah's hardening list (§7): accept both methods and read the parameters from the request body as well as the query. Ask Mir whether the dev instance sends GET or POST, if he knows.
+**Fixed on branch `lti-login-post` (needs merging and a redeploy). The login route used to accept GET only.** `GET /lti/oidc/login` is the only method the code handles, and a POST to the deployed address answers 404. The LTI standard lets a platform send the login request either way, and Canvas is reported to send a POST, so a real launch may fail at the first step. Registration does not depend on this. Add it to Aliyah's hardening list (§7): accept both methods and read the parameters from the request body as well as the query. Ask Mir whether the dev instance sends GET or POST, if he knows.
 
 **Before any real student launches through it:**
 
@@ -229,7 +229,7 @@ Follow-ups and who owns them: ____
 
 This is a clean subsystem for Aliyah, because it touches only a few files. The work, in order:
 
-0. Let the login initiation accept **POST** as well as GET, reading `login_hint`, `lti_message_hint` and the rest from the body as well as the query (§3B). Without it a Canvas launch may fail at the first step.
+0. (Done on branch `lti-login-post`, pending merge and redeploy.) Let the login initiation accept **POST** as well as GET, reading `login_hint`, `lti_message_hint` and the rest from the body as well as the query (§3B). Without it a Canvas launch may fail at the first step.
 1. Replace the unverified token decode with real verification against Canvas's published keys, including state, nonce and the claim checks. **Check `aud` and `deployment_id` against our own values.** Instructure-hosted Canvas instances share one issuer and one set of signing keys, so those two claims are what stop a token from another school's Canvas from being accepted.
 2. Replace `?token=` in the redirect with a safer hand-off.
 3. Host the tool's public keys.
