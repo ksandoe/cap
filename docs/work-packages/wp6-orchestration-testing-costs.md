@@ -1,7 +1,8 @@
 # Work package 6: orchestration, testing and cost tracking (Aliyah)
 
 **Status:** draft for Kent, 2026-11-23. Written by Claude as the architect. Not yet agreed with David.
-**For:** Aliyah Cardenas. This document is meant to be read and used without Claude. Questions go to Kent, who can pass them on.
+**For:** Aliyah Cardenas. It works with or without Claude: Aliyah is expected to get her own Claude seat soon. Until then, questions go to Kent, who can pass them on.
+**Updated 2026-11-23:** Part B, the target flow in section 1 and tasks A8 and B3 to B5 were added after reading how completion and grade posting work today. The reasoning is in `docs/decisions/2026-11-launch-and-grade-return.md`.
 **Basis:** a read of CAP `main` at `af5aea7` (`ltiService.ts`, `gradeService.ts`, `orchestratorService.ts`, `assessmentService.ts`, `llmProvider.ts`, `contextCompiler.ts`, `evalDb.ts`, `.env.example`) and the Canvas decision note `docs/decisions/2026-10-canvas-lti-atec.md`. I did not read the admin app, `infra/`, or the CloudWatch setup.
 **Facts established on 2026-11-22:** a real Canvas launch from Chico State's dev instance now works end to end, using a development key and the deployed backend. Everything below builds on that.
 
@@ -11,6 +12,13 @@
 2. **Cost tracking.** Before the realistic test runs, find out roughly what one conversation costs on a few different language models, and record the estimated cost with every conversation from now on.
 3. **Ongoing testing.** Run a series of realistic test conversations, log what happens, and put the transcripts in front of Kent and the team.
 
+**The target flow** (proposed, not yet agreed with David or Mir):
+1. The student opens an assignment in Canvas. Our tool launches **inside the Canvas frame** and shows a landing page.
+2. A button on the landing page opens CAP **in a new browser tab**, with a full window to work in. The new tab is signed in by a one-time code, not by a second launch.
+3. When the student finishes, our **server** posts the grade to Canvas (AGS) whatever the browser is doing. The landing page in the Canvas frame asks the server for the status and shows it, and the last screen in the new tab has a "Return to Canvas" button.
+
+Fine-tuning the screens of step 2 is not part of this package. Parand and Aliyah will do that together later.
+
 **Suggested order.** Cost tracking comes first because Kent wants cost numbers attached to the realistic runs and because it is a small, self-contained change that teaches you where things live. Then start the launch hardening. The realistic runs begin once cost capture is merged and the cost probe (section 4) has been done once. Testing continues after that, every time something is deployed.
 
 **Not your job in this package:** phase 3 (Canvas to AWS to Qualtrics and back, the survey launcher). It waits for Arash, David and the IRB to settle how student emails are handled. Do not start it, and do not add email or name handling anywhere.
@@ -18,6 +26,7 @@
 ## 2. Rules that apply to everything here
 
 - **Synthetic data only.** Test runs use made-up students. Never type a real name, student ID, email or anything personal into a test conversation, even your own. Transcripts from test runs are then not student data, which is what lets Kent review them with Claude's help.
+- **If you use Claude on this repository,** the same terms apply to what you give it: synthetic data only, no secrets, no Canvas addresses or IDs, and never read `.env` files.
 - **Secrets never go in the repository, in a pull request, in a chat, or in a screenshot.** That covers the Canvas client ID, deployment ID, the Canvas Dev address, the tool's private key, the OpenAI key and any other API key, and the learner-key secret. They live in `.env` files (never committed) and in the Lambda console.
 - **Do not read or write production data.** Local development uses `USE_LOCAL_DB=true`, a JSON file on your machine.
 - **Answer keys stay on the server.** Nothing a student's browser or an AI prompt can see may contain expected net values or exercise answers.
@@ -44,13 +53,15 @@ Each task has a **done when** line. Do them roughly in this order.
 - `deployment_id` equals `LTI_DEPLOYMENT_ID`;
 - the message type is a resource link request and the version is 1.3.0.
 
+**This task comes before any grade posting.** The grade address arrives inside this token, so an unverified token could point it at someone else's server (see Part B).
+
 The `aud` and `deployment_id` checks are the important ones. Canvas hosted by Instructure signs every school's launches with the same keys and the same issuer name, so a valid token for another school's tool would otherwise pass.
 **Done when:** each check has a test that fails without it, using a test key pair and a fake key server inside the test (no real Canvas needed), and a launch from the real dev instance still works.
 
-**A2. Real `state` and `nonce`.** Today both are the placeholder text `TODO_generate_state`. Generate a random value for each at login, remember them, and check at launch that the returned state is one we issued, recently, and used only once. Two ways to remember: a small DynamoDB table with a time-to-live (Kent creates the table), or a signed, short-lived value with no table. Write a half-page note on which you recommend and why, and get David's view before building.
+**A2. Real `state` and `nonce`.** Today both are the placeholder text `TODO_generate_state`. Generate a random value for each at login, remember them, and check at launch that the returned state is one we issued, recently, and used only once. Two ways to remember: a small DynamoDB table with a time-to-live (Kent creates the table), or a signed, short-lived value with no table. **Do not use cookies for this.** In the target flow the login happens inside an iframe in Canvas, where browsers often block third-party cookies. Write a half-page note on which of the two approaches you recommend and why, and get David's view before building.
 **Done when:** a replayed launch is rejected, and a launch with a wrong or expired state is rejected.
 
-**A3. Take the session token out of the address.** The launch currently redirects to `…/launch?token=<session token>`. Addresses end up in browser history and server logs. Propose a replacement (for example a short-lived one-time code exchanged by the student app for the session token) and get David's view first.
+**A3. Take the session token out of the address.** The launch currently redirects to `…/launch?token=<session token>`. Addresses end up in browser history and server logs. The replacement is also how the landing page signs the student in to the new tab (step 2 of the target flow). Propose a design (for example a short-lived one-time code exchanged by the student app for the session token) and get David's view first.
 **Done when:** no session token appears in any address, and the student app still signs in, including after a relaunch.
 
 **A4. Reject unknown activities.** Found on 2026-11-22: a launch that names an activity that does not exist is accepted and creates a session for it. Check the activity against the module configuration and refuse launches for unknown ones.
@@ -64,19 +75,57 @@ The `aud` and `deployment_id` checks are the important ones. Canvas hosted by In
 
 **A7. Activity choice (design note only).** `LTI_DEFAULT_ACTIVITY_ID` (added on 2026-11-22) makes one key open one activity. For several activities in one course we will need to tell links apart, by Canvas's resource link ID or by Deep Linking, where the instructor picks the activity when adding the link. Write a short note comparing the two. Do not build it yet.
 
+**A8. Say who may frame us.** The app sends no framing headers today, so any site can put it in a frame. The target flow needs Canvas to frame the landing page, and nobody else should. Add `Content-Security-Policy: frame-ancestors` with the Canvas origins, read from configuration (the Canvas addresses are not written in the repository), and do not send `X-Frame-Options: DENY` or `SAMEORIGIN`, which would block Canvas too. Check that the student app, the landing page and the launch response all carry it.
+**Done when:** a test shows the header on those responses, and the landing page still loads inside a frame from an allowed origin in a browser.
+
 ## 4. Part B: activity to grade return (phase 2)
 
-**Where it lives:** `services/grade/gradeService.ts` (a stub with TODOs), `shared` for the session fields, the completion path in `orchestratorService.ts`.
+**Where it lives:** `services/grade/gradeService.ts` (a stub with TODOs), `completeSession` in `services/orchestrator/orchestratorService.ts`, `db/sessionDb.ts`, the shared session types, and the student app (a new landing page, plus the exit page).
 
-**Decided so far** (`docs/decisions/2026-10-canvas-lti-atec.md`): completion is graded all or nothing, 1.0 if passed and 0.0 otherwise. **Still open:** whether to use LTI Advantage grade services (AGS) or a narrowly scoped Canvas API. Kent proposed AGS and ATEC has more experience with the API. Also open: what exactly counts as "passed".
+**The design and the reasons for it** are in `docs/decisions/2026-11-launch-and-grade-return.md`. Read it first. This part is the task list.
 
-Do these in order, and stop where a decision is needed:
-1. Write a one-page comparison of AGS and the scoped Canvas API for this use, covering what Mir has to configure, what secrets we hold, and what happens to a student who completes twice. Kent takes it to Mir.
-2. **Blocked until Mir and the decision:** the placement. The current "SAP Access" link is in the course navigation, which has no grade line in Canvas. Grade return needs the tool placed as an assignment, and the key needs the grade scopes.
-3. If AGS: implement the token request (a signed assertion using the tool's private key, which belongs in AWS Secrets Manager, not an environment variable), the score post, and the retry. The existing stub marks all three as TODO.
-4. Cover failure: Canvas refuses, the network drops, the student finishes but the post fails. The student must not lose the completion, and Kent must be able to see which posts failed.
+**What the code does today** (found on 2026-11-23, and the reason this is more than finishing the stub):
 
-**Done when:** a test student in the dev instance completes the activity and the Canvas gradebook shows the right score, and a deliberate failure leaves a visible, retryable record.
+| Finding | Consequence |
+|---|---|
+| `completeSession` posts the grade inside `Promise.allSettled`, so a failure is ignored, and then **deletes the session record**, including the grade address and the student's `sub`. | If Canvas is unreachable for a minute, the grade is lost for good and nothing can retry it. |
+| Nothing keyed to the learner survives completion. Only de-identified research records do. | There is nothing to show "completed" on a landing page, and nothing to retry from. A small durable completion record is needed (B3). |
+| The grade address (`lineitem`) comes from the launch token, which is not verified yet (A1). | A forged launch could point it at another server, and the server would send its Canvas access token there. Verification (A1) comes first, and the address must also be checked to belong to Canvas. |
+| The stub posts the score to the line item address itself. | As we understand the AGS standard, scores go to that address with `/scores` added to the path. Check it against the specification (B4). |
+| The launch's `launch_presentation.return_url` is not read anywhere. | There is no "Return to Canvas" target yet (B5). |
+
+**Decided so far** (`docs/decisions/2026-10-canvas-lti-atec.md`): completion is graded all or nothing, 1.0 if passed and 0.0 otherwise. **Still open:** whether to use LTI Advantage grade services (AGS) or a narrowly scoped Canvas API. Kent proposes AGS and ATEC has more experience with the API. Also open: what exactly counts as "passed", and whether a failed attempt posts 0.0 or posts nothing (section 7).
+
+Do these in order and stop where a decision is needed.
+
+**B1. Compare AGS and the scoped Canvas API.** One page. Cover what Mir has to configure, what secrets we hold, how each handles a student who completes twice, and what each needs in the dev instance and later in production. Kent takes it to Mir.
+
+**B2. Placement and scopes (blocked until Mir).** The "SAP Access" link in the course navigation has no grade line in Canvas. Grade return needs the tool launched from an **assignment**, and the key needs the grade scopes (at least the score scope, probably the read-only line item scope as well). Kent is asking Mir. Until the test assignment exists, build against a fake Canvas in tests.
+
+**B3. The completion record and the retry queue.** Add a small durable record per learner and activity, written before the session is deleted. It holds: the learner key, the activity id, status (in progress or completed), attempt count, last result, the grade state (`pending`, `posted` or `failed`), the number of post attempts, and what is needed to post the grade (the line item address, the raw `sub`, the context id, the return address). Rules:
+- It is server-side only. No endpoint returns the `sub` or the line item address to a browser.
+- It carries a time-to-live so it is purged at semester end. Agree the period with David.
+- A completion writes the record as `pending`, then tries to post. A failure leaves it `pending` with a reason, and it is retried. Start with: retry on the student's next launch, plus an admin-only "retry pending grades" action. A scheduled job is a later option and needs infrastructure from Kent.
+- Kent must be able to see which grades are `pending` or `failed`.
+**David reviews this task** because it adds persistent per-learner data.
+**Done when:** completing an activity leaves a record, a simulated Canvas outage leaves it `pending`, and a later retry posts the grade once and marks it `posted`. Posting twice must not create a second score.
+
+**B4. The AGS client** (`gradeService.ts`), built after A1 and B3.
+- Fetch an access token from Canvas with the client-credentials flow, authenticating with a signed assertion made with the tool's private key. **The private key goes in AWS Secrets Manager, not an environment variable.** Kent creates the secret and gives the function permission to read it, and you write the code that reads it (cache it). The key itself never appears in the repository, a pull request or a chat.
+- Cache the token until shortly before it expires.
+- Before sending anything, check that the line item address belongs to Canvas's own host, and refuse otherwise.
+- Post the score to the line item address with `/scores` added, as the specification describes. Use the score content type and the fields the specification requires. Confirm the path and the content type against the AGS specification rather than this document.
+- Never swallow an error. Record a non-sensitive reason code on the completion record and in the log.
+**Done when:** tests against a fake Canvas cover a good post, an expired token, a refused post, a bad line item address and a network error, and a test student in the dev instance sees the right score in the gradebook (needs B2).
+
+**B5. The landing page and "Return to Canvas".** After B3 and B4, and after A3 (the one-time code):
+- **Landing page.** After a verified launch from an assignment, serve a small page for the Canvas frame. It shows the student's status for this activity (not started, in progress, completed, grade recorded or being recorded) and a button that opens CAP in a new tab. The tab is signed in with the one-time code from A3, not by a second launch.
+- **Status.** The landing page asks a status endpoint every few seconds while it is visible. The endpoint uses a short-lived token issued at launch and returns only the status, never an identifier or an address. **Do not use cookies, and do not rely on the two tabs sharing any browser storage:** browsers increasingly isolate storage inside embedded frames, so the server is the only meeting point.
+- **Return to Canvas.** Read `launch_presentation.return_url` from the verified launch and keep it on the completion record. On the last screen in the new tab, offer a "Return to Canvas" button that waits until the grade is `posted` (or says it may take a moment). Confirm with Mir that Canvas sends this value on assignment launches and where it leads.
+- **Frame height.** Canvas supports a message from the tool asking it to resize the frame. Use it if the landing page needs more room.
+**Done when:** in the dev instance a test student launches the assignment, sees the landing page in the frame, completes the activity in the new tab, and the landing page shows "completed" with the grade in the gradebook. The first version of the screens can be plain.
+
+**Done for Part B when** the steps above work together, a deliberate failure leaves a visible, retryable record, and David has reviewed B3.
 
 ## 5. Part C: cost capture (do this first)
 
@@ -165,6 +214,9 @@ The scripted student needs replies of realistic length. Use three scripts, short
 | 6 | Read access to the function's logs for Aliyah | Yes, read-only |
 | 7 | AGS or the scoped Canvas API (with Mir) | Open |
 | 8 | What counts as passed | Open |
+| 9 | Whether a failed attempt posts 0.0 or posts nothing. Posting nothing leaves the assignment ungraded until the student passes; scores can be overwritten, so a later pass replaces an earlier 0.0 either way | Post only on a pass, and decide with Parand how an unfinished assignment should look to the student |
+| 10 | How long the completion record is kept (B3) | Until the end of the semester, with David's agreement |
+| 11 | Whether the landing page ships with the first grade-return version or just after it | Grade return first with the plain exit page, landing page second |
 
 ## 8. What I could not check
 
@@ -172,3 +224,5 @@ The scripted student needs replies of realistic length. Use three scripts, short
 - I did not check the exact field names a non-OpenAI endpoint returns for usage. The OpenAI-style response carries `usage.prompt_tokens` and `usage.completion_tokens`; confirm the same for each endpoint you try.
 - I have not looked at prices. Read them yourself, with the date.
 - Whether interrupted conversations are kept or cleared after the stale-session sweep. C2 asks for per-call log events precisely so that their cost is not lost either way.
+- **Canvas behavior for Part B is from my understanding of the LTI and AGS standards and of Canvas, not from the dev instance.** Confirm each of these with Mir or in the dev instance before relying on it: the name of the placement that lets a tool be used as an assignment; which scopes Canvas needs to include the line item in the launch; that Canvas sends `launch_presentation.return_url` on assignment launches and where it leads; the exact AGS score path and content type; the token endpoint address for the dev instance; and that a link inside the framed tool can open a new tab.
+- I have not tried the framed landing page in a real Canvas frame. The headers that matter (A8) and the cookie-free design are there because of known browser behavior, and they need a real test.
