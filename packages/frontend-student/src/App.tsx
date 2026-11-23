@@ -10,6 +10,7 @@ import { LaunchPage }    from './pages/LaunchPage';
 import { WizardPage }    from './pages/WizardPage';
 import { ErrorPage }     from './pages/ErrorPage';
 import { DevLaunchPage } from './pages/DevLaunchPage';
+import { ExitPage }      from './pages/ExitPage';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
       <Route path="/"       element={<DevLaunchPage />} />
       <Route path="/launch" element={<LaunchPage />} />
       <Route path="/wizard" element={<WizardPage />} />
+      <Route path="/exit"   element={<ExitPage />} />
       <Route path="/error"  element={<ErrorPage />} />
       <Route path="*"       element={<Navigate to="/error" />} />
     </Routes>

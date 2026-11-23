@@ -22,6 +22,7 @@ export function WizardShell({ currentPhase, children }: { currentPhase: number; 
   const steps        = useSessionStore(s => s.recipe?.steps) ?? [];
   const activityStep = useSessionStore(s => s.activityStep);
   const sessionId    = useSessionStore(s => s.sessionId);
+  const dev          = useSessionStore(s => !!s.persona);   // started from the developer launchpad
   const navigate     = useNavigate();
   const [saving, setSaving] = useState(false);
 
@@ -42,9 +43,7 @@ export function WizardShell({ currentPhase, children }: { currentPhase: number; 
     setSaving(true);
     try {
       const { resumeWithinDays } = await api.session.save(sessionId);
-      navigate('/', {
-        state: { notice: `Progress saved — relaunch the module within ${resumeWithinDays} days to pick up where you left off.` },
-      });
+      navigate('/exit', { replace: true, state: { reason: 'saved', days: resumeWithinDays, dev } });
     } catch {
       setSaving(false);
     }
