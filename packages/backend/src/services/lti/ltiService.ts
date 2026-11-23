@@ -61,6 +61,22 @@ export async function handleOidcLogin(req: Request, res: Response): Promise<void
   res.redirect(authUrl.toString());
 }
 
+/**
+ * Which activity a launch opens, in order of precedence:
+ *   1. the activity_id custom parameter the platform sent (module_id is the
+ *      pre-decision name, accepted so existing placements keep working);
+ *   2. the server's LTI_DEFAULT_ACTIVITY_ID setting.
+ * (2) lets one Canvas key open one activity with no custom field configured in
+ * Canvas. It is a fallback only: a custom parameter, when present, always wins,
+ * so one key can still serve several activities later.
+ */
+export function resolveActivityId(custom: Record<string, unknown>): string | undefined {
+  const fromLaunch = custom.activity_id ?? custom.module_id;
+  if (typeof fromLaunch === 'string' && fromLaunch.trim()) return fromLaunch.trim();
+  const fallback = process.env.LTI_DEFAULT_ACTIVITY_ID?.trim();
+  return fallback || undefined;
+}
+
 export async function handleLaunch(req: Request, res: Response): Promise<void> {
   try {
     // TODO: validate state from body against stored nonce
@@ -74,10 +90,10 @@ export async function handleLaunch(req: Request, res: Response): Promise<void> {
     // learner = iss + sub, activity = LIFT-owned custom parameter.
     // No name/email/roster claims are read.
     const custom   = claims['https://purl.imsglobal.org/spec/lti/claim/custom'] ?? {};
-    // activity_id is the agreed parameter; module_id is the pre-decision
-    // name, accepted so existing placements keep working.
-    const moduleId = custom.activity_id ?? custom.module_id;
-    if (!moduleId) throw new Error('LTI launch is missing the activity_id custom parameter');
+    const moduleId = resolveActivityId(custom);
+    if (!moduleId) {
+      throw new Error('LTI launch has no activity_id custom parameter and the server has no LTI_DEFAULT_ACTIVITY_ID');
+    }
 
     const ltiContext = {
       canvasUuid:        deriveLearnerKey(claims.iss, claims.sub),
