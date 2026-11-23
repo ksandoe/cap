@@ -64,7 +64,7 @@ export function WizardPage() {
         // recycling while the JWT is still valid. Bounce back to the launchpad
         // instead of dead-ending on an error.
         if (String(e.message).includes('SESSION_NOT_FOUND')) {
-          navigate('/', { replace: true, state: { notice: 'Your previous session expired — pick a persona and relaunch.' } });
+          navigate('/exit', { replace: true, state: { reason: 'expired', dev: !!useSessionStore.getState().persona } });
           return;
         }
         setError(`Could not load your session. ${e.message}`);

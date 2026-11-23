@@ -125,7 +125,8 @@ export function SummaryPhase() {
             </button>
           </>
         )}
-        <button className="secondary" onClick={() => navigate('/')}>
+        <button className="secondary"
+          onClick={() => navigate('/exit', { replace: true, state: { reason: 'finished', dev: !!persona } })}>
           Return to course
         </button>
       </div>
