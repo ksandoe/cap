@@ -14,8 +14,8 @@
  * Served publicly via GET /assets/:id — recipe screenshots carry no
  * student data.
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { makeDocClient } from './ddbClient';
 import { USE_LOCAL_DB } from '../config/env';
 import { localAssetDb } from './localStore';
 
@@ -27,7 +27,7 @@ export interface Asset {
   createdAt:   string;
 }
 
-const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
+const ddb   = makeDocClient();
 const TABLE = process.env.DYNAMODB_TABLE_ASSETS!;
 
 const ddbAssetDb = {
