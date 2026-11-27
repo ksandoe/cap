@@ -38,9 +38,14 @@ One secret is one permission boundary: whoever can read any of it reads all of i
    No rotation; the default encryption key is fine.
 2. **Create `cap/lti-dev`** with the dev private key. Build the JSON without ever displaying the key, in your own PowerShell, and paste the clipboard into the Plaintext tab:
    ```powershell
-   @{ LTI_PRIVATE_KEY = (Get-Content -Raw "$env:USERPROFILE\cap-keys\cap-lti-dev-private.pem") } | ConvertTo-Json -Compress | Set-Clipboard
+   $ErrorActionPreference = 'Stop'
+   $pem = [System.IO.File]::ReadAllText("$env:USERPROFILE\cap-keys\cap-lti-dev-private.pem")
+   if ($pem -notmatch 'BEGIN .*PRIVATE KEY') { throw 'The key file is empty or is not a PEM private key.' }
+   @{ LTI_PRIVATE_KEY = $pem } | ConvertTo-Json -Compress | Set-Clipboard
+   "Copied $($pem.Length) characters to the clipboard."
    ```
-   (PEM line breaks must be written out in JSON; `ConvertTo-Json` does it.) Clear the clipboard afterwards.
+   Use exactly this. **Do not use `Get-Content -Raw`:** in Windows PowerShell 5.1 it returns a string with hidden extra properties, and `ConvertTo-Json` then writes the key as an object, `{"LTI_PRIVATE_KEY": {"value": "...", "PSPath": ...}}`, instead of as text. The loader refuses that, and (before the loader tolerated a bad optional secret) it stopped the function answering requests. `[System.IO.File]::ReadAllText` returns a plain string, and the `if` line makes the snippet stop with an error rather than produce an empty value if the file is missing. PEM line breaks must be written out in JSON; `ConvertTo-Json` does that. Clear the clipboard afterwards.
+   **Check what was stored:** in Secrets Manager, open the secret, Retrieve secret value, Plaintext. It must read `{"LTI_PRIVATE_KEY":"-----BEGIN PRIVATE KEY-----\n...` with the text **directly after the colon**. A second `{` after the colon means the wrong snippet was used. Do not copy or share the value.
 3. **Let the function read both.** Lambda console, the function, Configuration, Permissions, click the execution role, Add permissions, Create inline policy, JSON (replace `<ACCOUNT_ID>`; the `-??????` matches the six random characters AWS adds to a secret's ARN):
    ```json
    {
