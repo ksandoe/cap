@@ -14,7 +14,8 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  RecipeDraft, GeneratedRecipe, AuthoringSectionId, SourceMaterial, validateCheckinQuestions,
+  RecipeDraft, GeneratedRecipe, AuthoringSectionId, SourceMaterial,
+  validateCheckinQuestions, cleanCheckinQuestions,
 } from '@cap/shared';
 import { draftDb }  from '../../db/draftDb';
 import { recipeDb } from '../../db/recipeDb';
@@ -225,7 +226,19 @@ export async function generate(req: Request, res: Response): Promise<void> {
       const merged: RecipeDraft = {
         ...draft,
         title: draft.data?.moduleTitle ? draft.title : (generated.moduleTitle || draft.title),
-        data: { ...draft.data, ...generated },
+        // Take the generated fields by name. Spreading the whole model output would let
+        // a stray key from the model (such as checkinQuestions, which students see)
+        // land in the draft and be published.
+        data: {
+          ...draft.data,
+          moduleTitle:         generated.moduleTitle,
+          moduleDescription:   generated.moduleDescription,
+          learningOutcomes:    generated.learningOutcomes,
+          keyConcepts:         generated.keyConcepts,
+          probingRules:        generated.probingRules,
+          vagueAnswerTriggers: generated.vagueAnswerTriggers,
+          toneGuidance:        generated.toneGuidance,
+        },
         sourceMaterials: mats,
         aiFields: [...new Set([...draft.aiFields,
           'moduleTitle', 'moduleDescription', 'learningOutcomes', 'keyConcepts',
@@ -291,11 +304,15 @@ export async function publishDraft(req: Request, res: Response): Promise<void> {
     steps:             (d.steps ?? []).map((s, i) => ({ ...s, stepNumber: i + 1 })),
     probingRules:      (d.probingRules ?? []).filter(p => p.trigger?.trim()),
     vagueAnswerTriggers: (d.vagueAnswerTriggers ?? []).filter(Boolean),
-    toneGuidance:      d.toneGuidance?.trim() || undefined,
+    // Optional fields are added only when they have a value. The DynamoDB client used
+    // here rejects a property whose value is undefined, so writing `field: undefined`
+    // would make the publish fail against the real table (it passes on the local
+    // JSON store, which is why tests alone would not catch it).
+    ...(d.toneGuidance?.trim() ? { toneGuidance: d.toneGuidance.trim() } : {}),
     // The fixed check-in questionnaire. Publishing builds the recipe from a list of
     // fields, so a field left out here is silently dropped from the next version.
     // Absent or empty means "not fixed": students get generated questions.
-    checkinQuestions:  (d.checkinQuestions ?? []).length ? d.checkinQuestions : undefined,
+    ...((d.checkinQuestions ?? []).length ? { checkinQuestions: cleanCheckinQuestions(d.checkinQuestions!) } : {}),
     // Source materials ride onto the published recipe as background docs so
     // the conversation keeps the grounding the author generated from.
     backgroundDocs:    d.backgroundDocs ?? (draft.sourceMaterials ?? [])

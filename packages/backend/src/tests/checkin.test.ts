@@ -13,7 +13,7 @@
  * The model is switched on but pointed at a closed port, so any attempt to call it
  * fails. Runs on an ephemeral port against the JSON-file store, no AWS and no model.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -122,10 +122,16 @@ describe('a stored questionnaire that fails validation', () => {
     const questions = active!.checkinQuestions!;
     const broken = [questions[0], { ...questions[1], questionKey: questions[0].questionKey }];   // duplicate key
     await api.recipeDb.saveRecipe({ ...active!, checkinQuestions: broken });
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
       const r = await checkin(await launch('learner-f', SIM_MODULE));
       expect(r.status).toBe(500);        // fell back to generating, which the closed port refuses
+      // The 500 alone would also come from any other failure. The log line shows that
+      // the stored questionnaire was rejected by validation, which is why it fell back.
+      expect(JSON.stringify([...spy.mock.calls, ...warn.mock.calls])).toContain('CHECKIN_QUESTIONS_INVALID');
     } finally {
+      spy.mockRestore(); warn.mockRestore();
       await api.recipeDb.saveRecipe({ ...active!, checkinQuestions: questions });
     }
     expect((await checkin(await launch('learner-g', SIM_MODULE))).status).toBe(200);
@@ -200,10 +206,49 @@ describe('publishing a draft from the authoring wizard', () => {
     expect(r.body.recipe.checkinQuestions).toBeUndefined();
   });
 
+  it('never hands an undefined value to the recipe store', async () => {
+    // The DynamoDB client rejects a property whose value is undefined, and the local JSON
+    // store does not, so only a check of what is passed to the store catches this.
+    const spy = vi.spyOn(api.recipeDb, 'saveRecipe');
+    try {
+      await publish('draft-undef-a', draftData());                                              // no tone, no fixed questions
+      await publish('draft-undef-b', draftData({ toneGuidance: '   ', checkinQuestions: [] })); // blank tone, empty list
+      await publish('draft-undef-c', draftData({ checkinQuestions: questions }));
+      expect(spy).toHaveBeenCalledTimes(3);
+      for (const [recipe] of spy.mock.calls) {
+        for (const [key, value] of Object.entries(recipe)) expect(value, `property ${key}`).not.toBeUndefined();
+      }
+    } finally { spy.mockRestore(); }
+  });
+
+  it('stores the text and options without surrounding spaces', async () => {
+    const padded = [{ questionKey: 'q1', questionText: '  Describe your experience.  ', responseType: 'multiple_choice',
+      options: [' None ', 'Some'], theme: 'past' }];
+    const r = await publish('draft-trim', draftData({ checkinQuestions: padded }));
+    expect(r.status).toBe(200);
+    expect(r.body.recipe.checkinQuestions[0].questionText).toBe('Describe your experience.');
+    expect(r.body.recipe.checkinQuestions[0].options).toEqual(['None', 'Some']);
+  });
+
   it('refuses a draft whose check-in questions are malformed', async () => {
     const r = await publish('draft-bad', draftData({ checkinQuestions: [{ ...questions[0], questionText: '' }] }));
     expect(r.status).toBe(422);
     expect(JSON.stringify(r.body)).toContain('Check-in questions: Question 1: needs question text.');
+  });
+});
+
+describe('restarting a local server', () => {
+  it('does not put fixed questions back on a version an author published without them', async () => {
+    const { seedLocalStore } = await import('../db/localStore');
+    const active = await api.recipeDb.getActiveRecipe(SIM_MODULE);
+    const { checkinQuestions: kept, ...withoutQuestions } = active!;
+    await api.recipeDb.saveRecipe(withoutQuestions);          // an author chose "Stop using fixed questions"
+    try {
+      seedLocalStore();                                        // what a restart does
+      expect((await api.recipeDb.getActiveRecipe(SIM_MODULE))!.checkinQuestions).toBeUndefined();
+    } finally {
+      await api.recipeDb.saveRecipe({ ...active!, checkinQuestions: kept });
+    }
   });
 });
 
@@ -223,6 +268,7 @@ describe('validateCheckinQuestions', () => {
     expect(msgs([q({ questionText: '   ' })])).toContain('needs question text');
     expect(msgs([q({ questionText: 'x'.repeat(301) })])).toContain('longer than 300');
     expect(msgs([q({ responseType: 'essay' })])).toContain('answer type');
+    expect(msgs([q({ questionKey: ' a' })])).toContain('needs a key');   // a key is not trimmed
     expect(msgs([q({ responseType: 'likert' })])).toContain('at least 2 options');
     expect(msgs([q({ responseType: 'multiple_choice', options: ['only'] })])).toContain('at least 2 options');
     expect(msgs([q({ responseType: 'multiple_choice', options: ['a', ''] })])).toContain('every option needs text');

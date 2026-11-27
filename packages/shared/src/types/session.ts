@@ -145,7 +145,9 @@ export function validateCheckinQuestions(input: unknown): string[] {
   input.forEach((raw, i) => {
     const n = `Question ${i + 1}`;
     const q = (raw ?? {}) as Record<string, unknown>;
-    const key = typeof q.questionKey === 'string' ? q.questionKey.trim() : '';
+    // The key is checked as given, not trimmed: a key with a stray space would pass a
+    // trimmed check and then be stored, and answered against, with the space.
+    const key = typeof q.questionKey === 'string' ? q.questionKey : '';
     if (!/^[A-Za-z0-9_-]{1,60}$/.test(key)) problems.push(`${n}: needs a key of letters, numbers, - or _ (up to 60).`);
     else if (seen.has(key)) problems.push(`${n}: the key "${key}" is used twice.`);
     else seen.add(key);
@@ -174,4 +176,19 @@ export function validateCheckinQuestions(input: unknown): string[] {
       problems.push(`${n}: the theme must be past, present or future.`);
   });
   return problems;
+}
+
+/**
+ * A copy of a validated questionnaire with surrounding spaces removed from the text and
+ * the options, and with no undefined properties (the DynamoDB client rejects those).
+ * Validation checks trimmed text, so store what was checked.
+ */
+export function cleanCheckinQuestions(questions: CheckinQuestion[]): CheckinQuestion[] {
+  return questions.map(q => ({
+    questionKey:  q.questionKey,
+    questionText: q.questionText.trim(),
+    responseType: q.responseType,
+    ...(q.theme ? { theme: q.theme } : {}),
+    ...(q.responseType !== 'short_text' && q.options ? { options: q.options.map(o => String(o).trim()) } : {}),
+  }));
 }

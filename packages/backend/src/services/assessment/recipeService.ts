@@ -8,7 +8,7 @@ import { compileContext } from './contextCompiler';
 import { callModel, extractJson } from './llmProvider';
 import { LLM_MODE }       from '../../config/env';
 import { mockCheckinQuestions } from './mockAi';
-import { normalizeCheckinOptions, validateCheckinQuestions } from '@cap/shared';
+import { normalizeCheckinOptions, validateCheckinQuestions, cleanCheckinQuestions } from '@cap/shared';
 
 export async function getRecipe(req: Request, res: Response): Promise<void> {
   const recipe = await recipeDb.getActiveRecipe(req.params.moduleId);
@@ -35,6 +35,7 @@ export async function upsertRecipe(req: Request, res: Response): Promise<void> {
         res.status(400).json({ error: 'INVALID_CHECKIN_QUESTIONS', problems });
         return;
       }
+      body.checkinQuestions = cleanCheckinQuestions(body.checkinQuestions);
     }
   }
   if (!body.recipeId) body.recipeId = crypto.randomUUID();

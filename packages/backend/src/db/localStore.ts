@@ -365,12 +365,14 @@ function seedSimRecipe(): void {
   const recipes = table('cap-recipes');
   const existing = recipes.filter(r => r.moduleId === SIM_MODULE_ID);
   if (existing.length) {
-    // A local store made before the fixed questionnaire existed: add it to the active
-    // version so the local copy matches a fresh one. This changes the local JSON file
-    // only. The DynamoDB seed script builds its data from a fresh local store, and it
-    // overwrites a deployed recipe only when someone runs it on purpose.
-    const active = existing.find(r => r.isActive);
-    if (active && !active.checkinQuestions) active.checkinQuestions = SIM_CHECKIN_QUESTIONS;
+    // A local store made before the fixed questionnaire existed: add it to the seeded
+    // version (1) so the local copy matches a fresh one. Only version 1: a later
+    // version was published by someone using the admin app, and if they chose "Stop
+    // using fixed questions" a restart must not undo that. This changes the local JSON
+    // file only. The DynamoDB seed script builds its data from a fresh local store, and
+    // it overwrites a deployed recipe only when someone runs it on purpose.
+    const seeded = existing.find(r => r.version === 1 && r.isActive);
+    if (seeded && !seeded.checkinQuestions) seeded.checkinQuestions = SIM_CHECKIN_QUESTIONS;
     return;
   }
   const now = new Date().toISOString();
