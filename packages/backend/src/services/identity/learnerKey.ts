@@ -13,7 +13,9 @@
  * rotating the secret breaks resume lookups and any research linkage
  * built on the key, so treat it as long-lived.
  *
- * TODO: load LEARNER_KEY_SECRET from Secrets Manager
+ * In production LEARNER_KEY_SECRET can come from Secrets Manager instead of a plain
+ * environment variable (config/secretsManager.ts, infra/secrets.md). Moving it there must
+ * keep the SAME value.
  */
 import { createHmac } from 'crypto';
 import { requireSecret } from '../../config/secrets';
