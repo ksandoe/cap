@@ -16,13 +16,15 @@
  * TODO: load LEARNER_KEY_SECRET from Secrets Manager
  */
 import { createHmac } from 'crypto';
-
-const SECRET = process.env.LEARNER_KEY_SECRET ?? 'dev-learner-key-change-me';
+import { requireSecret } from '../../config/secrets';
 
 export function deriveLearnerKey(iss: string, sub: string): string {
   if (!iss || !sub) throw new Error('LTI launch is missing iss or sub');
+  // Read on use, and never defaulted on a deployed function: a student's ID computed
+  // from a public default could be recomputed by anyone who knows their Canvas ID.
+  const secret = requireSecret('LEARNER_KEY_SECRET');
   // Newline separator: neither an issuer URL nor a sub can contain one,
   // so distinct (iss, sub) pairs can't collide by concatenation.
-  const mac = createHmac('sha256', SECRET).update(`${iss}\n${sub}`).digest('hex');
+  const mac = createHmac('sha256', secret).update(`${iss}\n${sub}`).digest('hex');
   return `lk-${mac}`;
 }

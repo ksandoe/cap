@@ -22,8 +22,9 @@ npm run dev               # starts all three on their respective ports
 Then open http://localhost:3000 and click **Launch demo** — the dev landing
 page simulates the Canvas LTI launch. The Admin App runs at
 http://localhost:3002 and signs in with a shared team passkey
-(`ADMIN_PASSKEY` in `.env`, dev default `cap-team-2026`, plus an optional
-display name used for draft attribution). This is an interim measure — the planned
+(`ADMIN_PASSKEY` in `.env`, local-development default `cap-team-2026` which a
+deployed function never accepts, plus an optional display name used for draft
+attribution). This is an interim measure — the planned
 model is OTP sign-on against institutional emails with per-user roles
 managed by a superadmin; the role-gate plumbing already supports it.
 

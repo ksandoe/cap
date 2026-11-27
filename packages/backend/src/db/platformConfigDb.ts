@@ -15,6 +15,7 @@
  *             OTP + per-user role model.
  */
 import { moduleConfigDb } from './moduleConfigDb';
+import { resolvePasskey } from '../config/secrets';
 import { MASTER_RUBRIC, MasterRubricDimension } from '@cap/shared';
 
 const PLATFORM_KEY = '_platform';
@@ -56,10 +57,12 @@ export const platformConfigDb = {
     return cfg?.rubric?.length ? cfg.rubric : MASTER_RUBRIC;
   },
 
-  /** The effective admin passkey — stored override or env. An empty
-   *  stored value (reset) falls back to the env var. */
-  async passkey(): Promise<string> {
+  /** The effective admin passkey — stored override or env. An empty stored value
+   *  (reset) falls back to the env var. Returns null when a deployed function has
+   *  neither (or only the public development default), and sign-in is then refused.
+   *  The dev default applies to local development only (config/secrets.ts). */
+  async passkey(): Promise<string | null> {
     const cfg = await this.get().catch(() => null);
-    return cfg?.passkey || process.env.ADMIN_PASSKEY || 'cap-team-2026';
+    return resolvePasskey(cfg?.passkey, process.env);
   },
 };
