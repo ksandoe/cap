@@ -45,7 +45,7 @@ describe('when it is switched off', () => {
     const client = clientReturning({ SESSION_JWT_SECRET: VALUE_A });
     const e = env({ USE_LOCAL_DB: 'false' });
     const { result } = await logged(() => loadSecretsIntoEnv({ env: e, client }));
-    expect(result).toEqual({ source: 'none', fromSecret: [], keptFromEnv: [], ignored: [] });
+    expect(result).toEqual({ source: 'none', secretIds: [], fromSecret: [], keptFromEnv: [], ignored: [] });
     expect(client.send).not.toHaveBeenCalled();
     expect(e.SESSION_JWT_SECRET).toBeUndefined();
   });
@@ -166,6 +166,94 @@ describe('when the secret cannot be used', () => {
       expect(error?.message, JSON.stringify(value)).toContain('ADMIN_PASSKEY');
       expect(error?.message).not.toContain(VALUE_A);
     }
+  });
+});
+
+describe('several secrets, split by who may read them', () => {
+  /** A fake that serves a different secret per name, and reports an unknown name as not found. */
+  const clientByName = (secrets: Record<string, unknown>) => ({
+    send: vi.fn(async (command: any) => {
+      const id = command.input.SecretId as string;
+      if (!(id in secrets)) throw Object.assign(new Error('REQUEST-DETAILS'), { name: 'ResourceNotFoundException' });
+      return { SecretString: JSON.stringify(secrets[id]) };
+    }),
+  });
+  const PEM = '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n';
+
+  it('reads a comma-separated list, trimming blanks and repeats', async () => {
+    const { parseSecretIds } = await import('../config/secretsManager');
+    expect(parseSecretIds(undefined)).toEqual([]);
+    expect(parseSecretIds('   ')).toEqual([]);
+    expect(parseSecretIds('cap/prod/app')).toEqual(['cap/prod/app']);
+    expect(parseSecretIds(' cap/prod/app , cap/lti-dev ,, cap/prod/app ')).toEqual(['cap/prod/app', 'cap/lti-dev']);
+  });
+
+  it('loads both secrets, in order, and applies the values from each', async () => {
+    const client = clientByName({
+      'cap/prod/app': { SESSION_JWT_SECRET: VALUE_A, ADMIN_PASSKEY: VALUE_B },
+      'cap/lti-dev':  { LTI_PRIVATE_KEY: PEM },
+    });
+    const e = env({ APP_SECRETS_ID: 'cap/prod/app,cap/lti-dev' });
+    const { result, output } = await logged(() => loadSecretsIntoEnv({ env: e, client }));
+    expect(client.send.mock.calls.map(c => (c[0] as any).input.SecretId)).toEqual(['cap/prod/app', 'cap/lti-dev']);
+    expect(e.SESSION_JWT_SECRET).toBe(VALUE_A);
+    expect(e.ADMIN_PASSKEY).toBe(VALUE_B);
+    expect(e.LTI_PRIVATE_KEY).toBe(PEM);
+    expect(result!.secretIds).toEqual(['cap/prod/app', 'cap/lti-dev']);
+    expect(result!.fromSecret.sort()).toEqual(['ADMIN_PASSKEY', 'LTI_PRIVATE_KEY', 'SESSION_JWT_SECRET']);
+    expect(output).toContain('cap/lti-dev');          // each secret is named in the log...
+    expect(output).not.toContain(VALUE_A);            // ...never a value
+    expect(output).not.toContain('abc');
+  });
+
+  it('lets a developer load only the Canvas key secret and nothing else', async () => {
+    // Aliyah's case: her sign-in can read only the small secret, so that is all she names.
+    const client = clientByName({ 'cap/lti-dev': { LTI_PRIVATE_KEY: PEM } });
+    const e = env({ APP_SECRETS_ID: 'cap/lti-dev', USE_LOCAL_DB: 'true' });
+    await logged(() => loadSecretsIntoEnv({ env: e, client }));
+    expect(e.LTI_PRIVATE_KEY).toBe(PEM);
+    expect(e.SESSION_JWT_SECRET).toBeUndefined();
+    expect(e.ADMIN_PASSKEY).toBeUndefined();
+    expect(client.send).toHaveBeenCalledTimes(1);     // the main secret is never even requested
+  });
+
+  it('refuses the same name in two secrets, and applies nothing', async () => {
+    const client = clientByName({
+      'cap/prod/app': { SESSION_JWT_SECRET: VALUE_A, ADMIN_PASSKEY: VALUE_B },
+      'cap/lti-dev':  { ADMIN_PASSKEY: 'a-second-value-that-must-not-leak', LTI_PRIVATE_KEY: PEM },
+    });
+    const e = env({ APP_SECRETS_ID: 'cap/prod/app,cap/lti-dev' });
+    const { error } = await logged(() => loadSecretsIntoEnv({ env: e, client }));
+    expect(error?.message).toContain('ADMIN_PASSKEY is in both "cap/prod/app" and "cap/lti-dev"');
+    expect(error?.message).not.toContain(VALUE_B);
+    expect(error?.message).not.toContain('a-second-value-that-must-not-leak');
+    expect(e.SESSION_JWT_SECRET).toBeUndefined();     // all or nothing: the first secret was not applied
+    expect(e.LTI_PRIVATE_KEY).toBeUndefined();
+  });
+
+  it('fails, naming the secret, when any one cannot be read, and applies nothing', async () => {
+    const client = clientByName({ 'cap/prod/app': { SESSION_JWT_SECRET: VALUE_A } });   // the second does not exist
+    const e = env({ APP_SECRETS_ID: 'cap/prod/app,cap/lti-dev' });
+    const { error } = await logged(() => loadSecretsIntoEnv({ env: e, client }));
+    expect(error?.message).toContain('could not read the secret "cap/lti-dev" (ResourceNotFoundException)');
+    expect(error?.message).not.toContain('REQUEST-DETAILS');
+    expect(e.SESSION_JWT_SECRET).toBeUndefined();
+  });
+
+  it('applies the allowed-names and environment-wins rules to each secret', async () => {
+    const client = clientByName({
+      'cap/prod/app': { SESSION_JWT_SECRET: VALUE_A, USE_LOCAL_DB: 'true' },
+      'cap/lti-dev':  { LTI_PRIVATE_KEY: PEM, NODE_ENV: 'development' },
+    });
+    const e = env({ APP_SECRETS_ID: 'cap/prod/app,cap/lti-dev', LTI_PRIVATE_KEY: 'set-on-the-function', USE_LOCAL_DB: 'false' });
+    const { result, output } = await logged(() => loadSecretsIntoEnv({ env: e, client }));
+    expect(e.SESSION_JWT_SECRET).toBe(VALUE_A);
+    expect(e.LTI_PRIVATE_KEY).toBe('set-on-the-function');    // the environment wins
+    expect(e.USE_LOCAL_DB).toBe('false');                      // not an allowed name: ignored
+    expect(e.NODE_ENV).toBeUndefined();
+    expect(result!.keptFromEnv).toEqual(['LTI_PRIVATE_KEY']);
+    expect(result!.ignored.sort()).toEqual(['NODE_ENV', 'USE_LOCAL_DB']);
+    expect(output).not.toContain('set-on-the-function');
   });
 });
 
