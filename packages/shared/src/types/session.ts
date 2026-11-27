@@ -117,3 +117,78 @@ export function normalizeCheckinOptions(options: unknown): string[] | undefined 
     return Object.entries(options).map(([k, v]) => (v === '' || v == null ? k : String(v)));
   return undefined;
 }
+
+/** Limits for a module's fixed check-in questionnaire (Recipe.checkinQuestions). */
+export const CHECKIN_LIMITS = {
+  maxQuestions: 12,
+  maxTextLength: 300,
+  maxOptions: 8,
+  maxOptionLength: 100,
+} as const;
+
+/**
+ * Checks a fixed check-in questionnaire and returns a list of problems in plain
+ * language (empty when it is valid). Used by the admin app before publishing and by
+ * the server when a recipe is saved, so a malformed questionnaire never reaches
+ * students.
+ *
+ * A question's key must stay the same when its wording is edited: answers are
+ * recorded against the key.
+ */
+export function validateCheckinQuestions(input: unknown): string[] {
+  if (!Array.isArray(input)) return ['The check-in questions must be a list.'];
+  const problems: string[] = [];
+  if (input.length > CHECKIN_LIMITS.maxQuestions)
+    problems.push(`At most ${CHECKIN_LIMITS.maxQuestions} check-in questions are allowed.`);
+
+  const seen = new Set<string>();
+  input.forEach((raw, i) => {
+    const n = `Question ${i + 1}`;
+    const q = (raw ?? {}) as Record<string, unknown>;
+    // The key is checked as given, not trimmed: a key with a stray space would pass a
+    // trimmed check and then be stored, and answered against, with the space.
+    const key = typeof q.questionKey === 'string' ? q.questionKey : '';
+    if (!/^[A-Za-z0-9_-]{1,60}$/.test(key)) problems.push(`${n}: needs a key of letters, numbers, - or _ (up to 60).`);
+    else if (seen.has(key)) problems.push(`${n}: the key "${key}" is used twice.`);
+    else seen.add(key);
+
+    const text = typeof q.questionText === 'string' ? q.questionText.trim() : '';
+    if (!text) problems.push(`${n}: needs question text.`);
+    else if (text.length > CHECKIN_LIMITS.maxTextLength)
+      problems.push(`${n}: the text is longer than ${CHECKIN_LIMITS.maxTextLength} characters.`);
+
+    const type = q.responseType;
+    if (type !== 'likert' && type !== 'multiple_choice' && type !== 'short_text') {
+      problems.push(`${n}: the answer type must be likert, multiple_choice or short_text.`);
+    } else if (type === 'short_text') {
+      if (Array.isArray(q.options) && q.options.length) problems.push(`${n}: a short-text question has no options.`);
+    } else {
+      const opts = Array.isArray(q.options) ? q.options : [];
+      if (opts.length < 2) problems.push(`${n}: needs at least 2 options.`);
+      else if (opts.length > CHECKIN_LIMITS.maxOptions) problems.push(`${n}: at most ${CHECKIN_LIMITS.maxOptions} options.`);
+      else if (opts.some(o => typeof o !== 'string' || !o.trim() || o.length > CHECKIN_LIMITS.maxOptionLength))
+        problems.push(`${n}: every option needs text of up to ${CHECKIN_LIMITS.maxOptionLength} characters.`);
+      else if (new Set(opts.map(o => String(o).trim())).size !== opts.length)
+        problems.push(`${n}: two options are the same.`);
+    }
+
+    if (q.theme !== undefined && q.theme !== 'past' && q.theme !== 'present' && q.theme !== 'future')
+      problems.push(`${n}: the theme must be past, present or future.`);
+  });
+  return problems;
+}
+
+/**
+ * A copy of a validated questionnaire with surrounding spaces removed from the text and
+ * the options, and with no undefined properties (the DynamoDB client rejects those).
+ * Validation checks trimmed text, so store what was checked.
+ */
+export function cleanCheckinQuestions(questions: CheckinQuestion[]): CheckinQuestion[] {
+  return questions.map(q => ({
+    questionKey:  q.questionKey,
+    questionText: q.questionText.trim(),
+    responseType: q.responseType,
+    ...(q.theme ? { theme: q.theme } : {}),
+    ...(q.responseType !== 'short_text' && q.options ? { options: q.options.map(o => String(o).trim()) } : {}),
+  }));
+}

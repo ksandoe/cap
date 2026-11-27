@@ -50,6 +50,8 @@ function draftFromRecipe(r: any): Partial<RecipeDraft> {
       steps: r.steps ?? [], probingRules: r.probingRules ?? [],
       vagueAnswerTriggers: r.vagueAnswerTriggers ?? [],
       toneGuidance: r.toneGuidance, backgroundDocs: r.backgroundDocs,
+      // Without this the draft starts with no fixed check-in and publishing would drop it.
+      checkinQuestions: r.checkinQuestions,
     },
     sections: { basics: 'done', outcomes: 'done', concepts: 'done', activity: 'done', conversation: 'done' },
   };
