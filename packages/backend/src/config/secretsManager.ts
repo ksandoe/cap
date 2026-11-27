@@ -22,17 +22,32 @@
  *   - ONLY the names in SECRET_KEYS are accepted. Anything else in a secret is ignored and
  *     reported by name, so a secret can never switch on USE_LOCAL_DB, change NODE_ENV or
  *     repoint a table.
- *   - A name may live in only ONE secret. The same name in two is refused, so it is never
- *     unclear which value is used.
  *   - A variable already set on the function wins over a secret. That lets you move the
  *     values one at a time and check each, and a stale variable you forgot to delete is
  *     reported (by name) as "also set as an environment variable".
- *   - All-or-nothing: every secret is read and checked BEFORE anything is copied into the
- *     environment. If any cannot be read, is malformed, or conflicts, this throws, nothing
- *     is applied, and the function does not serve requests. It never falls back to a default.
- *   - It logs names only. No value, and no part of one, is ever logged or put in an error.
+ *
+ * A BROKEN SECRET DOES NOT STOP THE APP, unless the app cannot start safely without it.
+ *   - A secret that cannot be read, is not text, is not valid JSON, or is not an object is
+ *     skipped. A single value that is not a non-empty text value is skipped (the rest of its
+ *     secret still applies). A name found in two secrets is applied from neither, because
+ *     which one is meant is unclear. Each of these is logged as an ERROR naming the secret or
+ *     the name and the problem, so it is visible in CloudWatch, and is returned in `problems`.
+ *   - The one exception is the pair the app cannot run safely without, REQUIRED_SECRET_KEYS
+ *     (the session secret and the learner-key secret, which have public defaults in the source
+ *     and so must never be missing). On a deployed function, if either is still missing from the
+ *     environment after loading, this throws and the function does not serve requests, until it
+ *     is fixed; the next request tries again, so no redeploy is needed. A broken optional secret,
+ *     such as the Canvas key, must never take the site down: it has no public default, and
+ *     whatever needs it fails clearly when used.
+ *   - In local development a missing required name is not an error (the development defaults
+ *     apply).
+ *   - It never falls back to a default for a required secret on a deployed function.
+ *
+ * It logs names only. No value, and no part of one, is ever logged or put in an error, and the
+ * AWS error text is never echoed (only its name, such as AccessDeniedException).
  */
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { isLocalDevelopment } from './secrets';
 
 /** The only names a secret may fill in. LTI_PRIVATE_KEY is for Canvas grade return. */
 export const SECRET_KEYS = [
@@ -45,6 +60,9 @@ export const SECRET_KEYS = [
   'LTI_PRIVATE_KEY',
 ] as const;
 
+/** Names a deployed function cannot start safely without (see assertProductionSecrets). */
+export const REQUIRED_SECRET_KEYS = ['SESSION_JWT_SECRET', 'LEARNER_KEY_SECRET'] as const;
+
 export interface SecretsClientLike {
   send(command: unknown): Promise<{ SecretString?: string; SecretBinary?: unknown }>;
 }
@@ -52,7 +70,7 @@ export interface SecretsClientLike {
 export interface SecretsLoadResult {
   /** 'none' when APP_SECRETS_ID is not set and nothing was read. */
   source: 'none' | 'secrets-manager';
-  /** The secrets that were read, in order. */
+  /** The secrets that were asked for, in order. */
   secretIds: string[];
   /** Names copied from the secrets into the environment. */
   fromSecret: string[];
@@ -60,6 +78,8 @@ export interface SecretsLoadResult {
   keptFromEnv: string[];
   /** Names in a secret that are not allowed and were ignored. */
   ignored: string[];
+  /** What went wrong, in words, naming secrets and settings but never values. Empty when all is well. */
+  problems: string[];
 }
 
 function failure(message: string): Error {
@@ -72,43 +92,49 @@ export function parseSecretIds(raw: string | undefined): string[] {
   return [...new Set(ids)];
 }
 
-interface ReadSecret { id: string; values: Record<string, string>; ignored: string[] }
+interface ReadSecret { id: string; values: Record<string, string>; ignored: string[]; problems: string[] }
 
+/** Reads one secret. Never throws: a problem is returned in `problems` and the secret, or the
+ *  offending value, is skipped. */
 async function readSecret(id: string, client: SecretsClientLike): Promise<ReadSecret> {
+  const result: ReadSecret = { id, values: {}, ignored: [], problems: [] };
+  const skip = (why: string) => { result.problems.push(`${why} It was skipped.`); return result; };
+
   let response: { SecretString?: string; SecretBinary?: unknown };
   try {
     response = await client.send(new GetSecretValueCommand({ SecretId: id }));
   } catch (err) {
     // The error's name (AccessDeniedException, ResourceNotFoundException, ...) says what is
     // wrong. Its message is not copied: it can quote the request.
-    throw failure(`could not read the secret "${id}" (${(err as Error)?.name ?? 'unknown error'}). `
-      + 'Check that it exists and that the function\'s role is allowed to read it (see infra/secrets.md).');
+    return skip(`Could not read the secret "${id}" (${(err as Error)?.name ?? 'unknown error'}). `
+      + 'Check that it exists and that the function\'s role may read it (see infra/secrets.md).');
   }
 
   if (typeof response.SecretString !== 'string') {
-    throw failure(`the secret "${id}" is not a text secret. Store it as key/value pairs (JSON).`);
+    return skip(`The secret "${id}" is not a text secret. Store it as key/value pairs (JSON).`);
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(response.SecretString);
   } catch {
-    throw failure(`the secret "${id}" is not valid JSON. Store it as key/value pairs.`);
+    return skip(`The secret "${id}" is not valid JSON. Store it as key/value pairs.`);
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw failure(`the secret "${id}" must be a JSON object of name: value pairs.`);
+    return skip(`The secret "${id}" must be a JSON object of name: value pairs.`);
   }
 
   const allowed = new Set<string>(SECRET_KEYS);
-  const values: Record<string, string> = {};
-  const ignored: string[] = [];
   for (const [name, value] of Object.entries(parsed as Record<string, unknown>)) {
-    if (!allowed.has(name)) { ignored.push(name); continue; }
+    if (!allowed.has(name)) { result.ignored.push(name); continue; }
     if (typeof value !== 'string' || value.trim() === '') {
-      throw failure(`${name} in the secret "${id}" must be a non-empty text value.`);
+      // Only this setting is skipped; the rest of the secret still applies. (A key that was
+      // stored as a nested object, a null or an empty string ends up here.)
+      result.problems.push(`${name} in the secret "${id}" is not a non-empty text value. It was skipped.`);
+      continue;
     }
-    values[name] = value;
+    result.values[name] = value;
   }
-  return { id, values, ignored };
+  return result;
 }
 
 export async function loadSecretsIntoEnv(
@@ -116,29 +142,30 @@ export async function loadSecretsIntoEnv(
 ): Promise<SecretsLoadResult> {
   const env = opts.env ?? process.env;
   const ids = parseSecretIds(env.APP_SECRETS_ID);
-  if (!ids.length) return { source: 'none', secretIds: [], fromSecret: [], keptFromEnv: [], ignored: [] };
+  if (!ids.length) return { source: 'none', secretIds: [], fromSecret: [], keptFromEnv: [], ignored: [], problems: [] };
 
   const client: SecretsClientLike = opts.client
     ?? (new SecretsManagerClient({ region: env.AWS_REGION }) as unknown as SecretsClientLike);
 
-  // 1. Read and check every secret first. Nothing touches the environment yet, so a failure
-  //    part-way leaves it exactly as it was.
+  // 1. Read and check every secret first. Nothing touches the environment yet.
   const secrets: ReadSecret[] = [];
   for (const id of ids) secrets.push(await readSecret(id, client));
+  const problems = secrets.flatMap(s => s.problems);
 
-  const owner = new Map<string, string>();
+  // A name in two secrets is applied from neither: which one is meant is unclear.
+  const owners = new Map<string, string[]>();
   for (const secret of secrets) {
-    for (const name of Object.keys(secret.values)) {
-      const first = owner.get(name);
-      if (first !== undefined) {
-        throw failure(`${name} is in both "${first}" and "${secret.id}". A setting must live in exactly one secret.`);
-      }
-      owner.set(name, secret.id);
-    }
+    for (const name of Object.keys(secret.values)) owners.set(name, [...(owners.get(name) ?? []), secret.id]);
+  }
+  for (const [name, where] of owners) {
+    if (where.length < 2) continue;
+    problems.push(`${name} is in both ${where.map(w => `"${w}"`).join(' and ')}. A setting must live in exactly one secret, `
+      + 'so it was applied from neither.');
+    for (const secret of secrets) delete secret.values[name];
   }
 
   // 2. Apply. A variable already set on the function wins.
-  const result: SecretsLoadResult = { source: 'secrets-manager', secretIds: ids, fromSecret: [], keptFromEnv: [], ignored: [] };
+  const result: SecretsLoadResult = { source: 'secrets-manager', secretIds: ids, fromSecret: [], keptFromEnv: [], ignored: [], problems };
   for (const secret of secrets) {
     const taken: string[] = [];
     const kept: string[] = [];
@@ -159,6 +186,19 @@ export async function loadSecretsIntoEnv(
     }
     if (secret.ignored.length) {
       console.warn(`[secrets] "${secret.id}": ignored (not an allowed name): ${secret.ignored.join(', ')}`);
+    }
+  }
+  for (const problem of problems) console.error(`[secrets] ERROR: ${problem}`);
+
+  // 3. The app cannot start safely without the required secrets, and they have public defaults
+  //    in the source, so a deployed function must not run without them. Throwing here makes the
+  //    next request try again, so a fixed secret needs no redeploy. Anything else that is broken
+  //    has already been logged above and the app carries on.
+  if (!isLocalDevelopment(env)) {
+    const missing = REQUIRED_SECRET_KEYS.filter(name => !env[name]?.trim());
+    if (missing.length) {
+      throw failure(`${missing.join(' and ')} ${missing.length > 1 ? 'are' : 'is'} required and not set in the environment `
+        + `or in any of the secrets named by APP_SECRETS_ID. ${problems.length ? `Problems: ${problems.join(' ')}` : ''}`.trim());
     }
   }
   return result;

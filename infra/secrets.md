@@ -20,9 +20,11 @@ One secret is one permission boundary: whoever can read any of it reads all of i
 
 ## The rules the loader follows
 - Only these names are accepted from a secret: `SESSION_JWT_SECRET`, `LEARNER_KEY_SECRET`, `ADMIN_PASSKEY`, `OPENAI_API_KEY`, `SAP_CLIENT_SECRET`, `DATABASE_URL`, `LTI_PRIVATE_KEY`. Anything else is ignored and named in a log line, so a secret can never switch on `USE_LOCAL_DB` or repoint a table.
-- **A name may be in only one secret.** The same name in two is refused, naming both, so it is never unclear which value is used.
+- **A name may be in only one secret.** The same name in two is applied from neither, and logged naming both, so it is never unclear which value is used.
 - A variable already set on the function wins over a secret, so you can move values one at a time. A stale one is reported by name.
-- **All or nothing:** every secret is read and checked before anything is applied. If any cannot be read, is malformed, or conflicts, nothing is applied and the function does not serve requests. It never falls back to a default.
+- **A broken secret does not stop the app, unless the app cannot start safely without it.** A secret that cannot be read, is not text, is not valid JSON or is not an object is skipped. A single value that is not a non-empty text value (a key stored as a nested object, a `null`, an empty string) is skipped on its own, and the rest of its secret still applies. A name found in two secrets is applied from neither. Each is logged as `[secrets] ERROR: ...`, naming the secret or setting and the problem.
+- **The exception is the two settings a deployed function must have:** `SESSION_JWT_SECRET` and `LEARNER_KEY_SECRET` (they have public defaults in the source, so they must never be missing). If either is still missing from the function's environment after loading, requests fail with an error naming it, until it is fixed. The next request tries again, so no redeploy is needed. Everything else (`LTI_PRIVATE_KEY`, `OPENAI_API_KEY`, `ADMIN_PASSKEY`, `SAP_CLIENT_SECRET`, `DATABASE_URL`) has no public default and fails clearly where it is used, so a problem there never takes the site down.
+- **A skipped secret is fixed by a new function instance.** After correcting a secret that was skipped, make any harmless configuration change to the function (edit a non-secret variable) so new instances read it.
 - Only names are logged, never values, and AWS's own error text is never echoed.
 
 ## One-time setup (Kent or an AWS admin; about 20 minutes)
@@ -60,7 +62,7 @@ One secret is one permission boundary: whoever can read any of it reads all of i
    ```
    If a secret uses a customer-managed encryption key instead of the default, the reader also needs `kms:Decrypt` on that key.
 4. **Point the function at them.** Lambda console, Configuration, Environment variables, Edit, add `APP_SECRETS_ID` = `cap/prod/app,cap/lti-dev` (Edit, never the `--environment` command, which replaces every variable). Then ask Devin to redeploy (`update-function-code` only).
-5. **Check the first start.** CloudWatch shows `[secrets] from "cap/prod/app": ...` and `[secrets] from "cap/lti-dev": LTI_PRIVATE_KEY`, plus, while the old variables still exist, a warning that those variables win. If it logs `could not read the secret "..." (AccessDeniedException)` the permission in step 3 is wrong: the function does not serve requests until it is fixed, and the next request tries again without a redeploy.
+5. **Check the first start.** CloudWatch shows `[secrets] from "cap/prod/app": ...` and `[secrets] from "cap/lti-dev": LTI_PRIVATE_KEY`, plus, while the old variables still exist, a warning that those variables win. **Look for `[secrets] ERROR:` lines.** Each names the secret or setting that is wrong. `Could not read the secret "..." (AccessDeniedException)` means the permission in step 3 is wrong; `... is not a non-empty text value` means a value was stored as something other than text (see the Canvas-key snippet in step 2). A broken Canvas-key secret is logged and skipped and the site keeps working. If a **required** secret (session or learner-key) cannot be loaded and the environment does not hold it, requests fail with an error naming it until it is fixed, and the next request retries without a redeploy.
 
 ## Moving the values, one at a time
 Delete one sensitive variable from the function (Environment variables, Edit), then test. The log line moves that name from "also set as environment variables" to "from ...". Suggested order, easiest to check first:
