@@ -1,6 +1,7 @@
 /**
  * session.ts — Session lifecycle routes
  *
+ * GET  /session/status            — Landing-page status for the token's session (always 200)
  * GET  /session/:id               — Get current session state
  * POST /session/:id/checkin       — Submit check-in responses
  * POST /session/:id/verify-sap    — Initiate SAP verification
@@ -15,11 +16,13 @@ import { asyncRouter } from '../middleware/asyncRouter';
 import {
   getSession, submitCheckin, initiateSapVerification,
   getSapVerificationStatus, completeSession, saveSession, createRetry,
-  saveProgress,
+  saveProgress, getLandingStatus,
 } from '../services/orchestrator/orchestratorService';
 
 export const sessionRouter = asyncRouter();
 
+// Registered before '/:id', or Express reads "status" as a session id.
+sessionRouter.get( '/status',            getLandingStatus);
 sessionRouter.get( '/:id',               getSession);
 sessionRouter.post('/:id/checkin',       submitCheckin);
 sessionRouter.post('/:id/verify-sap',    initiateSapVerification);

@@ -215,7 +215,9 @@ describe('POST /lti/launch', () => {
     await withDefaultActivity('sim-sales-process', async () => {
       const r = await launch();
       expect(r.status).toBe(302);
-      expect(r.headers.get('location') ?? '').toContain('/launch?token=');
+      // A launch lands on the landing page, which passes straight on to the
+      // activity when it is not in a frame (see landing.test.ts).
+      expect(r.headers.get('location') ?? '').toContain('/landing?token=');
     });
   });
 

@@ -11,7 +11,7 @@
  * Available when the backend exposes /dev/* (local dev, or a demo build
  * with ENABLE_DEV_ROUTES=true).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { API_BASE } from '../services/api';
 import { APP_VERSION } from '@cap/shared';
@@ -34,6 +34,24 @@ export function DevLaunchPage() {
   const [modules,  setModules]  = useState<Module[] | null>(null);
   const [loadErr,  setLoadErr]  = useState(false);
   const [instructorPreview, setInstructorPreview] = useState(false);
+
+  // "Preview as a Canvas assignment": show the landing page inside a frame on this page,
+  // the way Canvas frames an assignment launch. The landing page asks its host to
+  // resize the frame with the standard LTI message, which is handled here too.
+  const [framedPreview, setFramedPreview] = useState(false);
+  const [framedUrl, setFramedUrl]         = useState<string | null>(null);
+  const [frameHeight, setFrameHeight]     = useState(420);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      // Only our own frame may resize it, and only to a real number.
+      if (e.source !== frameRef.current?.contentWindow) return;
+      if (e.data?.subject === 'lti.frameResize' && Number.isFinite(e.data.height))
+        setFrameHeight(Math.max(200, Math.min(2000, Math.ceil(e.data.height))));
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
 
   // Simulated "Canvas grade column": keys CAP returned on prior launches,
   // stored per persona+module in localStorage by LaunchPage. Passing the
@@ -98,6 +116,11 @@ export function DevLaunchPage() {
           Instructor preview — show rubric scores on the summary page
           <span style={{ color: '#999' }}>(testing only — students never see this)</span>
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555', marginTop: 10, cursor: 'pointer' }}>
+          <input type="checkbox" checked={framedPreview}
+                 onChange={e => { setFramedPreview(e.target.checked); if (!e.target.checked) setFramedUrl(null); }} />
+          Preview as a Canvas assignment — open the landing page inside a frame on this page
+        </label>
       </section>
 
       <section>
@@ -140,6 +163,11 @@ export function DevLaunchPage() {
               href={`${API_BASE}/dev/launch?moduleId=${encodeURIComponent(m.moduleId)}&persona=${persona}` +
                     (storedKey(m.moduleId) ? `&key=${storedKey(m.moduleId)}` : '') +
                     (instructorPreview ? '&instructor=1' : '')}
+              onClick={e => {
+                if (!framedPreview) return;
+                e.preventDefault();
+                setFramedUrl(`${e.currentTarget.getAttribute('href')}&landing=1`);
+              }}
               style={{
                 padding: '9px 18px', background: '#1D4E8C', color: '#fff',
                 borderRadius: 6, textDecoration: 'none', fontWeight: 600,
@@ -155,6 +183,21 @@ export function DevLaunchPage() {
           <p style={{ color: '#888' }}>Loading modules…</p>
         )}
       </section>
+
+      {framedUrl && (
+        <section style={{ marginTop: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: 17, color: '#333', margin: 0 }}>Simulated Canvas assignment page</h2>
+            <button type="button" onClick={() => setFramedUrl(null)}
+              style={{ border: '1px solid #ccc', background: '#fff', borderRadius: 4, padding: '4px 10px', fontSize: 12 }}>
+              Close frame
+            </button>
+          </div>
+          <iframe ref={frameRef} key={framedUrl} title="Simulated Canvas assignment frame" src={framedUrl}
+            style={{ width: '100%', height: frameHeight + 2 /* the 1px border on each side */, border: '1px solid #ccc', borderRadius: 6,
+              background: '#fff', marginTop: 10 }} />
+        </section>
+      )}
 
       <p style={{ fontSize: 12, color: '#999', marginTop: 32 }}>
         Demo launchpad — replaces Canvas while LTI registration is pending.
