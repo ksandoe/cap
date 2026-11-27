@@ -15,6 +15,7 @@
 // config/env must be imported first — it loads .env before other modules read it
 import { USE_LOCAL_DB } from './config/env';
 import { assertProductionSecrets } from './config/secrets';
+import { loadSecretsIntoEnv } from './config/secretsManager';
 import { auroraConfigured } from './db/auroraDb';
 import express         from 'express';
 import fs              from 'fs';
@@ -124,7 +125,13 @@ app.use(errorHandler);
 // Local dev server
 if (process.env.NODE_ENV !== 'production') {
   const port = process.env.PORT ?? 3001;
-  app.listen(port, () =>
-    console.log(`Backend running → http://localhost:${port}`)
-  );
+  // A developer can name secrets in APP_SECRETS_ID and run with their own AWS sign-in (for
+  // example the small secret holding only the Canvas key, infra/secrets.md): they are loaded
+  // before serving. Unset, this does nothing. In Lambda the handler has already loaded them.
+  const ready = process.env.AWS_LAMBDA_FUNCTION_NAME
+    ? Promise.resolve()
+    : loadSecretsIntoEnv().then(() => undefined);
+  ready
+    .then(() => app.listen(port, () => console.log(`Backend running → http://localhost:${port}`)))
+    .catch(err => { console.error(err instanceof Error ? err.message : String(err)); process.exit(1); });
 }

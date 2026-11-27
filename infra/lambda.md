@@ -30,7 +30,7 @@ Single Lambda function serves both Student App and Admin App.
 
 | Group | Variables |
 |---|---|
-| Secrets Manager | `APP_SECRETS_ID`: the name of the secret to load (see below); unset means off |
+| Secrets Manager | `APP_SECRETS_ID`: the name or names (comma-separated) of the secrets to load (see below); unset means off |
 | Mode switches | `USE_LOCAL_DB` (must be `false` here), `SAP_MODE`, `CANVAS_MODE`, `CREDLY_MODE`, `LLM_MODE`, `ENABLE_DEV_ROUTES`, `NODE_ENV`, `ALLOWED_ORIGINS` |
 | DynamoDB tables | `DYNAMODB_TABLE_SESSIONS`, `_RECIPES`, `_RECIPE_DRAFTS`, `_SAP_POOL`, `_PARAMS`, `_MODULE_CONFIG`, `_EVALUATIONS`, `_ASSETS`, `_SIM_STATE` |
 | Retention | `SIM_STATE_TTL_DAYS`, `SESSION_TTL_HOURS`, `SAVED_TTL_DAYS` |
@@ -47,10 +47,11 @@ Single Lambda function serves both Student App and Admin App.
 - `OPENAI_API_KEY` and `SAP_CLIENT_SECRET` have no default: missing, the calls that need them fail.
 
 ## Secrets Manager: built, off until `APP_SECRETS_ID` is set
-The code can load the sensitive values from one Secrets Manager secret at start-up (`config/secretsManager.ts`, `lambda/bootstrap.ts`). **It does nothing until the function has the variable `APP_SECRETS_ID`** (the secret's name, which is not itself a secret). Until then the sensitive values are plain environment variables, as the table above says.
+The code can load the sensitive values from Secrets Manager at start-up (`config/secretsManager.ts`, `lambda/bootstrap.ts`). They are split into **two secrets by who may read them**: `cap/prod/app` (the runtime secrets) and `cap/lti-dev` (only the dev Canvas private key). **It does nothing until the function has the variable `APP_SECRETS_ID`** (the secrets' names, comma-separated, which are not themselves secret). Until then the sensitive values are plain environment variables, as the table above says.
 
 Setup, the permission the function's role needs, how to move the values one at a time, and how to roll back are in `infra/secrets.md`. Rules in short:
-- Only these names can come from the secret: `SESSION_JWT_SECRET`, `LEARNER_KEY_SECRET`, `ADMIN_PASSKEY`, `OPENAI_API_KEY`, `SAP_CLIENT_SECRET`, `DATABASE_URL`, `LTI_PRIVATE_KEY`. Anything else in it is ignored, so a secret can never switch on `USE_LOCAL_DB` or repoint a table.
-- A variable already set on the function wins over the secret. Move values one at a time, then delete the variable.
-- If the secret cannot be read, the function does not serve requests; it never falls back to a default.
+- Only these names can come from a secret: `SESSION_JWT_SECRET`, `LEARNER_KEY_SECRET`, `ADMIN_PASSKEY`, `OPENAI_API_KEY`, `SAP_CLIENT_SECRET`, `DATABASE_URL`, `LTI_PRIVATE_KEY`. Anything else in one is ignored, so a secret can never switch on `USE_LOCAL_DB` or repoint a table.
+- A name may be in only one secret; the same name in two is refused.
+- A variable already set on the function wins over a secret. Move values one at a time, then delete the variable.
+- If any secret cannot be read, nothing is applied and the function does not serve requests; it never falls back to a default.
 - Only names are logged, never values. Settings that are not secrets (table names, modes, retention) stay environment variables.
