@@ -39,11 +39,10 @@ Single Lambda function serves both Student App and Admin App.
 
 **The sensitive ones**: `OPENAI_API_KEY`, `LEARNER_KEY_SECRET`, `SESSION_JWT_SECRET`, `ADMIN_PASSKEY`, `SAP_CLIENT_SECRET` (and `DATABASE_URL` if it holds a password).
 - `LEARNER_KEY_SECRET` derives each student's permanent ID. **Never change it once real students have launched**, or every student gets a new ID and loses their work.
-- **Three of them have a built-in default that is public** (it is in the source, and the passkey's also in the README). If one is missing on a deployed function, the code silently uses the default instead of failing:
-  - `SESSION_JWT_SECRET` missing: every session token, student and admin, is signed with a default anyone can read, so anyone could forge a token, including an admin one.
-  - `ADMIN_PASSKEY` missing (and no stored override): the default passkey signs the holder in as admin.
-  - `LEARNER_KEY_SECRET` missing: every student's permanent ID is computed from a public default.
-  Each must be set to its own long random value, and **a value must not be one of the defaults or a placeholder**. Check the values in the console, not only that the names exist.
+- **Three of them have a public development default in the source** (and the passkey's is also in the README), used **only when running locally** (`USE_LOCAL_DB=true`). On a deployed function (`USE_LOCAL_DB` anything else) the code refuses a missing value or a value equal to the public default (`config/secrets.ts`, tested in `secrets.test.ts`):
+  - `SESSION_JWT_SECRET` and `LEARNER_KEY_SECRET`: the function **refuses to start**, with an error in CloudWatch that names the variable (never a value). Before this check, a missing `SESSION_JWT_SECRET` meant every session token, admin ones included, was signed with a secret anyone could read.
+  - `ADMIN_PASSKEY` (or a stored override set in the admin app): admin sign-in returns **503 "not set up"** until one exists. The public default passkey is never accepted.
+  Each must be its own long random value (32 or more characters; shorter ones start with a warning). The check cannot tell a random value from a placeholder, so look at the values in the console too. **If you deploy this code to a function that lacks these, it stops working until you set them.** Set them first.
 - `OPENAI_API_KEY` and `SAP_CLIENT_SECRET` have no default: missing, the calls that need them fail.
 
 ## Secrets Manager: planned, not in use
