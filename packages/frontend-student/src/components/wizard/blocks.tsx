@@ -132,7 +132,8 @@ function GuidedTool({ b, readOnly }: { b: GuidedToolBlock; readOnly: boolean }) 
   ) : b.tool === 'sap_sim' && !readOnly ? (
     // The parent must give the workspace its height — the SAP screen
     // scrolls inside it and the status bar sticks to the bottom.
-    <div className="tool-frame" style={{ height: 620 }}>
+    // At least 620px, and taller on a tall window so the workspace uses the screen.
+    <div className="tool-frame" style={{ height: 'max(620px, calc(100vh - 300px))' }}>
       <SimWorkspace api={simApi} />
     </div>
   ) : (

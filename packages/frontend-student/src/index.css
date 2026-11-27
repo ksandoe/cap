@@ -150,9 +150,16 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   position: relative; display: block; text-align: center;
   font-size: 12px; font-weight: 600; line-height: 22px; color: #333;
 }
+/* Instructions in a fixed-width column that stays in view beside the tool; the tool takes
+   the rest. minmax(0, 1fr) lets the tool shrink instead of forcing the page wider. The
+   simulator measures its own container, so it uses whatever width it is given. */
 .guided-layout.side {
-  display: grid; grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr);
-  gap: 16px; align-items: start;
+  display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 20px; align-items: start;
+}
+.guided-layout.side > .guided-instructions {
+  position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto;
+  padding-right: 4px;
 }
 .guided-steps { margin: 0; padding-left: 22px; }
 .guided-step { margin: 10px 0; line-height: 1.55; }
@@ -181,8 +188,11 @@ kbd.param {
   background: repeating-linear-gradient(45deg, #fafbfd, #fafbfd 12px, #f2f5fa 12px, #f2f5fa 24px);
   color: #555; font-size: 15px;
 }
-@media (max-width: 720px) {
+/* Below about 1000px a 340px column leaves a SAP screen under ~500px: stack them,
+   instructions first, and let the instructions scroll with the page. */
+@media (max-width: 1000px) {
   .guided-layout.side { grid-template-columns: 1fr; }
+  .guided-layout.side > .guided-instructions { position: static; max-height: none; overflow: visible; }
 }
 .step-nav {
   display: flex; justify-content: space-between; align-items: center;
