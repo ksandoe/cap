@@ -14,6 +14,7 @@
  */
 // config/env must be imported first — it loads .env before other modules read it
 import { USE_LOCAL_DB } from './config/env';
+import { assertProductionSecrets } from './config/secrets';
 import { auroraConfigured } from './db/auroraDb';
 import express         from 'express';
 import fs              from 'fs';
@@ -27,6 +28,10 @@ import { simRouter }        from './routes/sim';
 import { errorHandler }     from './middleware/errorHandler';
 import { requestLogger }    from './middleware/requestLogger';
 import { authMiddleware }   from './middleware/auth';
+
+// A deployed function refuses to start without its own token and learner-key secrets
+// (it never signs tokens with a default written in the source). Local development is exempt.
+assertProductionSecrets();
 
 /** The student app's page routes that the server must serve index.html for, so that opening
  *  or refreshing one directly works in a deployed build. Keep in step with the routes in

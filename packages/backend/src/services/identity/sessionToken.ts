@@ -8,8 +8,11 @@
  * TODO: rotate JWT secret via Secrets Manager
  */
 import { SignJWT, jwtVerify } from 'jose';
+import { requireSecret } from '../../config/secrets';
 
-const SECRET = new TextEncoder().encode(process.env.SESSION_JWT_SECRET ?? 'dev-secret-change-me');
+// Read on use, not when the module loads, and never defaulted on a deployed function:
+// config/secrets.ts refuses a missing or public-default secret there.
+const secret = () => new TextEncoder().encode(requireSecret('SESSION_JWT_SECRET'));
 const TTL_H  = parseInt(process.env.SESSION_TTL_HOURS ?? '8', 10);
 
 export interface SessionTokenPayload {
@@ -26,10 +29,10 @@ export async function issueSessionToken(payload: SessionTokenPayload): Promise<s
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${TTL_H}h`)
-    .sign(SECRET);
+    .sign(secret());
 }
 
 export async function verifySessionToken(token: string): Promise<SessionTokenPayload> {
-  const { payload } = await jwtVerify(token, SECRET);
+  const { payload } = await jwtVerify(token, secret());
   return payload as unknown as SessionTokenPayload;
 }
