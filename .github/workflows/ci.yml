@@ -1,0 +1,72 @@
+# CI: build, type-check and test every pull request, and every push to main.
+#
+# What it does, in this order, on a clean machine:
+#   1. npm ci            installs exactly what package-lock.json says, never rewriting it.
+#   2. build:sim         the simulator packages (type-check + build).
+#   3. build             shared types, the backend (type-check + the Lambda bundle), and the
+#                        student and admin apps (type-check + production build).
+#   4. typecheck         every package that has a type-check script (also covers the
+#                        simulator's standalone server, which build does not).
+#   5. tests             backend (vitest run) and the simulator packages (npm run test:sim).
+#
+# The student and admin apps have no tests yet, and their `test` script runs vitest in
+# watch mode, so they are deliberately not run here. Add them when they get tests.
+#
+# Node version: 24, the runtime the Lambda function runs (nodejs24.x) and what developers
+# use locally, so what is tested is what runs. When the function's runtime changes, change
+# the version below, the esbuild --target in packages/backend/package.json, and
+# infra/lambda.md together. To test two versions, make `node-version` a matrix again.
+#
+# No secrets are needed or used. The tests run against a local JSON file store and a
+# model pointed at nothing; nothing here reaches AWS, Canvas or an AI provider.
+#
+# To make this block merging when it fails: GitHub > Settings > Branches > a rule for
+# main > "Require status checks to pass" > add "Build and test (Node 24)". The name only
+# appears in that list after the first run.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Read-only: this workflow only reads the repository.
+permissions:
+  contents: read
+
+# A new push to the same branch cancels the run that is still going for the old one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install (exactly the lock file)
+        run: npm ci
+
+      - name: Build the simulator packages
+        run: npm run build:sim
+
+      - name: Build shared, backend (with the Lambda bundle), student and admin apps
+        run: npm run build
+
+      - name: Type-check every package
+        run: npm run typecheck
+
+      - name: Test the backend
+        run: npm test -w packages/backend
+
+      - name: Test the simulator packages
+        run: npm run test:sim

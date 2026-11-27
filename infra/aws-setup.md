@@ -82,6 +82,8 @@ creating the inline policy):
 
 ## 3. Seed + flip
 
+> **First-time setup only.** The `update-function-configuration --environment` command below **replaces every environment variable on the function** with exactly the ones in the command. Run on a function that is already configured, it deletes everything left out (the Canvas launch settings, the learner secret, and others). To change a value on a live function, use the console (Configuration → Environment variables → Edit), or send the complete merged set. Redeploying code (§3b) never touches the variables. See `lambda.md`.
+
 ```bash
 cd packages/backend
 DYNAMODB_TABLE_RECIPES=cap-recipes DYNAMODB_TABLE_SAP_POOL=cap-sap-pool \
