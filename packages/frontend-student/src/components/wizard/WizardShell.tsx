@@ -17,6 +17,9 @@ import { useSessionStore } from '../../store/sessionStore';
 import { api } from '../../services/api';
 import { APP_VERSION } from '@cap/shared';
 
+const READING_PAGE_WIDTH = 860;    // check-in, reflection conversation, summary
+const WIDE_PAGE_WIDTH    = 1600;   // a step with a tool beside its instructions
+
 export function WizardShell({ currentPhase, children }: { currentPhase: number; children: ReactNode }) {
   const moduleTitle  = useSessionStore(s => s.recipe?.moduleTitle);
   const steps        = useSessionStore(s => s.recipe?.steps) ?? [];
@@ -38,6 +41,15 @@ export function WizardShell({ currentPhase, children }: { currentPhase: number; 
     currentPhase === 3 ? 1 + steps.length :
     2 + steps.length;
 
+  // Reading steps keep a comfortable text width. A step with a tool beside its
+  // instructions (the SAP simulator, or a framed tool) gets most of the window, because a
+  // SAP screen needs about 700px on its own, and half of a narrow centered column is not
+  // enough. The header and progress bar widen with it so their left edges line up.
+  const step = currentPhase === 2 ? steps[activityStep] : undefined;
+  const wide = !!step?.blocks.some(b =>
+    b.type === 'guided_tool' && (b.layout === 'side_by_side' || b.tool === 'sap_sim'));
+  const pageWidth = wide ? WIDE_PAGE_WIDTH : READING_PAGE_WIDTH;
+
   async function saveAndExit() {
     if (!sessionId || saving) return;
     setSaving(true);
@@ -52,7 +64,7 @@ export function WizardShell({ currentPhase, children }: { currentPhase: number; 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header style={{ background: '#1D4E8C', color: '#fff', padding: '16px 32px' }}>
-        <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ maxWidth: pageWidth, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 16 }}>
           <div>
             <div style={{ fontSize: 13, opacity: 0.85 }}>
               Conversational Assessment Platform <span style={{ opacity: 0.7, fontSize: 11 }}>v{APP_VERSION}</span>
@@ -73,7 +85,7 @@ export function WizardShell({ currentPhase, children }: { currentPhase: number; 
 
       <nav aria-label="Progress" style={{ background: '#fff', borderBottom: '1px solid #e2e2e0' }}>
         <ol style={{
-          maxWidth: 860, margin: '0 auto', padding: '12px 32px',
+          maxWidth: pageWidth, margin: '0 auto', padding: '12px 32px',
           display: 'flex', gap: 6, listStyle: 'none', fontSize: 14,
           alignItems: 'center', flexWrap: 'wrap',
         }}>
@@ -104,7 +116,7 @@ export function WizardShell({ currentPhase, children }: { currentPhase: number; 
         </ol>
       </nav>
 
-      <main style={{ flex: 1, maxWidth: 860, width: '100%', margin: '0 auto', padding: '28px 32px 48px' }}>
+      <main style={{ flex: 1, maxWidth: pageWidth, width: '100%', margin: '0 auto', padding: '28px 32px 48px' }}>
         {children}
       </main>
     </div>
