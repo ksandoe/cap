@@ -5,7 +5,9 @@
  * The token carries only: sessionId, tempUserId, moduleId, currentPhase.
  * No student PII is encoded in the token.
  *
- * TODO: rotate JWT secret via Secrets Manager
+ * In production SESSION_JWT_SECRET can come from Secrets Manager instead of a plain
+ * environment variable (config/secretsManager.ts, infra/secrets.md). Rotating it signs
+ * everyone out; there is no automatic rotation.
  */
 import { SignJWT, jwtVerify } from 'jose';
 import { requireSecret } from '../../config/secrets';

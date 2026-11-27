@@ -10,7 +10,8 @@
  *   3. generateEvaluation        — one-shot, returns structured Evaluation object
  *
  * When MOCK_AI is on, returns canned responses from mockAi.ts instead.
- * TODO: load API key from Secrets Manager (not env var) in production
+ * The API key is read from OPENAI_API_KEY. In production it can come from Secrets Manager
+ * instead of a plain environment variable (config/secretsManager.ts, infra/secrets.md).
  */
 import { Request, Response } from 'express';
 import { sessionDb }     from '../../db/sessionDb';
