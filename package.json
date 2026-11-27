@@ -27,6 +27,7 @@
     "test:sim": "npm run test -w packages/sim-engine && npm run test -w packages/sim-web"
   },
   "devDependencies": {
-    "concurrently": "^8.0.0"
+    "concurrently": "^8.0.0",
+    "vite": "^6.4.6"
   }
 }
