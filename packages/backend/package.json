@@ -20,7 +20,6 @@
     "dotenv": "^16.6.1",
     "express": "^4.18.0",
     "jose": "^5.0.0",
-    "ltijs": "^5.9.0",
     "mammoth": "^1.13.0",
     "pg": "^8.13.0",
     "serverless-http": "^3.2.0",
@@ -32,9 +31,10 @@
     "@types/node": "^20.0.0",
     "@types/pg": "^8.11.0",
     "@types/uuid": "^9.0.0",
-    "esbuild": "^0.20.0",
+    "esbuild": "^0.25.12",
     "tsx": "^4.23.13",
     "typescript": "^5.0.0",
-    "vitest": "^1.6.0"
+    "vite": "^6.4.6",
+    "vitest": "^3.2.7"
   }
 }
