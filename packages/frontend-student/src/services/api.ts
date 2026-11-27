@@ -23,11 +23,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   if (!resp.ok) {
     const text = await resp.text();
-    // Ephemeral demo store: a session record can vanish (redeploy / instance
-    // recycle) while the JWT is still valid. Bounce to the launchpad with a
-    // notice rather than dead-ending on an error inside a phase.
+    // A session record can vanish (redeploy, instance recycle, expiry) while the JWT
+    // is still valid. Go to the exit page, which tells the student to reopen the
+    // activity from Canvas, rather than dead-ending on an error inside a phase. A
+    // session started from the developer launchpad also gets a link back to it.
     if (text.includes('SESSION_NOT_FOUND')) {
-      window.location.assign('/?notice=session-expired');
+      const dev = useSessionStore.getState().persona ? '&dev=1' : '';
+      window.location.assign(`/exit?reason=expired${dev}`);
       return new Promise<T>(() => {}); // navigation in progress
     }
     throw new Error(`API error ${resp.status}: ${text}`);
@@ -53,6 +55,10 @@ export interface CheckinQuestion {
 export const api = {
   session: {
     get:              (id: string)           => request<any>('GET', `/session/${id}`),
+    /** Landing-page status for the token's own session. Always answers normally, even
+     *  when the session has ended, so polling it never sends the page anywhere. */
+    status:           ()                     => request<{ status: 'not_started' | 'in_progress' | 'saved' | 'ended';
+                                                          phaseReached?: number; attemptNumber?: number }>('GET', '/session/status'),
     submitCheckin:    (id: string, responses: any) => request<any>('POST', `/session/${id}/checkin`, { responses }),
     verifySap:        (id: string)           => request<any>('POST', `/session/${id}/verify-sap`),
     verifyStatus:     (id: string)           => request<any>('GET',  `/session/${id}/verify-status`),

@@ -35,6 +35,21 @@ export function DevLaunchPage() {
   const [loadErr,  setLoadErr]  = useState(false);
   const [instructorPreview, setInstructorPreview] = useState(false);
 
+  // "Preview as a Canvas assignment": show the landing page inside a frame on this page,
+  // the way Canvas frames an assignment launch. The landing page asks its host to
+  // resize the frame with the standard LTI message, which is handled here too.
+  const [framedPreview, setFramedPreview] = useState(false);
+  const [framedUrl, setFramedUrl]         = useState<string | null>(null);
+  const [frameHeight, setFrameHeight]     = useState(420);
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.data?.subject === 'lti.frameResize' && typeof e.data.height === 'number')
+        setFrameHeight(Math.max(200, Math.min(2000, Math.ceil(e.data.height))));
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
   // Simulated "Canvas grade column": keys CAP returned on prior launches,
   // stored per persona+module in localStorage by LaunchPage. Passing the
   // key back on relaunch exercises the identity-free resume path.
@@ -98,6 +113,11 @@ export function DevLaunchPage() {
           Instructor preview — show rubric scores on the summary page
           <span style={{ color: '#999' }}>(testing only — students never see this)</span>
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555', marginTop: 10, cursor: 'pointer' }}>
+          <input type="checkbox" checked={framedPreview}
+                 onChange={e => { setFramedPreview(e.target.checked); if (!e.target.checked) setFramedUrl(null); }} />
+          Preview as a Canvas assignment — open the landing page inside a frame on this page
+        </label>
       </section>
 
       <section>
@@ -140,6 +160,11 @@ export function DevLaunchPage() {
               href={`${API_BASE}/dev/launch?moduleId=${encodeURIComponent(m.moduleId)}&persona=${persona}` +
                     (storedKey(m.moduleId) ? `&key=${storedKey(m.moduleId)}` : '') +
                     (instructorPreview ? '&instructor=1' : '')}
+              onClick={e => {
+                if (!framedPreview) return;
+                e.preventDefault();
+                setFramedUrl(`${e.currentTarget.getAttribute('href')}&landing=1`);
+              }}
               style={{
                 padding: '9px 18px', background: '#1D4E8C', color: '#fff',
                 borderRadius: 6, textDecoration: 'none', fontWeight: 600,
@@ -155,6 +180,21 @@ export function DevLaunchPage() {
           <p style={{ color: '#888' }}>Loading modules…</p>
         )}
       </section>
+
+      {framedUrl && (
+        <section style={{ marginTop: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: 17, color: '#333', margin: 0 }}>Simulated Canvas assignment page</h2>
+            <button type="button" onClick={() => setFramedUrl(null)}
+              style={{ border: '1px solid #ccc', background: '#fff', borderRadius: 4, padding: '4px 10px', fontSize: 12 }}>
+              Close frame
+            </button>
+          </div>
+          <iframe key={framedUrl} title="Simulated Canvas assignment frame" src={framedUrl}
+            style={{ width: '100%', height: frameHeight + 2 /* the 1px border on each side */, border: '1px solid #ccc', borderRadius: 6,
+              background: '#fff', marginTop: 10 }} />
+        </section>
+      )}
 
       <p style={{ fontSize: 12, color: '#999', marginTop: 32 }}>
         Demo launchpad — replaces Canvas while LTI registration is pending.

@@ -102,7 +102,9 @@ if (fs.existsSync(studentDist)) {
   app.get(/^\/admin-app(\/.*)?$/, (_req, res) =>
     res.sendFile(path.join(adminDist, 'index.html')));
   app.use(express.static(studentDist));
-  app.get(/^\/(launch|wizard|error|exit)?$/, (_req, res) =>
+  // Every page route of the student app must be listed here, or opening it directly
+  // (or refreshing it) is a 404 in a deployed build, though it works in local dev.
+  app.get(/^\/(launch|landing|wizard|error|exit)?$/, (_req, res) =>
     res.sendFile(path.join(studentDist, 'index.html')));
 }
 

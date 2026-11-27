@@ -10,7 +10,7 @@
  * link back to it, so the demo workflow still works.
  */
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useSessionStore } from '../store/sessionStore';
 
 export type ExitReason = 'saved' | 'finished' | 'expired';
@@ -41,7 +41,15 @@ const COPY: Record<ExitReason, { title: string; body: (days?: number) => string 
 };
 
 export function ExitPage() {
-  const state  = (useLocation().state as ExitState | null) ?? {};
+  // The reason normally arrives as navigation state. A full page load (the API client
+  // sends one when a session has vanished) carries it in the address instead.
+  const [query] = useSearchParams();
+  const navState = (useLocation().state as ExitState | null) ?? {};
+  const state: ExitState = {
+    ...navState,
+    reason: navState.reason ?? (query.get('reason') as ExitReason | null) ?? undefined,
+    dev:    navState.dev ?? query.get('dev') === '1',
+  };
   const reason: ExitReason = state.reason && COPY[state.reason] ? state.reason : 'finished';
   const copy   = COPY[reason];
   const [closeFailed, setCloseFailed] = useState(false);

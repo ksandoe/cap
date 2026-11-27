@@ -226,6 +226,28 @@ export async function getSession(req: Request, res: Response): Promise<void> {
   res.json(safeSession);
 }
 
+/**
+ * GET /session/status — what the landing page in the Canvas frame shows.
+ *
+ * The session comes from the token, never from the address, and the answer is
+ * always 200: a finished or expired session is "ended", not a 404. The landing page
+ * polls this, and a 404 would make the shared client throw the whole frame to
+ * another page. It returns a status and a phase number only: no identifiers, no
+ * addresses, no answers.
+ */
+export async function getLandingStatus(req: Request, res: Response): Promise<void> {
+  const session = await sessionDb.getSession(req.session!.sessionId) as any;
+  const gone = !session || ['COMPLETED', 'EXPIRED', 'INTERRUPTED'].includes(session.state);
+  if (gone) { res.json({ status: 'ended' }); return; }
+
+  const phaseReached = Number(session.phaseReached) || PHASES.CHECKIN;
+  const status =
+    session.state === 'SAVED'         ? 'saved' :
+    phaseReached <= PHASES.CHECKIN    ? 'not_started' :
+                                        'in_progress';
+  res.json({ status, phaseReached, attemptNumber: session.attemptNumber ?? 1 });
+}
+
 export async function submitCheckin(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
   const { responses } = req.body;

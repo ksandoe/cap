@@ -73,6 +73,16 @@ Two choices come from how browsers behave:
 5. That a link inside the framed tool can open a new tab, that a later score overwrites an earlier one, and how the posting policy (automatic or manual) affects when the student sees the grade.
 6. AGS or the scoped API, and the production approval path.
 
+## 7a. Progress
+
+**Landing page, first version (2026-11-30).** Built on the current sign-in mechanism, before the one-time code, the completion record and the grade client exist.
+- A verified launch goes to `/landing` (switch `LTI_LANDING_PAGE=off` sends it to the activity directly, as before). The page checks whether it is inside a frame. In a frame, it shows the activity, the student's stage, and a link with `target="_blank"` that opens the activity in a new tab. As a whole window, it passes straight on to the activity.
+- Status comes from `GET /session/status`, which reads the session from the token and always answers 200, including for a finished or deleted session. The shared API client sends the whole page elsewhere on a 404, so a polled endpoint must never return one.
+- The page asks the host to resize the frame with the standard `lti.frameResize` message.
+- **Not yet possible:** showing "completed", a score or "Return to Canvas". They need the completion record (B3), the grade client (B4) and the return address (B0 confirms it is sent).
+- **Not decided by anyone yet:** whether Canvas reports an assignment launch as framed. The page does not depend on it, because it checks the frame itself. B0's log line (`launch_presentation.document_target`) is still worth reading.
+- **Found while building:** the session routes under `/session/:id` do not check that the id in the address belongs to the token's session, so any valid token can read any session whose id it knows. Ids are random, which limits the risk, but the check should be added (Aliyah's list, David to review). The new status route avoids it by using the token's own session.
+
 ## 8. Open decisions
 
 - What counts as passed, and whether a failed attempt posts 0.0 or nothing.

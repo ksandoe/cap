@@ -77,6 +77,17 @@ export function resolveActivityId(custom: Record<string, unknown>): string | und
   return fallback || undefined;
 }
 
+/**
+ * Where a verified launch sends the browser. The landing page (/landing) decides for
+ * itself: loaded inside a frame (a Canvas assignment) it shows the activity and a
+ * button that opens it in a new tab; loaded as a whole window (the course navigation
+ * link, or an assignment set to open in a new window) it passes straight on to the
+ * activity. LTI_LANDING_PAGE=off sends everyone to the activity directly, as before.
+ */
+export function launchLandingPath(): '/landing' | '/launch' {
+  return process.env.LTI_LANDING_PAGE?.trim().toLowerCase() === 'off' ? '/launch' : '/landing';
+}
+
 export async function handleLaunch(req: Request, res: Response): Promise<void> {
   try {
     // TODO: validate state from body against stored nonce
@@ -111,7 +122,7 @@ export async function handleLaunch(req: Request, res: Response): Promise<void> {
 
     // Redirect student into the React SPA with their session token
     const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/launch?token=${sessionToken}&phase=${redirectPhase}`);
+    res.redirect(`${frontendUrl}${launchLandingPath()}?token=${sessionToken}&phase=${redirectPhase}`);
   } catch (err) {
     logger.error(EVENTS.LTI_LAUNCH_FAILED, { error: String(err) });
     res.status(400).send('LTI launch failed. Please try again from Canvas.');

@@ -60,7 +60,9 @@ devRouter.get('/launch', async (req: Request, res: Response) => {
     // &key=+&persona= ride along so the student SPA can "return" the key to
     // the launchpad's localStorage — standing in for the Canvas grade column.
     const instructor = req.query.instructor === '1' ? '&instructor=1' : '';
-    res.redirect(`${frontendUrl}/launch?token=${sessionToken}&phase=${redirectPhase}&key=${sessionKey}&persona=${persona}${instructor}`);
+    // ?landing=1 sends the browser to the landing page, as a Canvas assignment launch does.
+    const page = req.query.landing === '1' ? '/landing' : '/launch';
+    res.redirect(`${frontendUrl}${page}?token=${sessionToken}&phase=${redirectPhase}&key=${sessionKey}&persona=${persona}${instructor}`);
   } catch (err) {
     logger.error(EVENTS.LTI_LAUNCH_FAILED, { error: String(err), source: 'dev-launch' });
     const code = err instanceof Error ? err.message : 'UNKNOWN';
