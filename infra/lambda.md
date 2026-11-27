@@ -51,7 +51,7 @@ The code can load the sensitive values from Secrets Manager at start-up (`config
 
 Setup, the permission the function's role needs, how to move the values one at a time, and how to roll back are in `infra/secrets.md`. Rules in short:
 - Only these names can come from a secret: `SESSION_JWT_SECRET`, `LEARNER_KEY_SECRET`, `ADMIN_PASSKEY`, `OPENAI_API_KEY`, `SAP_CLIENT_SECRET`, `DATABASE_URL`, `LTI_PRIVATE_KEY`. Anything else in one is ignored, so a secret can never switch on `USE_LOCAL_DB` or repoint a table.
-- A name may be in only one secret; the same name in two is refused.
+- A name may be in only one secret; the same name in two is applied from neither and logged.
 - A variable already set on the function wins over a secret. Move values one at a time, then delete the variable.
-- If any secret cannot be read, nothing is applied and the function does not serve requests; it never falls back to a default.
+- A secret that cannot be read or is malformed is skipped and logged as `[secrets] ERROR`; the site keeps running. The exception is `SESSION_JWT_SECRET` and `LEARNER_KEY_SECRET`: if either is still missing after loading, requests fail (and retry) until it is fixed, because those have public defaults in the source and must never be missing.
 - Only names are logged, never values. Settings that are not secrets (table names, modes, retention) stay environment variables.
