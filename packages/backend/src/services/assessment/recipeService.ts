@@ -8,7 +8,7 @@ import { compileContext } from './contextCompiler';
 import { callModel, extractJson } from './llmProvider';
 import { LLM_MODE }       from '../../config/env';
 import { mockCheckinQuestions } from './mockAi';
-import { normalizeCheckinOptions } from '@cap/shared';
+import { normalizeCheckinOptions, validateCheckinQuestions } from '@cap/shared';
 
 export async function getRecipe(req: Request, res: Response): Promise<void> {
   const recipe = await recipeDb.getActiveRecipe(req.params.moduleId);
@@ -23,6 +23,20 @@ export async function listAllRecipes(_req: Request, res: Response): Promise<void
 
 export async function upsertRecipe(req: Request, res: Response): Promise<void> {
   const body = { ...req.body };
+  // A fixed check-in questionnaire goes to every student, so a malformed one is
+  // refused here instead of being found by a student. An empty list means "no
+  // fixed questionnaire" and is stored as absent.
+  if (body.checkinQuestions !== undefined) {
+    if (Array.isArray(body.checkinQuestions) && body.checkinQuestions.length === 0) {
+      delete body.checkinQuestions;
+    } else {
+      const problems = validateCheckinQuestions(body.checkinQuestions);
+      if (problems.length) {
+        res.status(400).json({ error: 'INVALID_CHECKIN_QUESTIONS', problems });
+        return;
+      }
+    }
+  }
   if (!body.recipeId) body.recipeId = crypto.randomUUID();
   const saved = await recipeDb.saveRecipe(body);
   res.json(saved);

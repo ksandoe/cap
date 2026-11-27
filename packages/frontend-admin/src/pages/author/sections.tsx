@@ -14,9 +14,10 @@ import { adminApi } from '../../services/api';
 import {
   input, lbl, addBtn, smallBtn, move, Move, ListEditor,
   newStep, newBlock, bodyText, BLOCK_LABELS, BlockEditor,
-  AiBadge, HelpBlock,
+  AiBadge, HelpBlock, uid,
 } from '../../components/authoring/editors';
-import type { RecipeDraft, ModuleStep, ContentBlock, Recipe } from '@cap/shared';
+import { normalizeCheckinOptions, validateCheckinQuestions } from '@cap/shared';
+import type { RecipeDraft, ModuleStep, ContentBlock, Recipe, CheckinQuestion } from '@cap/shared';
 
 export interface SectionProps {
   draft:    RecipeDraft;
@@ -229,24 +230,146 @@ export function ActivitySection({ draft, setData, imageUpload }: SectionProps) {
   );
 }
 
+// ── Fixed check-in questionnaire ──────────────────────────────────────────────
+// Every student of the module gets exactly these questions, in this order, on
+// every attempt. A module with none falls back to questions the AI writes anew
+// for each student. The AI is used here only to draft a starting point.
+const THEME_LABEL: Record<string, string> = { past: 'Past experience', present: 'Present', future: 'Future' };
+const LIKERT_DEFAULT = ['1 - Not at all', '2', '3', '4', '5 - Very much'];
+
+function cleanKey(raw: unknown, taken: Set<string>): string {
+  let base = String(raw ?? '').toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50);
+  if (!base) base = `q_${uid()}`;
+  let key = base, n = 2;
+  while (taken.has(key)) key = `${base}_${n++}`;
+  taken.add(key);
+  return key;
+}
+
+function CheckinQuestionsEditor({ draft, setData }: SectionProps) {
+  const d = draft.data;
+  const questions: CheckinQuestion[] = d.checkinQuestions ?? [];
+  const fixed = questions.length > 0;
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState<string | null>(null);
+  const problems = fixed ? validateCheckinQuestions(questions) : [];
+
+  const patch = (i: number, p: Partial<CheckinQuestion>) =>
+    setData({ checkinQuestions: questions.map((q, j) => j === i ? { ...q, ...p } : q) });
+
+  async function generateDraft() {
+    if (fixed && !window.confirm('Replace the current questions with a newly generated draft?')) return;
+    setBusy(true); setErr(null);
+    try {
+      const r = await adminApi.recipe.previewCheckin(draft.moduleId || d.moduleId || 'draft', d);
+      const taken = new Set<string>();
+      setData({ checkinQuestions: (r.questions ?? []).map((q: any): CheckinQuestion => {
+        const responseType = ['likert', 'multiple_choice', 'short_text'].includes(q.responseType) ? q.responseType : 'short_text';
+        const options = responseType === 'short_text' ? undefined : normalizeCheckinOptions(q.options);
+        return {
+          questionKey: cleanKey(q.questionKey, taken),
+          questionText: String(q.questionText ?? ''),
+          responseType,
+          ...(['past', 'present', 'future'].includes(q.theme) ? { theme: q.theme } : {}),
+          ...(options ? { options } : {}),
+        };
+      }) });
+    } catch (e: any) {
+      setErr(`Could not generate a draft: ${e.message}`);
+    } finally { setBusy(false); }
+  }
+
+  function addQuestion() {
+    const taken = new Set(questions.map(q => q.questionKey));
+    setData({ checkinQuestions: [...questions, {
+      questionKey: cleanKey(`q_${uid()}`, taken), questionText: '', theme: 'past', responseType: 'short_text',
+    }] });
+  }
+
+  function changeType(i: number, responseType: CheckinQuestion['responseType']) {
+    const q = questions[i];
+    patch(i, {
+      responseType,
+      options: responseType === 'short_text' ? undefined
+        : q.options?.length ? q.options
+        : responseType === 'likert' ? LIKERT_DEFAULT : ['', ''],
+    });
+  }
+
+  return (
+    <div style={{ border: '1px solid #d6e2dc', borderRadius: 6, padding: 16, background: '#fbfdfc' }}>
+      <h3 style={{ marginTop: 0, fontSize: 15, color: '#085041' }}>Check-in questions</h3>
+      <p style={{ fontSize: 13, color: fixed ? '#1e6b34' : '#8a5a00', marginTop: 0 }}>
+        {fixed
+          ? `Fixed: every student gets these ${questions.length} questions, in this order, every time they take the module.`
+          : 'Not fixed yet: the AI writes new questions for each student, so students see different questions. Generate a draft, edit it, then publish to fix the questions.'}
+      </p>
+      <p style={{ fontSize: 12, color: '#777' }}>
+        Answers are recorded against each question's key, which stays the same when you edit the wording.
+        If you change what a question asks, add a new question instead of editing the old one.
+      </p>
+
+      {questions.map((q, i) => (
+        <div key={q.questionKey} style={{ border: '1px solid #e3e8e5', borderRadius: 6, padding: 10, marginBottom: 10, background: '#fff' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <span style={{ fontWeight: 600, fontSize: 13, minWidth: 22 }}>{i + 1}.</span>
+            <select style={{ ...input, width: 'auto' }} value={q.theme ?? 'past'}
+              onChange={e => patch(i, { theme: e.target.value as CheckinQuestion['theme'] })}>
+              {Object.entries(THEME_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <select style={{ ...input, width: 'auto' }} value={q.responseType}
+              onChange={e => changeType(i, e.target.value as CheckinQuestion['responseType'])}>
+              <option value="short_text">Short text</option>
+              <option value="multiple_choice">Multiple choice</option>
+              <option value="likert">Scale (Likert)</option>
+            </select>
+            <span style={{ fontSize: 11, color: '#999', marginLeft: 'auto' }}>key: {q.questionKey}</span>
+            <Move first={i === 0} last={i === questions.length - 1}
+              onUp={() => setData({ checkinQuestions: move(questions, i, -1) })}
+              onDown={() => setData({ checkinQuestions: move(questions, i, 1) })}
+              onDel={() => setData({ checkinQuestions: questions.filter((_, j) => j !== i) })} />
+          </div>
+          <input style={input} placeholder="Question text" value={q.questionText}
+            onChange={e => patch(i, { questionText: e.target.value })} />
+          {q.responseType !== 'short_text' && (
+            <textarea style={{ ...input, minHeight: 70, marginTop: 6 }} placeholder="One option per line"
+              value={(q.options ?? []).join('\n')}
+              onChange={e => patch(i, { options: e.target.value.split('\n') })} />
+          )}
+        </div>
+      ))}
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button type="button" style={addBtn} onClick={addQuestion}>+ Add question</button>
+        <button type="button" disabled={busy} onClick={generateDraft}
+          style={{ background: '#E6F4F1', color: '#085041', border: 'none', borderRadius: 4,
+            padding: '8px 16px', fontSize: 13, cursor: busy ? 'default' : 'pointer' }}>
+          {busy ? 'Generating…' : fixed ? 'Replace with a new AI draft' : 'Generate a draft with the AI'}
+        </button>
+        {fixed && (
+          <button type="button" style={{ ...smallBtn, color: '#a33' }}
+            onClick={() => window.confirm('Go back to AI-generated questions for each student?')
+              && setData({ checkinQuestions: [] })}>
+            Stop using fixed questions
+          </button>
+        )}
+      </div>
+      {err && <p style={{ color: '#a33', fontSize: 13 }}>{err}</p>}
+      {problems.length > 0 && (
+        <ul style={{ color: '#a33', fontSize: 13, marginBottom: 0 }}>
+          {problems.map(p => <li key={p}>{p}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ── 5. Assessment conversation ────────────────────────────────────────────────
 export function ConversationSection({ draft, setData }: SectionProps) {
   const d = draft.data;
   const probingRules = d.probingRules ?? [];
   const vague        = d.vagueAnswerTriggers ?? [];
   const ai = (f: string) => draft.aiFields.includes(f);
-  const [preview, setPreview] = useState<any[] | 'loading' | null>(null);
-  const [previewErr, setPreviewErr] = useState<string | null>(null);
-
-  async function previewCheckin() {
-    setPreview('loading'); setPreviewErr(null);
-    try {
-      const r = await adminApi.recipe.previewCheckin(draft.moduleId || draft.data.moduleId || 'draft', draft.data);
-      setPreview(r.questions);
-    } catch (e: any) {
-      setPreview(null); setPreviewErr(`Preview failed: ${e.message}`);
-    }
-  }
 
   return (
     <div>
@@ -283,32 +406,7 @@ export function ConversationSection({ draft, setData }: SectionProps) {
         placeholder="e.g. Most students have no prior ERP experience — be patient and scaffolding." />
 
       <div style={{ height: 20 }} />
-      <button type="button" onClick={previewCheckin}
-        style={{ background: '#E6F4F1', color: '#085041', border: 'none',
-          borderRadius: 4, padding: '10px 24px', fontSize: 14, cursor: 'pointer' }}>
-        Preview check-in questions
-      </button>
-      <span style={{ fontSize: 12, color: '#888', marginLeft: 10 }}>
-        Sample questions the AI would generate from this draft — actual questions vary per session.
-      </span>
-
-      {previewErr && <p style={{ color: '#a33', marginTop: 10 }}>{previewErr}</p>}
-      {preview !== null && (
-        <div style={{ border: '1px solid #b7d4c9', borderRadius: 6, padding: 16,
-          background: '#f6fbf9', marginTop: 12 }}>
-          <h3 style={{ marginTop: 0, color: '#085041', fontSize: 15 }}>Sample check-in questions</h3>
-          {preview === 'loading' && <p style={{ color: '#888' }}>Generating…</p>}
-          {Array.isArray(preview) && preview.map((q: any, i: number) => (
-            <div key={i} style={{ marginBottom: 10 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{q.questionText}</div>
-              <div style={{ fontSize: 12, color: '#666' }}>
-                {q.responseType}{q.options ? ` — ${q.options.length} options` : ''}
-              </div>
-            </div>
-          ))}
-          <button style={smallBtn} onClick={() => setPreview(null)}>Close preview</button>
-        </div>
-      )}
+      <CheckinQuestionsEditor draft={draft} setData={setData} imageUpload={() => undefined} />
     </div>
   );
 }
@@ -323,6 +421,8 @@ export function completeness(draft: RecipeDraft): { errs: string[] } {
   if (!d.moduleDescription?.trim())     errs.push('Module basics: description is required.');
   if ((d.learningOutcomes ?? []).filter(o => o.trim()).length < 2)
     errs.push('Learning outcomes: at least 2 are required.');
+  if ((d.checkinQuestions ?? []).length)
+    for (const p of validateCheckinQuestions(d.checkinQuestions)) errs.push(`Check-in questions: ${p}`);
   const steps = d.steps ?? [];
   if (!steps.length) errs.push('Activity steps: at least one step is required.');
   for (const s of steps) {

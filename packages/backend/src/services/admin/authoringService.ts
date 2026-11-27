@@ -14,7 +14,7 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  RecipeDraft, GeneratedRecipe, AuthoringSectionId, SourceMaterial,
+  RecipeDraft, GeneratedRecipe, AuthoringSectionId, SourceMaterial, validateCheckinQuestions,
 } from '@cap/shared';
 import { draftDb }  from '../../db/draftDb';
 import { recipeDb } from '../../db/recipeDb';
@@ -264,6 +264,8 @@ function validateForPublish(draft: RecipeDraft): string[] {
     if (!s.description?.trim()) errs.push(`Step ${s.stepNumber} needs a description.`);
     if (!(s.blocks ?? []).length) errs.push(`Step ${s.stepNumber} has no content blocks.`);
   }
+  if ((d.checkinQuestions ?? []).length)
+    for (const p of validateCheckinQuestions(d.checkinQuestions)) errs.push(`Check-in questions: ${p}`);
   return errs;
 }
 
@@ -290,6 +292,10 @@ export async function publishDraft(req: Request, res: Response): Promise<void> {
     probingRules:      (d.probingRules ?? []).filter(p => p.trigger?.trim()),
     vagueAnswerTriggers: (d.vagueAnswerTriggers ?? []).filter(Boolean),
     toneGuidance:      d.toneGuidance?.trim() || undefined,
+    // The fixed check-in questionnaire. Publishing builds the recipe from a list of
+    // fields, so a field left out here is silently dropped from the next version.
+    // Absent or empty means "not fixed": students get generated questions.
+    checkinQuestions:  (d.checkinQuestions ?? []).length ? d.checkinQuestions : undefined,
     // Source materials ride onto the published recipe as background docs so
     // the conversation keeps the grounding the author generated from.
     backgroundDocs:    d.backgroundDocs ?? (draft.sourceMaterials ?? [])

@@ -331,6 +331,31 @@ function seedAdminUsers(): void {
   );
 }
 
+// The fixed check-in questionnaire: every student gets these, in this order,
+// on every attempt. Drafted by Claude from the themes the model used to be
+// asked for (past 3, present 2, future 2); Parand owns the final wording.
+// Keys stay the same when the wording is edited: answers are recorded by key.
+const SIM_CHECKIN_QUESTIONS = [
+  { questionKey: 'work_experience', theme: 'past', responseType: 'short_text',
+    questionText: 'Briefly describe any work experience you have (jobs, internships, or major class projects). What did you do?' },
+  { questionKey: 'process_experience', theme: 'past', responseType: 'multiple_choice',
+    questionText: 'How much experience do you have with sales or order-handling processes, such as quoting a customer or entering an order?',
+    options: ['None', 'Some exposure through class or work', 'I have worked with them regularly'] },
+  { questionKey: 'software_experience', theme: 'past', responseType: 'multiple_choice',
+    questionText: 'How much have you used business software, such as an ERP system (SAP, Oracle, NetSuite) or a similar business application?',
+    options: ['Never', 'A little', 'Regularly'] },
+  { questionKey: 'concept_knowledge', theme: 'present', responseType: 'likert',
+    questionText: 'How familiar are you with the idea that business documents link to one another, for example a quotation becoming a sales order?',
+    options: ['1 - Not at all familiar', '2', '3 - Somewhat familiar', '4', '5 - Very familiar'] },
+  { questionKey: 'erp_comfort', theme: 'present', responseType: 'likert',
+    questionText: 'How comfortable are you with the idea of finding your way around an enterprise system such as SAP?',
+    options: ['1 - Not comfortable at all', '2', '3', '4', '5 - Very comfortable'] },
+  { questionKey: 'future_encounter', theme: 'future', responseType: 'short_text',
+    questionText: 'Where might you run into a process like this again, such as another course, an internship, or a part-time job?' },
+  { questionKey: 'future_transfer', theme: 'future', responseType: 'short_text',
+    questionText: 'After this module, what would you like to be able to tell a future employer or teammate about working with business software?' },
+];
+
 // Sim variant of the Sales recipe. Instructions are the "assignment brief"
 // layer — the sim screens carry their own per-step text (transactionConfigs),
 // so these focus on the student's specific values and the business framing.
@@ -338,7 +363,16 @@ function seedAdminUsers(): void {
 // docs/sim/lead-in-content.md; Parand owns the final wording (§7.4).
 function seedSimRecipe(): void {
   const recipes = table('cap-recipes');
-  if (recipes.some(r => r.moduleId === SIM_MODULE_ID)) return;
+  const existing = recipes.filter(r => r.moduleId === SIM_MODULE_ID);
+  if (existing.length) {
+    // A local store made before the fixed questionnaire existed: add it to the active
+    // version so the local copy matches a fresh one. This changes the local JSON file
+    // only. The DynamoDB seed script builds its data from a fresh local store, and it
+    // overwrites a deployed recipe only when someone runs it on purpose.
+    const active = existing.find(r => r.isActive);
+    if (active && !active.checkinQuestions) active.checkinQuestions = SIM_CHECKIN_QUESTIONS;
+    return;
+  }
   const now = new Date().toISOString();
   recipes.push({
     recipeId:          uuidv4(),
@@ -350,6 +384,7 @@ function seedSimRecipe(): void {
       'the sales document flow in the simulated SAP environment — Inquiry, ' +
       'Quotation, and Sales Order — and learn why each document exists and how ' +
       'data carries forward.',
+    checkinQuestions: SIM_CHECKIN_QUESTIONS,
     learningOutcomes: [
       'Describe how inquiries, quotations, and sales orders are connected within the SAP sales process.',
       'Complete the inquiry-to-sales-order process in SAP using appropriate customer, product, pricing, and transaction information.',

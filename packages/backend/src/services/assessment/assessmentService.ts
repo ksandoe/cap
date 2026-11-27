@@ -21,7 +21,10 @@ import { compileContext } from './contextCompiler';
 import { platformConfigDb } from '../../db/platformConfigDb';
 import { callModel, extractJson } from './llmProvider';
 import { logger }        from '../eventLogger';
-import { EVENTS, Evaluation, normalizeCheckinOptions } from '@cap/shared';
+import {
+  EVENTS, Evaluation, Recipe, CheckinQuestion,
+  normalizeCheckinOptions, validateCheckinQuestions,
+} from '@cap/shared';
 import { LLM_MODE }      from '../../config/env';
 import { mockCheckinQuestions, mockConversationTurn, mockEvaluation } from './mockAi';
 
@@ -34,11 +37,34 @@ function touch(sessionId: string) {
     .catch(() => { /* non-fatal */ });
 }
 
+/**
+ * The module's fixed check-in questionnaire, or null when it has none (the
+ * questions are then generated per session). A stored questionnaire that does
+ * not pass validation is ignored, not served: it can only get here by a direct
+ * database edit, and a student must never see a malformed question.
+ */
+export function fixedCheckinQuestions(recipe: Recipe | null | undefined): CheckinQuestion[] | null {
+  const stored = recipe?.checkinQuestions;
+  if (!Array.isArray(stored) || stored.length === 0) return null;
+  if (validateCheckinQuestions(stored).length > 0) {
+    logger.warn(EVENTS.CHECKIN_QUESTIONS_INVALID, { moduleId: recipe!.moduleId, version: recipe!.version });
+    return null;
+  }
+  return stored.map(q => ({ ...q, options: normalizeCheckinOptions(q.options) }));
+}
+
 export async function generateCheckinQuestions(req: Request, res: Response): Promise<void> {
   const { sessionId } = req.session!;
   const session = await sessionDb.getSession(sessionId);
   if (!session) { res.status(404).json({ error: 'SESSION_NOT_FOUND' }); return; }
   const recipe  = await recipeDb.getActiveRecipe(session.moduleId);
+
+  // A module with a fixed questionnaire gives every student exactly those
+  // questions, in order, with no model call. Only a module without one falls
+  // back to generating questions per session.
+  const fixed = fixedCheckinQuestions(recipe);
+  if (fixed) { res.json({ questions: fixed, fixed: true }); return; }
+
   const { checkinSystemPrompt } = compileContext(recipe!, session);
 
   const raw = MOCK_AI
