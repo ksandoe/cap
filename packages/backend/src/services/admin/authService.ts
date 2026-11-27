@@ -15,6 +15,8 @@
 import { Request, Response } from 'express';
 import { issueSessionToken }   from '../identity/sessionToken';
 import { platformConfigDb }    from '../../db/platformConfigDb';
+import { logger }              from '../eventLogger';
+import { EVENTS }              from '@cap/shared';
 
 export async function handleAdminLogin(req: Request, res: Response): Promise<void> {
   const { passkey, name } = req.body ?? {};
@@ -26,6 +28,13 @@ export async function handleAdminLogin(req: Request, res: Response): Promise<voi
   // Stored override (set via Admin → Platform settings) wins over the env
   // var; the env var is the bootstrap/default.
   const expected = await platformConfigDb.passkey();
+  if (expected === null) {
+    // A deployed function with no passkey of its own (or only the public development
+    // default): refuse everyone rather than accept a passkey that is written in the source.
+    logger.error(EVENTS.ADMIN_SIGNIN_NOT_CONFIGURED, { hint: 'set ADMIN_PASSKEY on the function' });
+    res.status(503).json({ error: { code: 'ADMIN_NOT_CONFIGURED', message: 'Admin sign-in is not set up on this server.' } });
+    return;
+  }
   if (passkey !== expected) {
     res.status(401).json({ error: { code: 'INVALID_CREDENTIALS', message: 'Incorrect passkey.' } });
     return;
