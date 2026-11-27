@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "tsx watch src/app.ts",
     "build": "tsc && npm run bundle",
-    "bundle": "esbuild dist/lambda/handler.js --bundle --platform=node --target=node20 --outfile=dist/bundle.js",
+    "bundle": "esbuild dist/lambda/handler.js --bundle --platform=node --target=node24 --outfile=dist/bundle.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

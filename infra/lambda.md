@@ -2,7 +2,7 @@
 
 Single Lambda function serves both Student App and Admin App.
 
-- **Runtime**: Node.js 20.x
+- **Runtime**: Node.js 24.x (`nodejs24.x`, confirmed 2026-12). The bundle target in `packages/backend/package.json` and the Node version in `.github/workflows/ci.yml` match it; change all three together.
 - **Handler**: `dist/bundle.js` → `handler`
 - **Memory**: 512 MB
 - **Timeout**: 30 s (Anthropic API calls need headroom)

@@ -12,15 +12,17 @@
 # The student and admin apps have no tests yet, and their `test` script runs vitest in
 # watch mode, so they are deliberately not run here. Add them when they get tests.
 #
-# Node versions: 20 is the runtime the Lambda function runs today, 24 is what developers
-# use locally. When the function moves to Node 22, change 20 to 22 here.
+# Node version: 24, the runtime the Lambda function runs (nodejs24.x) and what developers
+# use locally, so what is tested is what runs. When the function's runtime changes, change
+# the version below, the esbuild --target in packages/backend/package.json, and
+# infra/lambda.md together. To test two versions, make `node-version` a matrix again.
 #
 # No secrets are needed or used. The tests run against a local JSON file store and a
 # model pointed at nothing; nothing here reaches AWS, Canvas or an AI provider.
 #
 # To make this block merging when it fails: GitHub > Settings > Branches > a rule for
-# main > "Require status checks to pass" > add "Build and test (Node 20)" and
-# "Build and test (Node 24)". The names only appear in that list after the first run.
+# main > "Require status checks to pass" > add "Build and test (Node 24)". The name only
+# appears in that list after the first run.
 
 name: CI
 
@@ -40,19 +42,15 @@ concurrency:
 
 jobs:
   test:
-    name: Build and test (Node ${{ matrix.node }})
+    name: Build and test (Node 24)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false          # show both Node versions even when one fails
-      matrix:
-        node: [20, 24]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 24
           cache: npm
 
       - name: Install (exactly the lock file)
