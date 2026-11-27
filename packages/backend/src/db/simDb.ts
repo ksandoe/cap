@@ -29,11 +29,11 @@
  * When USE_LOCAL_DB=true, delegates to the JSON-file store in
  * localStore.ts (same pk/sk item shape).
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
-  DynamoDBDocumentClient, QueryCommand, GetCommand, PutCommand, UpdateCommand,
+  QueryCommand, GetCommand, PutCommand, UpdateCommand,
   BatchWriteCommand,
 } from '@aws-sdk/lib-dynamodb';
+import { makeDocClient } from './ddbClient';
 import { v4 as uuidv4 } from 'uuid';
 import type {
   AssignmentInstance, DocType, NewSimEvent,
@@ -207,7 +207,7 @@ function makeSimStore(items: SimItemTable): SimStore {
 
 // ── DynamoDB adapter ─────────────────────────────────────────────────────────
 
-const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
+const ddb   = makeDocClient();
 const TABLE = process.env.DYNAMODB_TABLE_SIM_STATE!;
 
 const ddbItems: SimItemTable = {

@@ -16,12 +16,12 @@
  * When USE_LOCAL_DB=true, delegates to the JSON-file store in
  * localStore.ts so local dev works without AWS.
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand } from '@aws-sdk/lib-dynamodb';
+import { makeDocClient } from './ddbClient';
 import { USE_LOCAL_DB }  from '../config/env';
 import { localParamDb }  from './localStore';
 
-const ddb   = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
+const ddb   = makeDocClient();
 const TABLE = process.env.DYNAMODB_TABLE_PARAMS!;
 
 const ddbParamDb = {

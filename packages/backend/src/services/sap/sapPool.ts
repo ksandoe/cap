@@ -18,12 +18,12 @@
  * When USE_LOCAL_DB=true, delegates to the JSON-file store in
  * db/localStore.ts so local dev works without AWS.
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { makeDocClient } from '../../db/ddbClient';
 import { USE_LOCAL_DB }  from '../../config/env';
 import { localSapPool }  from '../../db/localStore';
 
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION }));
+const ddb = makeDocClient();
 const TABLE = process.env.DYNAMODB_TABLE_SAP_POOL!;
 
 async function ddbAcquire(sessionId: string): Promise<string> {
