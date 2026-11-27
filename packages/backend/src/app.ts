@@ -28,6 +28,11 @@ import { errorHandler }     from './middleware/errorHandler';
 import { requestLogger }    from './middleware/requestLogger';
 import { authMiddleware }   from './middleware/auth';
 
+/** The student app's page routes that the server must serve index.html for, so that opening
+ *  or refreshing one directly works in a deployed build. Keep in step with the routes in
+ *  packages/frontend-student/src/App.tsx (a test checks). */
+export const STUDENT_PAGES = ['launch', 'landing', 'wizard', 'error', 'exit'] as const;
+
 export const app = express();
 
 app.use(express.json({ limit: '2mb' }));
@@ -102,9 +107,10 @@ if (fs.existsSync(studentDist)) {
   app.get(/^\/admin-app(\/.*)?$/, (_req, res) =>
     res.sendFile(path.join(adminDist, 'index.html')));
   app.use(express.static(studentDist));
-  // Every page route of the student app must be listed here, or opening it directly
-  // (or refreshing it) is a 404 in a deployed build, though it works in local dev.
-  app.get(/^\/(launch|landing|wizard|error|exit)?$/, (_req, res) =>
+  // Every page route of the student app must be in STUDENT_PAGES, or opening it directly
+  // (or refreshing it) is a 404 in a deployed build, though it works in local dev. A test
+  // reads the routes in the student app's App.tsx and fails if one is missing here.
+  app.get(new RegExp(`^/(${STUDENT_PAGES.join('|')})?$`), (_req, res) =>
     res.sendFile(path.join(studentDist, 'index.html')));
 }
 

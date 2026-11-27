@@ -83,21 +83,44 @@ function FramedLanding({ token, search, persona }: { token: string; search: stri
   useEffect(() => {
     if (!moduleId) return;
     let stopped = false;
-    const refresh = () => {
-      if (document.hidden) return;
-      api.session.status()
-        .then(s => { if (!stopped) { setStatus(s); setStatusFailed(false); } })
-        .catch(() => { if (!stopped) setStatusFailed(true); });
+    let failures = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    // One request at a time, scheduled after the last one finishes. Polling stops for
+    // good once the session has ended (it cannot come back) or the token is no longer
+    // accepted (asking again will not help), and slows down after repeated failures
+    // instead of hammering a struggling server. A hidden tab makes no request.
+    const schedule = () => {
+      if (stopped) return;
+      clearTimeout(timer);
+      timer = setTimeout(refresh, failures >= 3 ? POLL_MS * 4 : POLL_MS);
     };
+    const refresh = () => {
+      if (stopped) return;
+      if (document.hidden) { schedule(); return; }
+      api.session.status()
+        .then(s => {
+          if (stopped) return;
+          failures = 0; setStatus(s); setStatusFailed(false);
+          if (s.status === 'ended') { stopped = true; return; }
+          schedule();
+        })
+        .catch((e: Error) => {
+          if (stopped) return;
+          if (/\b401\b/.test(e.message)) { stopped = true; setStatus({ status: 'ended' }); return; }
+          failures += 1; setStatusFailed(true); schedule();
+        });
+    };
+    const wake = () => { if (!stopped && !document.hidden) refresh(); };
+
     refresh();
-    const timer = setInterval(refresh, POLL_MS);
-    document.addEventListener('visibilitychange', refresh);
-    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('focus', wake);
     return () => {
       stopped = true;
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', refresh);
-      window.removeEventListener('focus', refresh);
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('focus', wake);
     };
   }, [moduleId]);
 
@@ -141,7 +164,7 @@ function FramedLanding({ token, search, persona }: { token: string; search: stri
         {status?.status === 'in_progress' &&
           `In progress: you are at the ${PHASE_LABEL[status.phaseReached ?? 1] ?? 'activity'} stage.`}
         {status?.status === 'saved' && 'Your progress is saved. You can continue where you left off.'}
-        {ended && 'This session has ended. If you finished the activity, your work is recorded. To start again, open this assignment in Canvas again.'}
+        {ended && 'This session has ended. If you still need to work on the activity, open this assignment in Canvas again to start a new session.'}
         {statusFailed && (
           <div className="muted" style={{ marginTop: 6 }}>Could not check your progress just now. This page will try again.</div>
         )}

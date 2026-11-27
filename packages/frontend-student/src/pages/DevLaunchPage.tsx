@@ -11,7 +11,7 @@
  * Available when the backend exposes /dev/* (local dev, or a demo build
  * with ENABLE_DEV_ROUTES=true).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { API_BASE } from '../services/api';
 import { APP_VERSION } from '@cap/shared';
@@ -41,9 +41,12 @@ export function DevLaunchPage() {
   const [framedPreview, setFramedPreview] = useState(false);
   const [framedUrl, setFramedUrl]         = useState<string | null>(null);
   const [frameHeight, setFrameHeight]     = useState(420);
+  const frameRef = useRef<HTMLIFrameElement>(null);
   useEffect(() => {
     function onMessage(e: MessageEvent) {
-      if (e.data?.subject === 'lti.frameResize' && typeof e.data.height === 'number')
+      // Only our own frame may resize it, and only to a real number.
+      if (e.source !== frameRef.current?.contentWindow) return;
+      if (e.data?.subject === 'lti.frameResize' && Number.isFinite(e.data.height))
         setFrameHeight(Math.max(200, Math.min(2000, Math.ceil(e.data.height))));
     }
     window.addEventListener('message', onMessage);
@@ -190,7 +193,7 @@ export function DevLaunchPage() {
               Close frame
             </button>
           </div>
-          <iframe key={framedUrl} title="Simulated Canvas assignment frame" src={framedUrl}
+          <iframe ref={frameRef} key={framedUrl} title="Simulated Canvas assignment frame" src={framedUrl}
             style={{ width: '100%', height: frameHeight + 2 /* the 1px border on each side */, border: '1px solid #ccc', borderRadius: 6,
               background: '#fff', marginTop: 10 }} />
         </section>

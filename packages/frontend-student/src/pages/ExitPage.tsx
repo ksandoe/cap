@@ -50,7 +50,10 @@ export function ExitPage() {
     reason: navState.reason ?? (query.get('reason') as ExitReason | null) ?? undefined,
     dev:    navState.dev ?? query.get('dev') === '1',
   };
-  const reason: ExitReason = state.reason && COPY[state.reason] ? state.reason : 'finished';
+  // The reason can now come from the address, so check it is one of ours. A plain
+  // lookup would accept names every object inherits (constructor, toString) and then fail.
+  const reason: ExitReason = state.reason && Object.prototype.hasOwnProperty.call(COPY, state.reason)
+    ? state.reason : 'finished';
   const copy   = COPY[reason];
   const [closeFailed, setCloseFailed] = useState(false);
 

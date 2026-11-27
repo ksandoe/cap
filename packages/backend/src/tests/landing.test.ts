@@ -102,6 +102,21 @@ describe('where a launch lands', () => {
   });
 });
 
+describe('the server\'s list of student pages', () => {
+  // The page routes are only served by name in a deployed build. Dropping one makes a
+  // direct load or a refresh of that page a 404 there, while local dev and every other
+  // test still pass: this happened with /exit. So read the real routes and compare.
+  it('includes every page route in the student app', async () => {
+    const { STUDENT_PAGES } = await import('../app');
+    const appSource = fs.readFileSync(
+      path.resolve(__dirname, '../../../frontend-student/src/App.tsx'), 'utf8');
+    const routes = [...appSource.matchAll(/<Route\s+path="\/([^"]*)"/g)].map(m => m[1]);
+    const pages = routes.filter(r => r !== '' && r !== '*');
+    expect(pages.length).toBeGreaterThan(3);                       // the pattern found the routes
+    for (const page of pages) expect(STUDENT_PAGES, `route /${page}`).toContain(page);
+  });
+});
+
 describe('GET /session/status', () => {
   it('reports a new session as not started', async () => {
     const { token } = await newSession('status-new');
